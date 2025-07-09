@@ -3,6 +3,7 @@ Golang tools, examples, and packages
 
 [![Go Tests](https://github.com/guionardo/go/actions/workflows/go_tests.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go_tests.yml)
 ![coverage](https://raw.githubusercontent.com/guionardo/go/badges/.badges/main/coverage.svg)
+[![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
 
 ## Package path_tools
 
