@@ -5,9 +5,16 @@ Golang tools, examples, and packages
 ![coverage](https://raw.githubusercontent.com/guionardo/go/badges/.badges/main/coverage.svg)
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
 
+## Development
+
+Don't forget to install pre-commit and setup the commit hook.
+
 ## Package path_tools
 
 ```go
-// Create full path, with permissions updated from parent folder.
+// DirExists simply returns true if the pathName is a existing directory
+func DirExists(pathName string) bool
+
+// CreatePath Create full path, with permissions updated from parent folder.
 func CreatePath(path string) error
 ```
