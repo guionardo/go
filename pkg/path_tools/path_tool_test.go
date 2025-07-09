@@ -25,6 +25,9 @@ func TestCreatePath(t *testing.T) {
 	tryWrite := func(base, filename string) error {
 		return os.WriteFile(path.Join(base, filename), []byte{}, 0644)
 	}
+	t.Run("Existing", func(t *testing.T) {
+		assert.NoError(t, CreatePath(tmp))
+	})
 	t.Run("Writable", func(t *testing.T) {
 		writable := path.Join(tmp, "writable")
 		if !assert.NoError(t, CreatePath(writable)) {
@@ -32,8 +35,13 @@ func TestCreatePath(t *testing.T) {
 		}
 		assert.NoError(t, tryWrite(writable, "test.txt"))
 	})
-	t.Run("Unwritable",func(t *testing.T){
-		unwritable=
+
+	t.Run("Unwritable", func(t *testing.T) {
+		unwritable := path.Join(tmp, "unwritable")
+		if !assert.NoError(t, CreatePath(unwritable)) {
+			return
+		}
+		assert.Error(t, tryWrite(unwritable, ""))
 	})
 
 }
