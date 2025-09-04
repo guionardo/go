@@ -17,3 +17,9 @@ func CreatePath(path string) error {
 	}
 	return createPath(path)
 }
+
+// FileExists symply returns true if the fileName is a existing file
+func FileExists(fileName string) bool {
+	stat, err := os.Stat(fileName)
+	return err == nil && !stat.IsDir()
+}
