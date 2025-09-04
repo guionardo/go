@@ -45,3 +45,14 @@ func TestCreatePath(t *testing.T) {
 	})
 
 }
+
+func TestFileExists(t *testing.T) {
+	tmp := t.TempDir()
+	t.Run("Existent", func(t *testing.T) {
+		assert.NoError(t, os.WriteFile(path.Join(tmp, "exist"), []byte{}, 0644))
+		assert.True(t, FileExists(path.Join(tmp, "exist")))
+	})
+	t.Run("Unexistent", func(t *testing.T) {
+		assert.False(t, FileExists(path.Join(tmp, "unexist")))
+	})
+}
