@@ -17,4 +17,7 @@ func DirExists(pathName string) bool
 
 // CreatePath Create full path, with permissions updated from parent folder.
 func CreatePath(path string) error
+
+// FileExists symply returns true if the fileName is a existing file
+func FileExists(fileName string) bool
 ```
