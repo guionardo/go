@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: no-commit-to-branch
         args: ["--branch", "main"]
@@ -21,3 +21,7 @@ repos:
       - id: commitlint
         stages: [commit-msg]
         additional_dependencies: ["@commitlint/config-conventional"]
+  - repo: https://github.com/guionardo/govuln
+    rev: v0.0.11
+    hooks:
+      - id: go-vulncheck
