@@ -23,4 +23,7 @@ func FileExists(fileName string) bool
 
 // Set values methods
 type Set[T comparable] map[T]struct{}
+
+// Machine ID
+func MachineID() string
 ```
