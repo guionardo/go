@@ -7,44 +7,50 @@ import (
 	"strings"
 )
 
+var collectFuncs = []func() (string, error){collectHostnamectl, collectEtcMachineId, collectDbusMachineId}
+
 // MachineID in linux use hostnamectl, /var/lib/dbus/machine-id, or /etc/machine-id
 func MachineID() string {
-	if c, err := collectHostnamectl(); err == nil {
-		return c
-	}
-	if c, err := collectDbusMachineId(); err == nil {
-		return c
-	}
-	if c, err := collectEtcMachineId(); err == nil {
-		return c
+	for _, cf := range collectFuncs {
+		if c, err := cf(); err == nil {
+			return c
+		}
 	}
 	return ""
 }
 
-func collectHostnamectl() (string, error) {
+func outErr(out string, funcName string) (string, error) {
+	var err error
+	if len(out) == 0 {
+		err = errors.New(funcName)
+	}
+	return out, err
+}
+
+func collectHostnamectl() (out string, err error) {
 	cmd := exec.Command("hostnamectl", "status")
 	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	for line := range strings.SplitSeq(string(output), "\n") {
-		if w := strings.Split(line, ":"); len(w) == 2 && strings.TrimSpace(strings.ToLower(w[0])) == "machine id" {
-			return strings.TrimSpace(w[1]), nil
+	if err == nil {
+		for line := range strings.SplitSeq(string(output), "\n") {
+			if w := strings.Split(line, ":"); len(w) == 2 && strings.TrimSpace(strings.ToLower(w[0])) == "machine id" {
+				out = strings.TrimSpace(w[1])
+				break
+			}
 		}
 	}
-	return "", errors.New("hostnamectl")
+	return outErr(out, "hostnamectl")
 }
 
-func collectDbusMachineId() (string, error) {
+func collectDbusMachineId() (out string, err error) {
 	if content, err := os.ReadFile("/var/lib/dbus/machine-id"); err == nil {
-		return string(content), nil
+		out = string(content)
 	}
-	return "", errors.New("dbus")
+	return outErr(out, "dbus")
 }
 
-func collectEtcMachineId() (string, error) {
+func collectEtcMachineId() (out string, err error) {
 	if content, err := os.ReadFile("/etc/machine-id"); err == nil {
-		return string(content), nil
+		out = string(content)
 	}
-	return "", errors.New("etc")
+	return outErr(out, "etc")
 }

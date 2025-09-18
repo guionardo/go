@@ -1,6 +1,7 @@
 package mid_test
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/guionardo/go/pkg/mid"
@@ -9,5 +10,6 @@ import (
 
 func TestMachineID(t *testing.T) {
 	got := mid.MachineID()
+	t.Logf("MachineId [%s] () = %s", runtime.GOOS, got)
 	assert.NotEmpty(t, got)
 }
