@@ -26,4 +26,9 @@ type Set[T comparable] map[T]struct{}
 
 // Machine ID
 func MachineID() string
+
+// FindFileInPath searches for a file in the paths from the PATH environment variable
+// returns the first occurrence or error
+// Handles OS-specific path separators
+func FindFileInPath(filename string) (string, error)
 ```
