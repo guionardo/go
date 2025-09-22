@@ -1,6 +1,7 @@
 # go
 Golang tools, examples, and packages
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/guionardo/go.svg)](https://pkg.go.dev/github.com/guionardo/go)
 [![Go Tests](https://github.com/guionardo/go/actions/workflows/go_tests.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go_tests.yml)
 ![coverage](https://raw.githubusercontent.com/guionardo/go/badges/.badges/main/coverage.svg)
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
@@ -16,6 +17,19 @@ Simplify logic flows
 ```go
 // If is a generic ternary operator
 func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T
+```
+
+## Package fraction
+
+This package is originally a work of Miguel Dorta [go-fraction](https://github.com/nethruster/go-fraction).
+
+I needed to encapsulate in this repository due to release name restrictions.
+
+```go
+// Fraction represents a fraction. It is an immutable type.
+//
+// It is always a valid fraction (never x/0) and it is always simplified.
+type Fraction struct
 ```
 
 ## Package mid
@@ -58,3 +72,7 @@ Generic set struct
 // Set values methods
 type Set[T comparable] map[T]struct{}
 ```
+
+## 🤝 Contributing
+
+Bugs or contributions on new features can be made in the [issues page](https://github.com/guionardo/go/issues).
