@@ -41,7 +41,7 @@ func isCadastro(
 	size int,
 	position int,
 ) bool {
-	removeNonDigitAndLetters(&doc)
+	RemoveNonDigitAndLetters(&doc)
 
 	if !pattern.MatchString(doc) {
 		return false
@@ -82,7 +82,8 @@ func calcCadastroDigit(doc string, position int) string {
 	return strconv.Itoa(11 - sum)
 }
 
-func removeNonDigitAndLetters(value *string) {
+// RemoveNonDigitAndLetters updates the value, keeping only 0-9, A-Z characters
+func RemoveNonDigitAndLetters(value *string) {
 	buf := bytes.NewBufferString("")
 	for _, r := range *value {
 		if ('0' <= r && r <= '9') || ('A' <= r && r <= 'Z') {

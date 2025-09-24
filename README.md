@@ -22,6 +22,9 @@ func IsCPF(doc string) bool
 // IsCNPJ verifies if the given string is a valid CNPJ document.
 // Punctuation will be automatically removed. Rules for new alfanumeric format.
 func IsCNPJ(doc string) bool
+
+// RemoveNonDigitAndLetters updates the value, keeping only 0-9, A-Z characters
+func RemoveNonDigitAndLetters(value *string)
 ```
 
 ## Package flow
