@@ -6,14 +6,13 @@ import (
 	"strconv"
 )
 
-// "Cadastro" will be used internally to define both CPF and CNPJ.
-
 var (
 	cpfRegexp  = regexp.MustCompile(`^\d{11}$`)
 	cnpjRegexp = regexp.MustCompile(`^[0-9A-Z]{12}\d{2}$`)
 )
 
 // IsCPF verifies if the given string is a valid CPF document.
+// Punctuation will be automatically removed
 func IsCPF(doc string) bool {
 	const (
 		size = 9
@@ -24,6 +23,7 @@ func IsCPF(doc string) bool {
 }
 
 // IsCNPJ verifies if the given string is a valid CNPJ document.
+// Punctuation will be automatically removed. Rules for new alfanumeric format.
 func IsCNPJ(doc string) bool {
 	const (
 		size = 12

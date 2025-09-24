@@ -15,7 +15,13 @@ Don't forget to install pre-commit and setup the commit hook.
 Validation for CPF and CNPJ
 
 ```go
+// IsCPF verifies if the given string is a valid CPF document.
+// Punctuation will be automatically removed
+func IsCPF(doc string) bool
 
+// IsCNPJ verifies if the given string is a valid CNPJ document.
+// Punctuation will be automatically removed. Rules for new alfanumeric format.
+func IsCNPJ(doc string) bool
 ```
 
 ## Package flow
