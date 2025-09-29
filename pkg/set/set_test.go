@@ -91,4 +91,11 @@ func TestSet_Set(t *testing.T) {
 		assert.False(t, s.HasAll(1, 2, 4))
 	})
 
+	t.Run("test_add_remove_value", func(t *testing.T) {
+		s := set.New(1, 2, 3)
+		assert.True(t, s.HasAll(1, 2, 3))
+
+		s.Remove(2)
+		assert.False(t, s.Has(2))
+	})
 }

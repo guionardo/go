@@ -29,6 +29,11 @@ func (s Set[T]) AddMultiple(values ...T) Set[T] {
 	return s
 }
 
+// Remove value from set
+func (s Set[T]) Remove(v T) {
+	delete(s, v)
+}
+
 // Union two sets to create a new set with all values
 func (s Set[T]) Union(another Set[T]) Set[T] {
 	out := New(s.ToArray()...).UpdateFrom(another)
