@@ -132,3 +132,11 @@ func (s Set[T]) Equals(another Set[T]) bool {
 	}
 	return true
 }
+
+// Clear empties all itens
+func (s Set[T]) Clear() {
+	keys := s.ToArray()
+	for _, key := range keys {
+		delete(s, key)
+	}
+}

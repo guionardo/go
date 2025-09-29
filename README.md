@@ -90,6 +90,8 @@ Generic set struct
 type Set[T comparable] map[T]struct{}
 ```
 
+`Set[T]` can be [un]marshaled
+
 ## 🤝 Contributing
 
 Bugs or contributions on new features can be made in the [issues page](https://github.com/guionardo/go/issues).
