@@ -1,6 +1,6 @@
 package flow
 
-// Default returns the second argument (valueIfZero) when the value has the default (zero)
+// Default returns valueIfZero if value equals the zero value for type T, otherwise returns value.
 func Default[T comparable](value T, valueIfZero T) T {
 	var zero T
 	if value == zero {
