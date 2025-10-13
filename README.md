@@ -32,6 +32,9 @@ func RemoveNonDigitAndLetters(value *string)
 Simplify logic flows
 
 ```go
+// Default returns the second argument (valueIfZero) when the value has the default (zero)
+func Default[T comparable](value T, valueIfZero T) T
+
 // If is a generic ternary operator
 func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T
 ```
