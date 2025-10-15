@@ -96,12 +96,8 @@ type Set[T comparable] map[T]struct{}
 `Set[T]` can be [un]marshaled and respects the Scanner and Valuer interfaces
 
 ```go
-type Scanner interface {
-	Scan(value interface{}) error
-}
-type Valuer interface {
-	Value() (driver.Value, error)
-}
+type Scanner = database/sql.Scanner
+type Valuer = database/sql/driver.Valuer
 ```
 
 ## 🤝 Contributing
