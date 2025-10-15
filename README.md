@@ -93,7 +93,12 @@ Generic set struct
 type Set[T comparable] map[T]struct{}
 ```
 
-`Set[T]` can be [un]marshaled
+`Set[T]` can be [un]marshaled and respects the Scanner and Valuer interfaces
+
+```go
+type Scanner = database/sql.Scanner
+type Valuer = database/sql/driver.Valuer
+```
 
 ## 🤝 Contributing
 
