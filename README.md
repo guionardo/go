@@ -112,8 +112,8 @@ func main() {
     args := shell_tools.NewQuotedShellArgs(input)
 
     // args is a QuotedShellArgs (slice of strings)
-    fmt.Printf("%q\n", []string(args)) // ["one" "two three" "four five" "six\\ seven"]
-    fmt.Println(args.String())         // one "two three" "four five" six\ seven
+    fmt.Printf("%q\n", []string(args)) // ["one" "two three" "four five" "six seven"]
+    fmt.Println(args.String())         // one "two three" "four five" "six seven"
 }
 ```
 
