@@ -35,6 +35,10 @@ func NewQuotedShellArgs(s string) QuotedShellArgs {
 				// found closing quote
 				parts = append(parts, s[pq+1:pq+1+p1])
 				s = s[pq+1+p1+1:]
+			} else {
+				// no closing quote found, treat rest as a single argument
+				parts = append(parts, s[pq+1:])
+				break
 			}
 		} else {
 			// add preceding unquoted words
