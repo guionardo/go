@@ -83,6 +83,39 @@ func FileExists(fileName string) bool
 func FindFileInPath(filename string) (string, error)
 ```
 
+## Package shell_tools
+
+Utilities to parse and reconstruct simple shell-like argument lists.
+
+- Type: `QuotedShellArgs` — a []string wrapper that holds parsed arguments.
+- Constructor: `NewQuotedShellArgs(s string) QuotedShellArgs` — parse input string into `QuotedShellArgs`.
+- Method: `QuotedShellArgs.String() string` — join arguments back into a shell-safe string (quotes added as needed).
+
+Behavior:
+- Supports single `'` and double `"` quotes. Quotes are removed from parsed arguments.
+- Splits on whitespace.
+- Reconstructs a shell-like string adding quotes only when needed.
+
+Example:
+
+```go
+package main
+
+import (
+    "fmt"
+
+    "github.com/guionardo/go/pkg/shell_tools"
+)
+
+func main() {
+    input := `one "two three" 'four five' six\ seven`
+    args := shell_tools.NewQuotedShellArgs(input)
+
+    // args is a QuotedShellArgs (slice of strings)
+    fmt.Printf("%q\n", []string(args)) // ["one" "two three" "four five" "six seven"]
+    fmt.Println(args.String())         // one "two three" "four five" "six seven"
+}
+```
 
 ## Package set
 
