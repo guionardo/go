@@ -85,7 +85,8 @@ func TestQuotedShellArgs(t *testing.T) {
 			s:          "\"hello\"'world'",
 			want:       QuotedShellArgs{"hello", "world"},
 			wantJoined: "hello world",
-		}, {
+		},
+		{
 			name:       "escaped quotes",
 			s:          `one "two three" 'four five' six\ seven`,
 			want:       QuotedShellArgs{"one", "two three", "four five", "six seven"},
