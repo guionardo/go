@@ -3,8 +3,7 @@ package pathtools
 import (
 	"errors"
 	"os"
-	"path"
-	"runtime"
+	"path/filepath"
 )
 
 var ErrNotAGoProject = errors.New("not a golang project")
@@ -22,15 +21,18 @@ func GetRootFolder(base string) (rootFolder string, err error) {
 		return "", os.ErrNotExist
 	}
 
-	for len(base) > 0 {
-		if FileExists(path.Join(base, "go.mod")) {
+	for {
+		if FileExists(filepath.Join(base, "go.mod")) {
 			return base, nil
 		}
 
-		base = path.Dir(base)
-		if (runtime.GOOS == "windows" && len(base) == 3) || len(base) == 1 {
-			base = ""
+		parent := filepath.Dir(base)
+		// Stop if we've reached the root directory
+		if parent == base {
+			break
 		}
+
+		base = parent
 	}
 
 	return "", ErrNotAGoProject
