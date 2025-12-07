@@ -64,7 +64,7 @@ install-swaggo:
 install-go-test-coverage:
 	@echo  "\n🛠️  \033[30;42m INSTALLING GO-TEST-COVERAGE \033[0m"
 	@go install github.com/vladopajic/go-test-coverage/v2@latest
-	@if [ -f .testcoverate.yml ]; then \
+	@if [ -f .testcoverage.yml ]; then \
 		echo "go-test-coverage config file already exists."; \
 	else \
 		echo "Creating default go-test-coverage config file..."; \
