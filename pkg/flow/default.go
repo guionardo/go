@@ -6,5 +6,6 @@ func Default[T comparable](value T, valueIfZero T) T {
 	if value == zero {
 		return valueIfZero
 	}
+
 	return value
 }

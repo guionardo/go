@@ -1,4 +1,6 @@
+// Package fraction provides an immutable fraction type with basic arithmetic operations.
 // Original source code from: https://github.com/nethruster/go-fraction
+// nolint:mnd
 package fraction
 
 import (
@@ -6,18 +8,31 @@ import (
 	"math"
 )
 
-// Fraction represents a fraction. It is an immutable type.
-//
-// It is always a valid fraction (never x/0) and it is always simplified.
-type Fraction struct {
-	numerator   int64
-	denominator int64
-}
+type (
+	// Fraction represents a fraction. It is an immutable type.
+	//
+	// It is always a valid fraction (never x/0) and it is always simplified.
+	Fraction struct {
+		numerator   int64
+		denominator int64
+	}
 
-// integer is a generic interface that represents all the integer types of Go.
-type integer interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
-}
+	// integer is a generic interface that represents all the integer types of Go.
+	integer interface {
+		int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+	}
+)
+
+const (
+	float64Min     = -9.223372036854775e+18
+	float64Max     = 9.223372036854775e+18
+	float64ZeroMin = -2.168404344971009e-19
+	float64ZeroMax = 2.168404344971009e-19
+
+	shift52 = 52
+	shift62 = 62
+	shift63 = 63
+)
 
 var (
 	// ErrDivideByZero is returned when trying to divide by a fraction with a value of 0.
@@ -44,16 +59,19 @@ func New[T, K integer](numerator T, denominator K) (Fraction, error) {
 	if denominator == 0 {
 		return zeroValue, ErrZeroDenominator
 	}
+
 	if numerator == 0 {
 		return zeroValue, nil
 	}
 
 	n := int64(numerator)
+
 	d := int64(denominator)
 	if d < 0 {
 		d *= -1
 		n *= -1
 	}
+
 	gcf := gcd(abs(n), d)
 
 	return Fraction{
@@ -68,25 +86,27 @@ func New[T, K integer](numerator T, denominator K) (Fraction, error) {
 // function will try to approximate it as much as possible, but some precision may be lost.
 //
 // If a NaN is provided, ErrInvalid will be returned.
-func FromFloat64(f float64) (Fraction, error) {
+func FromFloat64(f float64) (Fraction, error) { //nolint:cyclop
 	if math.IsNaN(f) {
 		return zeroValue, ErrInvalid
 	}
-	if f < -9.223372036854775e+18 || f > 9.223372036854775e+18 {
+
+	if f < float64Min || f > float64Max {
 		return zeroValue, ErrOutOfRange
 	}
-	if f > -2.168404344971009e-19 && f < 2.168404344971009e-19 {
+
+	if f > float64ZeroMin && f < float64ZeroMax {
 		return zeroValue, nil
 	}
 
 	// Decompose float64
 	bits := math.Float64bits(f)
-	isNegative := bits&(1<<63) != 0
-	exp := int64((bits>>52)&(1<<11-1)) - 1023
-	mantissa := (bits & (1<<52 - 1)) | 1<<52 // Since we discarded tiny values, it'll never be denormalized.
+	isNegative := bits&(1<<shift63) != 0
+	exp := int64((bits>>shift52)&(1<<11-1)) - 1023
+	mantissa := (bits & (1<<shift52 - 1)) | 1<<shift52 // Since we discarded tiny values, it'll never be denormalized.
 
 	// Amount of times to shift the mantissa to the right to compensate for the exponent
-	shift := 52 - exp
+	shift := shift52 - exp
 
 	// Reduce shift and mantissa as far as we can
 	for mantissa&1 == 0 && shift > 0 {
@@ -104,16 +124,17 @@ func FromFloat64(f float64) (Fraction, error) {
 
 	// Shift that require larger shifts that what an int64 can hold, or larger than the mantissa itself, will be
 	// approximated splitting it between the numerator and denominator.
-	if shiftD > 62 {
-		shiftD = 62
-		shiftN = shift - 62
-	} else if shiftN > 52 {
-		shiftN = 52
-		shiftD = shift - 52
+	if shiftD > shift62 {
+		shiftD = shift62
+		shiftN = shift - shift62
+	} else if shiftN > shift52 {
+		shiftN = shift52
+		shiftD = shift - shift52
 	}
 
 	numerator, denominator := int64(mantissa), int64(1)
 	denominator <<= shiftD
+
 	if shiftN < 0 {
 		numerator <<= -shiftN
 	} else {
@@ -123,12 +144,14 @@ func FromFloat64(f float64) (Fraction, error) {
 	if isNegative {
 		numerator *= -1
 	}
+
 	return New(numerator, denominator)
 }
 
 // Add adds both fractions and returns the result.
 func (f1 Fraction) Add(f2 Fraction) Fraction {
 	m := lcm(f1.denominator, f2.denominator)
+
 	return Fraction{
 		numerator:   f1.numerator*(m/f1.denominator) + f2.numerator*(m/f2.denominator),
 		denominator: m,
@@ -143,6 +166,7 @@ func (f1 Fraction) Divide(f2 Fraction) (Fraction, error) {
 	if err != nil {
 		err = ErrDivideByZero
 	}
+
 	return f, err
 }
 
@@ -183,6 +207,7 @@ func abs[T integer](n T) T {
 	if n < 0 {
 		return -n
 	}
+
 	return n
 }
 
@@ -191,6 +216,7 @@ func gcd(n1, n2 int64) int64 {
 	for n2 != 0 {
 		n1, n2 = n2, n1%n2
 	}
+
 	return n1
 }
 
@@ -200,5 +226,6 @@ func lcm(n1, n2 int64) int64 {
 	if n1 > n2 {
 		n1, n2 = n2, n1
 	}
+
 	return n1 * (n2 / gcd(n1, n2))
 }

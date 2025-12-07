@@ -13,6 +13,7 @@ var emptyStruct = struct{}{}
 func New[T comparable](values ...T) Set[T] {
 	s := make(Set[T], len(values))
 	s.AddMultiple(values...)
+
 	return s
 }
 
@@ -21,11 +22,11 @@ func (s Set[T]) Add(v T) {
 	s[v] = emptyStruct
 }
 
-// Add multiple values to set
 func (s Set[T]) AddMultiple(values ...T) Set[T] {
 	for _, value := range values {
 		s.Add(value)
 	}
+
 	return s
 }
 
@@ -43,27 +44,32 @@ func (s Set[T]) Union(another Set[T]) Set[T] {
 // Diff results a Set with values that are not common to two sets
 func (s Set[T]) Diff(another Set[T]) Set[T] {
 	out := Set[T]{}
+
 	for v := range s.Iter() {
 		if !another.Has(v) {
 			out.Add(v)
 		}
 	}
+
 	for v := range another.Iter() {
 		if !s.Has(v) {
 			out.Add(v)
 		}
 	}
+
 	return out
 }
 
 // Intersection results a Set with values common to the two sets
 func (s Set[T]) Intersection(another Set[T]) Set[T] {
 	out := Set[T]{}
+
 	for v := range s {
 		if another.Has(v) {
 			out.Add(v)
 		}
 	}
+
 	return out
 }
 
@@ -84,6 +90,7 @@ func (s Set[T]) UpdateFrom(another Set[T]) Set[T] {
 	for k := range another.Iter() {
 		s.Add(k)
 	}
+
 	return s
 }
 
@@ -93,6 +100,7 @@ func (s Set[T]) ToArray() []T {
 	for v := range s.Iter() {
 		a = append(a, v)
 	}
+
 	return a
 }
 
@@ -109,6 +117,7 @@ func (s Set[T]) HasAll(values ...T) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -130,11 +139,13 @@ func (s Set[T]) Equals(another Set[T]) bool {
 	if len(s) != len(another) {
 		return false
 	}
+
 	for v := range s {
 		if !another.Has(v) {
 			return false
 		}
 	}
+
 	return true
 }
 

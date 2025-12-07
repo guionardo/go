@@ -16,6 +16,7 @@ func MachineID() string {
 			return c
 		}
 	}
+
 	return ""
 }
 
@@ -24,11 +25,13 @@ func outErr(out string, funcName string) (string, error) {
 	if len(out) == 0 {
 		err = errors.New(funcName)
 	}
+
 	return out, err
 }
 
 func collectHostnamectl() (out string, err error) {
 	cmd := exec.Command("hostnamectl", "status")
+
 	output, err := cmd.Output()
 	if err == nil {
 		for line := range strings.SplitSeq(string(output), "\n") {
@@ -38,6 +41,7 @@ func collectHostnamectl() (out string, err error) {
 			}
 		}
 	}
+
 	return outErr(out, "hostnamectl")
 }
 
@@ -45,6 +49,7 @@ func collectDbusMachineId() (out string, err error) {
 	if content, err := os.ReadFile("/var/lib/dbus/machine-id"); err == nil {
 		out = string(content)
 	}
+
 	return outErr(out, "dbus")
 }
 
@@ -52,5 +57,6 @@ func collectEtcMachineId() (out string, err error) {
 	if content, err := os.ReadFile("/etc/machine-id"); err == nil {
 		out = string(content)
 	}
+
 	return outErr(out, "etc")
 }

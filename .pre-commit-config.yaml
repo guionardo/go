@@ -15,13 +15,15 @@ repos:
       - id: no-go-testing
       - id: golangci-lint
       - id: go-unit-tests
-  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v9.22.0
+  - repo: local
     hooks:
       - id: commitlint
+        name: Commit Lint
+        entry: commitlint lint --message
         stages: [commit-msg]
-        additional_dependencies: ["@commitlint/config-conventional"]
+        language: system
+        description: "Commit Lint to Conventional Commits pattern"
   - repo: https://github.com/guionardo/govuln
-    rev: v0.0.11
+    rev: v0.1.0
     hooks:
       - id: go-vulncheck

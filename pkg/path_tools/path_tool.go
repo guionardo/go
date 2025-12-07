@@ -15,6 +15,7 @@ func CreatePath(path string) error {
 	if DirExists(path) {
 		return nil
 	}
+
 	return createPath(path)
 }
 

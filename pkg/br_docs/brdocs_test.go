@@ -8,6 +8,8 @@ import (
 )
 
 func TestIsCPF(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
@@ -21,6 +23,8 @@ func TestIsCPF(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := brdocs.IsCPF(tt.doc)
 			assert.Equal(t, tt.want, got)
 		})
@@ -28,6 +32,8 @@ func TestIsCPF(t *testing.T) {
 }
 
 func TestIsCNPJ(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
@@ -41,6 +47,8 @@ func TestIsCNPJ(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := brdocs.IsCNPJ(tt.doc)
 			assert.Equal(t, tt.want, got)
 		})

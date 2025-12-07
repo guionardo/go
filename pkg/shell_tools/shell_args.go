@@ -23,56 +23,86 @@ func NewQuotedShellArgs(s string) QuotedShellArgs {
 			parts = append(parts, strings.Fields(s)...)
 			break
 		}
-		if pq == 0 {
-			// search for closing quote
-			p1 := strings.Index(s[pq+1:], string(s[pq]))     // find closing quote
-			p2 := strings.Index(s[pq+1:], string(s[pq])+" ") // find closing quote followed by space
-			if p2 > -1 {
-				// prefer closing quote followed by space
-				parts = append(parts, s[pq+1:pq+1+p2])
-				s = s[pq+1+p2+1:]
-			} else if p1 > -1 {
-				// found closing quote
-				parts = append(parts, s[pq+1:pq+1+p1])
-				s = s[pq+1+p1+1:]
+
+		if pq != 0 {
+			// add preceding unquoted word (if any)
+			if fields := strings.Fields(s); len(fields) > 0 {
+				parts = append(parts, fields[0])
+				s = s[len(fields[0]):]
 			} else {
-				// no closing quote found, treat rest as a single argument
-				parts = append(parts, s[pq+1:])
-				break
+				// fallback to avoid infinite loop
+				s = s[1:]
 			}
-		} else {
-			// add preceding unquoted words
-			if part := strings.Fields(s); len(part) > 0 {
-				parts = append(parts, part[0])
-				s = s[len(part[0]):]
-			}
+
+			s = strings.TrimSpace(s)
+
+			continue
 		}
-		s = strings.TrimSpace(s)
+
+		// pq == 0: extract quoted argument and remaining string
+		arg, rest := extractQuotedPrefix(s)
+		parts = append(parts, arg)
+		s = strings.TrimSpace(rest)
 	}
+
 	// restore escaped spaces
 	for i, part := range parts {
 		parts[i] = strings.ReplaceAll(part, `\0`, ` `)
 	}
+
 	return parts
 }
 
+// extractQuotedPrefix assumes s starts with a quote (single or double) and returns
+// the unquoted argument and the remaining string after consuming the closing quote
+// and an optional following space; if no closing quote is found, the rest is empty.
+func extractQuotedPrefix(s string) (string, string) {
+	if len(s) == 0 {
+		return "", ""
+	}
+
+	quote := s[0]
+	restSub := s[1:]
+	// prefer closing quote followed by space
+	if p2 := strings.Index(restSub, string(quote)+" "); p2 > -1 {
+		arg := restSub[:p2]
+		rest := s[p2+2:] // skip closing quote and following space
+
+		return arg, rest
+	}
+	// otherwise find any closing quote
+	if p1 := strings.Index(restSub, string(quote)); p1 > -1 {
+		arg := restSub[:p1]
+		rest := s[p1+2:] // skip closing quote
+
+		return arg, rest
+	}
+	// no closing quote found, treat rest as single argument
+	return restSub, ""
+}
+
 func (q QuotedShellArgs) String() string {
-	if len(q) < 2 {
+	if len(q) < 2 { //nolint:mnd
 		return strings.Join(q, " ")
 	}
+
 	var sb strings.Builder
+
 	for i, arg := range q {
 		if i > 0 {
 			sb.WriteRune(' ')
 		}
+
 		if !strings.Contains(arg, " ") {
 			sb.WriteString(arg)
 			continue
 		}
+
 		if strings.Contains(arg, "\"") {
 			sb.WriteString("'" + arg + "'")
 			continue
 		}
+
 		sb.WriteString("\"" + arg + "\"")
 	}
 

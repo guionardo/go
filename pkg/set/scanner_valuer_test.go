@@ -4,69 +4,76 @@ import (
 	"testing"
 
 	"github.com/guionardo/go/pkg/set"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSet_ScanValue(t *testing.T) {
+	t.Parallel()
+
 	set1 := set.New(1, 2, 3)
 	set2 := set.New[int]()
 
 	value, err := set1.Value()
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	err = set2.Scan(value)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
-	assert.True(t, set1.Equals(set2))
-
+	require.True(t, set1.Equals(set2))
 }
 
 func TestSet_Scan_InvalidType(t *testing.T) {
+	t.Parallel()
+
 	set1 := set.New[int]()
 	err := set1.Scan(123)
-	assert.Error(t, err)
-	assert.Equal(t, "invalid type for scan", err.Error())
+	require.Error(t, err)
+	require.Equal(t, "invalid type for scan", err.Error())
 }
 
 func TestSet_Scan_StringJSON(t *testing.T) {
+	t.Parallel()
+
 	set1 := set.New[string]()
 	jsonStr := `["a","b","c"]`
 	err := set1.Scan(jsonStr)
-	assert.NoError(t, err)
-	assert.True(t, set1.Equals(set.New("a", "b", "c")))
+	require.NoError(t, err)
+	require.True(t, set1.Equals(set.New("a", "b", "c")))
 }
 
 func TestSet_Scan_ByteJSON(t *testing.T) {
+	t.Parallel()
+
 	set1 := set.New[string]()
 	jsonBytes := []byte(`["x","y"]`)
 	err := set1.Scan(jsonBytes)
-	assert.NoError(t, err)
-	assert.True(t, set1.Equals(set.New("x", "y")))
+	require.NoError(t, err)
+	require.True(t, set1.Equals(set.New("x", "y")))
 }
 
 func TestSet_Value_And_Scan_RoundTrip(t *testing.T) {
+	t.Parallel()
+
 	original := set.New("foo", "bar")
 	value, err := original.Value()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	restored := set.New[string]()
 	err = restored.Scan(value)
-	assert.NoError(t, err)
-	assert.True(t, original.Equals(restored))
+	require.NoError(t, err)
+	require.True(t, original.Equals(restored))
 }
 
 func TestSet_Value_EmptySet(t *testing.T) {
+	t.Parallel()
+
 	empty := set.New[int]()
 	value, err := empty.Value()
-	assert.NoError(t, err)
-	assert.NotNil(t, value)
+	require.NoError(t, err)
+	require.NotNil(t, value)
 
 	restored := set.New[int]()
 	err = restored.Scan(value)
-	assert.NoError(t, err)
-	assert.True(t, empty.Equals(restored))
+	require.NoError(t, err)
+	require.True(t, empty.Equals(restored))
 }

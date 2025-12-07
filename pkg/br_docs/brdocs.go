@@ -1,3 +1,5 @@
+// Package brdocs provides functions to validate Brazilian documents such as CPF and CNPJ.
+// nolint:mnd
 package brdocs
 
 import (
@@ -55,7 +57,7 @@ func isCadastro(
 	d := doc[:size]
 	digit := calcCadastroDigit(d, position)
 
-	d = d + digit
+	d += digit
 	digit = calcCadastroDigit(d, position+1)
 
 	return doc == d+digit
@@ -65,7 +67,6 @@ func isCadastro(
 func calcCadastroDigit(doc string, position int) string {
 	var sum int
 	for _, r := range doc {
-
 		sum += int(r-'0') * position
 		position--
 
@@ -85,11 +86,13 @@ func calcCadastroDigit(doc string, position int) string {
 // RemoveNonDigitAndLetters updates the value, keeping only 0-9, A-Z characters
 func RemoveNonDigitAndLetters(value *string) {
 	buf := bytes.NewBufferString("")
+
 	for _, r := range *value {
 		if ('0' <= r && r <= '9') || ('A' <= r && r <= 'Z') {
 			buf.WriteRune(r)
 		}
 	}
+
 	*value = buf.String()
 }
 

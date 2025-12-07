@@ -1,6 +1,7 @@
 package pathtools
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,17 +13,19 @@ import (
 func FindFileInPath(filename string) (string, error) {
 	pathEnv := os.Getenv("PATH")
 	if pathEnv == "" {
-		return "", fmt.Errorf("PATH environment variable not set")
+		return "", errors.New("PATH environment variable not set")
 	}
 
 	paths := filepath.SplitList(pathEnv)
 
 	for _, dir := range paths {
 		fullPath := filepath.Join(dir, filename)
+
 		info, err := os.Stat(fullPath)
 		if err == nil && !info.IsDir() {
 			return fullPath, nil
 		}
 	}
+
 	return "", fmt.Errorf("file '%s' not found in PATH", filename)
 }
