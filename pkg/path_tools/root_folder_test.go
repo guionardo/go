@@ -24,7 +24,7 @@ func TestGetRootFolder(t *testing.T) {
 		require.ErrorIs(t, gotErr, pathtools.ErrNotAGoProject)
 		require.Empty(t, got)
 	})
-	t.Run("unexistent_folder", func(t *testing.T) {
+	t.Run("nonexistent_folder", func(t *testing.T) {
 		t.Parallel()
 		got, gotErr := pathtools.GetRootFolder(path.Join(t.TempDir(), "unexistent"))
 		require.ErrorIs(t, gotErr, os.ErrNotExist)
