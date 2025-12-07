@@ -6,7 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestQuotedShellArgs(t *testing.T) {
+func TestQuotedShellArgs(t *testing.T) { //nolint:funlen
+	t.Parallel()
+
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
@@ -95,6 +97,8 @@ func TestQuotedShellArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := NewQuotedShellArgs(tt.s)
 			if assert.Equal(t, tt.want, got, "NewQuotedShellArgs(%q)", tt.s) {
 				gotJoined := got.String()

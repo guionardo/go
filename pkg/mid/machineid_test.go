@@ -9,6 +9,8 @@ import (
 )
 
 func TestMachineID(t *testing.T) {
+	t.Parallel()
+
 	got := mid.MachineID()
 	t.Logf("MachineId [%s] () = %s", runtime.GOOS, got)
 	assert.NotEmpty(t, got)
