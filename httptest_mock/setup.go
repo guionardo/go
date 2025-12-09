@@ -64,13 +64,13 @@ func SetupServer(t *testing.T, options ...func(*MockHandler)) (server *httptest.
 //
 // Example:
 //
-//	server := httptestmock.SetupServer(t, httptestmock.WithRequests(*httptestmock.MockRequest{
-//	    {
+//	server := httptestmock.SetupServer(t, httptestmock.WithRequests(
+//	    &httptestmock.MockRequest{
 //	        Name: "health_check",
 //	        Request:  httptestmock.Request{Method: "GET", Path: "/health"},
 //	        Response: httptestmock.Response{Status: 200, Body: "OK"},
 //	    },
-//	}))
+//	))
 func WithRequests(requests ...*MockRequest) func(*MockHandler) {
 	return func(s *MockHandler) {
 		s.requests = requests
