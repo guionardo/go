@@ -64,7 +64,7 @@ import (
 
 func TestGetUser(t *testing.T) {
     // Setup mock server with mocks from directory
-    server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFromDir("mocks"))
+    server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
     defer assertFunc(t) // Verify mock assertions at the end
 
     // Make request to mock server
