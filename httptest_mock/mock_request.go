@@ -28,7 +28,7 @@ type (
 		PathParams map[string]string `json:"path_params" yaml:"path_params" validate:"omitempty,dive,keys,endkeys"`
 
 		// Headers are optional request headers to match (not yet implemented).
-		Headers map[string]string `json:"headers" yaml:"headers" validate:"omitempty,dive,keys,endkeys"`
+		Headers map[string]string `json:"headers" yaml:"headers" validate:"omitempty,dive,keys,required,endkeys,required"`
 
 		// Body is the expected request body (not yet implemented).
 		Body any `json:"body" yaml:"body"`
