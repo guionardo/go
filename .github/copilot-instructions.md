@@ -113,7 +113,7 @@ The repository uses golangci-lint with extensive linter configuration in `.golan
 1. Create a new directory under `pkg/`
 2. Follow the existing package structure
 3. Include comprehensive tests
-4. Add package documentation to README.md
+4. Add package documentation to the main README.md at repository root
 5. Ensure linting passes
 6. Verify test coverage meets thresholds
 
@@ -123,7 +123,7 @@ The repository uses golangci-lint with extensive linter configuration in `.golan
 1. Identify the appropriate package or create a new one
 2. Implement the function with proper documentation
 3. Add comprehensive tests
-4. Update README.md with usage example if it's a major feature
+4. Update the main README.md at repository root with usage example if it's a major feature
 5. Run `make lint` and `make test`
 
 ### Fixing a bug
