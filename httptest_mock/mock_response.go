@@ -66,6 +66,9 @@ func (m *Response) writeHeaderAndBody(w http.ResponseWriter) {
 				statusCode = http.StatusInternalServerError
 			} else {
 				// Set Content-Type to application/json if body is JSON
+				if m.Headers == nil {
+					m.Headers = make(map[string]string)
+				}
 				m.Headers["Content-Type"] = "application/json"
 			}
 		}
