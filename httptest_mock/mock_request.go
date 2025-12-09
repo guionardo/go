@@ -76,7 +76,7 @@ func (m *Request) match(r *http.Request) requestMatchLevel {
 		return matchLevelNone
 	}
 
-	// match method is called when method and path are accepted
+	// The following checks are only performed when method and path match
 	if m.matchQueryParams(r) && m.matchPathParams(r) && m.matchHeaders(r) && m.matchBody(r) {
 		m.matchLog = append(m.matchLog, matchEmoji+" MATCH")
 		return matchLevelFull
