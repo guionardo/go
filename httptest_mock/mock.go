@@ -4,10 +4,8 @@
 package httptestmock
 
 import (
-	"net/http"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
@@ -100,19 +98,4 @@ func (m *Mock) Assert(t *testing.T) {
 
 	count := m.assertionActual[t.Name()]
 	assert.Equalf(t, m.ExpectedHits, count, "%s: expected %d hits, got %d", m.String(), m.ExpectedHits, count)
-}
-
-// writeResponse writes the response headers, status code, and body to the ResponseWriter.
-func (m *Response) writeResponse(w http.ResponseWriter) {
-	if m.DelayMs > 0 {
-		// Introduce delay before sending response
-		time.Sleep(time.Duration(m.DelayMs) * time.Millisecond)
-	}
-
-	for key, value := range m.Headers {
-		w.Header().Add(key, value)
-	}
-
-	w.WriteHeader(m.Status)
-	m.writeBody(w)
 }

@@ -3,6 +3,7 @@ package httptestmock
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 type (
@@ -24,7 +25,6 @@ type (
 )
 
 // String returns a human-readable representation of the response for logging.
-// String returns a human-readable representation of the response for logging.
 func (m *Response) String() string {
 	sp := StringParts{}.Set("status", http.StatusText(m.Status)).
 		Set("body", m.Body).
@@ -34,27 +34,50 @@ func (m *Response) String() string {
 	return "Resp: " + sp.String()
 }
 
-// writeBody writes the response body to the ResponseWriter.
-// Handles string, []byte, and JSON-serializable types.
-func (m *Response) writeBody(w http.ResponseWriter) {
-	if m.Body == nil {
-		return
+// writeResponse writes the response headers, status code, and body to the ResponseWriter.
+func (m *Response) writeResponse(w http.ResponseWriter) {
+	if m.DelayMs > 0 {
+		// Introduce delay before sending response
+		time.Sleep(time.Duration(m.DelayMs) * time.Millisecond)
 	}
 
-	var err error
+	m.writeHeaderAndBody(w)
+}
 
-	switch body := m.Body.(type) {
-	case string:
-		_, err = w.Write([]byte(body))
-	case []byte:
-		_, err = w.Write(body)
-	default:
-		// For any other type (maps, structs, etc.), encode as JSON
-		err = json.NewEncoder(w).Encode(body)
+// writeHeaderAndBody writes the response headers and body to the given ResponseWriter.
+// error catching prevents inconsistent status codes when marshaling fails.
+func (m *Response) writeHeaderAndBody(w http.ResponseWriter) {
+	var (
+		bodyContent []byte
+		statusCode  = m.Status
+	)
+	if m.Body != nil {
+		switch body := m.Body.(type) {
+		case string:
+			bodyContent = []byte(body)
+		case []byte:
+			bodyContent = body
+		default:
+			var err error
+
+			bodyContent, err = json.Marshal(body)
+			if err != nil {
+				bodyContent = []byte(err.Error())
+				statusCode = http.StatusInternalServerError
+			} else {
+				// Set Content-Type to application/json if body is JSON
+				m.Headers["Content-Type"] = "application/json"
+			}
+		}
 	}
 
-	if err != nil {
-		// Do not call WriteHeader again; just write the error message to the body.
-		_, _ = w.Write([]byte(err.Error()))
+	for key, value := range m.Headers {
+		w.Header().Add(key, value)
+	}
+
+	w.WriteHeader(statusCode)
+
+	if len(bodyContent) > 0 {
+		_, _ = w.Write(bodyContent)
 	}
 }
