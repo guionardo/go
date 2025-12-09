@@ -128,5 +128,5 @@ func (s *MockHandler) log(format string, args ...any) {
 		return
 	}
 
-	s.T.Logf("%s %s", s.logHeader, fmt.Sprintf(format, args...))
+	s.T.Logf("%s "+format, append([]any{s.logHeader}, args...)...)
 }
