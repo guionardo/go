@@ -34,7 +34,8 @@ type MockHandler struct {
 
 // ServeHTTP implements the http.Handler interface.
 // It iterates through registered mocks and returns the response for the first match.
-// If no mock matches, the request receives no response (empty 200).
+// If no mock matches, the handler returns 404 Not Found.
+// If there are partial matches, the handler returns 400 Bad Request.
 func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	partialMatchRequests := make([]*Mock, 0)
 
