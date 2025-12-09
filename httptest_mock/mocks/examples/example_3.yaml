@@ -1,0 +1,13 @@
+name: example_3
+request:
+  method: POST
+  path: /api/v1/owners
+  headers:
+    Authorization: "OK"
+  partial_match: true
+response:
+  status: 200
+  body: "Success"
+  delay_ms: 100
+assertion: false
+expected_hits: 1

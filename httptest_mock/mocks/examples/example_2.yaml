@@ -1,0 +1,8 @@
+name: example_2
+request:
+  method: GET
+  path: /api/v1/users
+response:
+  status: 200
+  body: "Success"
+  delay_ms: 100

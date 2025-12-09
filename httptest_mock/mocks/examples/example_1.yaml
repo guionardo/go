@@ -1,0 +1,17 @@
+name: example_1
+request:
+  method: POST
+  path: /api/v1/users/{id}
+  query_params:
+    user_id: "123"
+  path_params:
+    id: "123"
+  headers:
+    API_KEY: "test_key"
+  body: "TEST_BODY"
+response:
+  status: 200
+  body:
+    message: "Hello, world!"
+  headers:
+    Content-Type: "application/json"

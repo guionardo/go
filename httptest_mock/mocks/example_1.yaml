@@ -1,0 +1,10 @@
+name: example_1
+request:
+  method: GET
+  path: /api/v1/example
+response:
+  status: 200
+  body:
+    message: "Hello, world!"
+  headers:
+    Content-Type: "application/json"

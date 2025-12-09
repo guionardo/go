@@ -1,0 +1,9 @@
+name: example_1
+request:
+  method: GET
+  path: /health
+response:
+  status: 200
+  body: "Success"
+assertion: true
+expected_hits: 100
