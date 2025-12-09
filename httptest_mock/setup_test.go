@@ -57,7 +57,7 @@ func TestSetupOptions(t *testing.T) {
 
 		defer func() { _ = response.Body.Close() }()
 
-		require.Equal(t, "example_2", response.Header.Get("HTTPTestMock-Name"))
+		require.Equal(t, "example_2", response.Header.Get("Httptestmock-Name"))
 	})
 	t.Run("WithAddMockInfoToResponse : custom header name", func(t *testing.T) {
 		t.Parallel()

@@ -1,6 +1,7 @@
 package httptestmock
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,6 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type badMarshaler struct{}
+
+func (b badMarshaler) MarshalJSON() ([]byte, error) {
+	return nil, errors.New("marshal error")
+}
 func Test_readMock(t *testing.T) {
 	t.Parallel()
 	t.Run("simple mock should be read successfully", func(t *testing.T) {
@@ -107,9 +113,12 @@ func TestResponse_writeBody(t *testing.T) {
 		t.Parallel()
 
 		w := httptest.NewRecorder()
-		response := &Response{Status: http.StatusOK, Body: make(chan int)} // body is invalid, cannot be marshaled
+		response := &Response{Status: http.StatusOK, Body: &badMarshaler{}} // body is invalid, cannot be marshaled
 		response.writeBody(w)
-		require.Equal(t, http.StatusInternalServerError, w.Code)
-		require.Equal(t, "json: unsupported type: chan int", w.Body.String())
+		require.Equal(
+			t,
+			"json: error calling MarshalJSON for type *httptestmock.badMarshaler: marshal error",
+			w.Body.String(),
+		)
 	})
 }
