@@ -142,33 +142,6 @@ Utilities for mocking HTTP servers in tests.
 - Supports setting up expected responses and verifying received requests.
 - More [documentation](httptest_mock/README.md)
 
-Example:
-
-```go
-package main
-
-import (
-    "net/http"
-    "testing"
-
-    "github.com/guionardo/go/httptest_mock"
-)
-
-func TestMockServer(t *testing.T) {
-    mock := httptest_mock.New()
-    mock.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusOK)
-        w.Write([]byte("Hello, World!"))
-    })
-
-    resp, err := http.Get(mock.URL() + "/hello")
-    if err != nil {
-        t.Fatal(err)
-    }
-    defer resp.Body.Close()
-    // Assert response, etc.
-}
-```
 
 ## Package reflect_tools
 
