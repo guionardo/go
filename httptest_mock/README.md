@@ -154,7 +154,7 @@ expected_hits: 1                     # Optional: expected number of times this m
 Creates and starts a new HTTP test server with the provided mock configurations.
 
 ```go
-func SetupServer(t *testing.T, options ...func(*server)) (server *httptest.Server, assertFunc func(*testing.T))
+func SetupServer(t *testing.T, options ...func(*MockHandler)) (server *httptest.Server, assertFunc func(*testing.T))
 ```
 
 The server automatically closes when the test context ends.
