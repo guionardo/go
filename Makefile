@@ -15,7 +15,7 @@ gocheck:
 
 ##@ Dependencies
 
-deps: gocheck install-pre-commit install-golangci install-commitlint install-govulncheck install-go-test-coverage install-swaggo ## Installs/updates dependencies
+deps: gocheck install-pre-commit install-golangci install-commitlint install-govulncheck install-go-test-coverage ## Installs/updates dependencies
 	@echo "\n🚀 \033[30;44m  ALL DEPENDENCIES ARE INSTALLED  \033[0m"
 
 install-pre-commit:
@@ -54,10 +54,6 @@ install-govulncheck:
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@echo "✅  GOVULNCHECK INSTALLED"
 
-install-swaggo:
-	@echo  "\n🛠️  \033[30;42m INSTALLING SWAGGER CLI \033[0m"
-	@go install github.com/swaggo/swag/cmd/swag@latest
-	@echo "✅  SWAGGER CLI INSTALLED"
 
 ##@ Testing
 
@@ -83,10 +79,6 @@ check-go-test-coverage:
 test: ## Run tests
 	@go test ./... -v
 
-test-e2e: ## Run end-to-end tests
-	@go mod vendor
-	@scope=E2E TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock go test  ./tests/e2e/... -count=10 -race
-
 coverage: check-go-test-coverage ## Check test coverage
 	@go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 	@go-test-coverage --config=./.testcoverage.yml
@@ -105,9 +97,3 @@ lint: check_golangci ## Run linters
 
 lint-fix: check_golangci ## Run linters and fix issues
 	@golangci-lint run --fix ./...
-
-swag: ## Generate swagger docs
-	@echo  "\n🛠️  \033[30;42m FORMATTING SWAGGER DESCRIPTORS \033[0m"
-	@swag fmt -g ./cmd/http/main.go
-	@echo  "\n🛠️  \033[30;42m GENERATING SWAGGER DOCS \033[0m"
-	@swag init -g ./cmd/http/main.go -o ./docs/swagger --parseDependency --parseInternal

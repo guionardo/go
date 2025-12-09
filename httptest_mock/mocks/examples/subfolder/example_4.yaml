@@ -1,0 +1,7 @@
+name: example_4
+request:
+  method: GET
+  path: /api/v1/products
+response:
+  status: 200
+  body: "Success"

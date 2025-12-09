@@ -5,7 +5,7 @@ issues:
   max-same-issues: 0 #Maximum count of issues with the same text.
   uniq-by-line: false # Make issues output unique by line.
   new: true
-  new-from-merge-base: master
+  new-from-merge-base: main
   new-from-rev: HEAD
   # Excluding configuration per-path, per-linter, per-text and per-source
 
