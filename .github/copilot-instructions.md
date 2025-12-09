@@ -95,7 +95,7 @@ The repository uses golangci-lint with extensive linter configuration in `.golan
 ### Documentation
 
 - Use Go doc comments for all exported functions, types, and packages
-- Keep README.md updated with package usage examples
+- Keep the main README.md at repository root updated with package usage examples
 - Document complex logic with inline comments when necessary
 
 ### Package-Specific Notes
