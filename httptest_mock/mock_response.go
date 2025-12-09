@@ -54,7 +54,7 @@ func (m *Response) writeBody(w http.ResponseWriter) {
 	}
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		// Do not call WriteHeader again; just write the error message to the body.
 		_, _ = w.Write([]byte(err.Error()))
 	}
 }
