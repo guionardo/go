@@ -133,6 +133,54 @@ type Scanner = database/sql.Scanner
 type Valuer = database/sql/driver.Valuer
 ```
 
+## Package httptest_mock
+
+Utilities for mocking HTTP servers in tests.
+
+- Easily create mock HTTP servers with custom handlers.
+- Record requests and responses for assertions.
+- Supports setting up expected responses and verifying received requests.
+- More [documentation](httptest_mock/README.md)
+
+Example:
+
+```go
+package main
+
+import (
+    "net/http"
+    "testing"
+
+    "github.com/guionardo/go/httptest_mock"
+)
+
+func TestMockServer(t *testing.T) {
+    mock := httptest_mock.New()
+    mock.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("Hello, World!"))
+    })
+
+    resp, err := http.Get(mock.URL() + "/hello")
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer resp.Body.Close()
+    // Assert response, etc.
+}
+```
+
+## Package reflect_tools
+
+Utilities for working with Go's reflection, including zero value checks.
+
+```go
+// IsZeroValue checks if the provided value is considered a zero value.
+// Handles numeric types, strings, booleans, time.Time, time.Duration, slices, arrays, maps, and pointers.
+// Returns true if the value is zero, nil or empty, false otherwise.
+func IsZeroValue(value any) bool
+```
+
 ## 🤝 Contributing
 
 Bugs or contributions on new features can be made in the [issues page](https://github.com/guionardo/go/issues).
