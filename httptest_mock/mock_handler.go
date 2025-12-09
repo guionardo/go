@@ -12,7 +12,7 @@ import (
 // It implements http.Handler to serve as the handler for httptest.MockHandler.
 type MockHandler struct {
 	// requests holds all registered mock definitions to match against incoming requests.
-	requests []*MockRequest
+	requests []*Mock
 
 	// T is the testing context, used for logging and cleanup.
 	T *testing.T
@@ -21,7 +21,7 @@ type MockHandler struct {
 	logHeader string
 
 	// preResponseHook is called before a response is sent.
-	preResponseHooks []func(*MockRequest, http.ResponseWriter)
+	preResponseHooks []func(*Mock, http.ResponseWriter)
 
 	// logDisabled indicates whether logging is enabled for this handler.
 	logDisabled bool
@@ -36,7 +36,7 @@ type MockHandler struct {
 // It iterates through registered mocks and returns the response for the first match.
 // If no mock matches, the request receives no response (empty 200).
 func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	partialMatchRequests := make([]*MockRequest, 0)
+	partialMatchRequests := make([]*Mock, 0)
 
 	for _, request := range s.requests {
 		switch request.Request.match(r) {
@@ -103,7 +103,7 @@ func (s *MockHandler) Validate() error {
 	return nil
 }
 
-func (s *MockHandler) DoPreResponseHook(m *MockRequest, r http.ResponseWriter) {
+func (s *MockHandler) DoPreResponseHook(m *Mock, r http.ResponseWriter) {
 	for _, hook := range s.preResponseHooks {
 		hook(m, r)
 	}

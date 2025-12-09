@@ -32,7 +32,7 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 	t.Parallel()
 
 	s, assertFunc := httptestmock.SetupServer(t,
-		httptestmock.WithRequestsFromDir(path.Join("mocks", "examples")),
+		httptestmock.WithRequestsFrom(path.Join("mocks", "examples")),
 		httptestmock.WithAddMockInfoToResponse())
 	defer assertFunc(t)
 
@@ -134,7 +134,7 @@ func TestAssertion(t *testing.T) {
 	t.Parallel()
 
 	mockServer, assertFunc := httptestmock.SetupServer(t,
-		httptestmock.WithRequestsFromDir(path.Join("mocks", "assertions")),
+		httptestmock.WithRequestsFrom(path.Join("mocks", "assertions")),
 		httptestmock.WithoutLog())
 	defer assertFunc(t) // assert that the server received the expected number of requests
 
@@ -170,7 +170,7 @@ func TestMockHandler_Validate(t *testing.T) {
 
 		var s = httptestmock.MockHandler{T: t}
 
-		request := &httptestmock.MockRequest{
+		request := &httptestmock.Mock{
 			Name: "invalid_request",
 			Request: httptestmock.Request{
 				Method:      "GETCH", // invalid HTTP method

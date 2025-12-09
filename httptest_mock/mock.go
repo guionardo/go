@@ -4,27 +4,19 @@
 package httptestmock
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
-
-	"gopkg.in/yaml.v3"
 )
 
 type (
-	// MockRequest represents a complete mock definition containing both
+	// Mock represents a complete mock definition containing both
 	// the expected request to match and the response to return.
-	MockRequest struct {
+	Mock struct {
 		// Name is an optional identifier for the mock, used in logging.
 		// If not specified, defaults to the file path.
 		Name string `json:"name" yaml:"name"`
@@ -62,20 +54,23 @@ const (
 var validate = validator.New(validator.WithRequiredStructEnabled())
 
 // String returns a human-readable representation of the mock for logging.
-func (m *MockRequest) String() string {
-	sp := StringParts{}.Set("name", m.Name).Set("from", m.source).Set("req", m.Request).Set("resp", m.Response)
+func (m *Mock) String() string {
+	sp := StringParts{}.Set("name", m.Name).
+		Set("from", m.source).
+		Set("req", m.Request.String()).
+		Set("resp", m.Response.String())
 
 	return "Mock: " + sp.String()
 }
 
 // Validate validates the mock definition using struct validation tags.
 // Returns an error if required fields are missing or have invalid values.
-func (m *MockRequest) Validate() error {
+func (m *Mock) Validate() error {
 	return validate.Struct(m)
 }
 
 // RegisterHit records a hit for this mock request during the test.
-func (m *MockRequest) RegisterHit(t *testing.T) {
+func (m *Mock) RegisterHit(t *testing.T) {
 	if !m.AssertionEnabled {
 		return
 	}
@@ -91,7 +86,7 @@ func (m *MockRequest) RegisterHit(t *testing.T) {
 }
 
 // Assert checks if the mock request was hit the expected number of times during the test.
-func (m *MockRequest) Assert(t *testing.T) {
+func (m *Mock) Assert(t *testing.T) {
 	if !m.AssertionEnabled {
 		return
 	}
@@ -120,59 +115,4 @@ func (m *Response) writeResponse(w http.ResponseWriter) {
 
 	w.WriteHeader(m.Status)
 	m.writeBody(w)
-}
-
-// readMock reads and parses a mock definition from a JSON or YAML file.
-// It first attempts JSON parsing, then falls back to YAML if JSON fails.
-func readMock(path string) (*MockRequest, error) {
-	file, err := os.ReadFile(filepath.Clean(path))
-	if err != nil {
-		return nil, err
-	}
-
-	var mock MockRequest
-
-	// Try JSON first, then fall back to YAML
-	err = json.Unmarshal(file, &mock)
-	if err != nil {
-		err = yaml.Unmarshal(file, &mock)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal json/yaml %s: %w", path, err)
-		}
-	}
-
-	// Use filename as mock name if not specified
-	if mock.Name == "" {
-		mock.Name = path
-	}
-
-	mock.source = path
-
-	return &mock, nil
-}
-
-// readMocks reads all mock definitions from a directory.
-// Processes files with .json, .yaml, or .yml extensions.
-// Subdirectories are skipped.
-func readMocks(dir string) ([]*MockRequest, error) {
-	files, err := os.ReadDir(filepath.Clean(dir))
-	if err != nil {
-		return nil, err
-	}
-
-	requests := make([]*MockRequest, 0, len(files))
-	for _, file := range files {
-		ext := strings.ToLower(path.Ext(file.Name()))
-		// Skip directories and non-mock files
-		if file.IsDir() || (ext != ".json" && ext != ".yaml" && ext != ".yml") {
-			continue
-		}
-
-		if mock, err := readMock(path.Join(dir, file.Name())); err != nil {
-			return nil, err
-		}
-		requests = append(requests, mock)
-	}
-
-	return requests, nil
 }

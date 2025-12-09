@@ -1,12 +1,18 @@
 package httptestmock
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert/yaml"
 )
 
 const defaultLogHeader = "HTTPTestMock"
@@ -65,13 +71,13 @@ func SetupServer(t *testing.T, options ...func(*MockHandler)) (server *httptest.
 // Example:
 //
 //	server := httptestmock.SetupServer(t, httptestmock.WithRequests(
-//	    &httptestmock.MockRequest{
+//	    &httptestmock.Mock{
 //	        Name: "health_check",
 //	        Request:  httptestmock.Request{Method: "GET", Path: "/health"},
 //	        Response: httptestmock.Response{Status: 200, Body: "OK"},
 //	    },
 //	))
-func WithRequests(requests ...*MockRequest) func(*MockHandler) {
+func WithRequests(requests ...*Mock) func(*MockHandler) {
 	return func(s *MockHandler) {
 		s.requests = requests
 		for _, req := range requests {
@@ -80,21 +86,27 @@ func WithRequests(requests ...*MockRequest) func(*MockHandler) {
 	}
 }
 
-// WithRequestsFromDir configures the server with mock requests loaded from a directory.
-// All files with .json, .yaml, or .yml extensions in the directory will be parsed as mock definitions.
+// WithRequestsFrom configures the server with mock requests loaded from specified files or folders.
+// Each path can be a file (JSON/YAML) or a directory containing mock definitions.
+// Path can be a mix of files and directories and contain patterns.
+// If a directory is provided, all valid mock files within it will be loaded.
 // Subdirectories are not traversed.
 //
 // Example:
 //
-//	server := httptestmock.SetupServer(t, httptestmock.WithRequestsFromDir("testdata/mocks"))
-//
-// The function will call t.Fatalf if the directory cannot be read or if any mock file is invalid.
-func WithRequestsFromDir(dir string) func(*MockHandler) {
+//	server := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("testdata/mocks"))
+func WithRequestsFrom(paths ...string) func(*MockHandler) {
 	return func(s *MockHandler) {
-		requests, err := readMocks(dir)
-		if err != nil {
-			s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks from dir: %w", err))
-			return
+		var requests []*Mock
+
+		for _, p := range paths {
+			mocks, err := readMocksFromPath(p)
+			if err != nil {
+				s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks from path %q: %w", p, err))
+				continue
+			}
+
+			requests = append(requests, mocks...)
 		}
 
 		WithRequests(requests...)(s)
@@ -103,15 +115,15 @@ func WithRequestsFromDir(dir string) func(*MockHandler) {
 
 // WithPostRequestHook adds a hook that will be called before sending the response.
 // This can be used to modify the response or perform additional actions before sending it.
-// The hook receives the matched MockRequest and the http.ResponseWriter to modify the response.
+// The hook receives the matched Mock and the http.ResponseWriter to modify the response.
 // This is useful for adding custom headers, logging, or other pre-response logic.
 //
 // Example:
 //
-//	httptestmock.WithPostRequestHook(func(mr *httptestmock.MockRequest, w http.ResponseWriter) {
+//	httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWriter) {
 //	    w.Header().Set("X-Custom-Header", "value")
 //	})
-func WithPostRequestHook(hook func(*MockRequest, http.ResponseWriter)) func(*MockHandler) {
+func WithPostRequestHook(hook func(*Mock, http.ResponseWriter)) func(*MockHandler) {
 	return func(s *MockHandler) {
 		s.preResponseHooks = append(s.preResponseHooks, hook)
 	}
@@ -135,7 +147,7 @@ func WithAddMockInfoToResponse(headerPrefix ...string) func(*MockHandler) {
 
 	prefix = strings.Trim(prefix, "-_.")
 
-	return WithPostRequestHook(func(mr *MockRequest, w http.ResponseWriter) {
+	return WithPostRequestHook(func(mr *Mock, w http.ResponseWriter) {
 		// Add mock information to the response
 		w.Header().Set(prefix+"-Name", mr.Name)
 		w.Header().Set(prefix+"-Path", mr.Request.Path)
@@ -149,4 +161,102 @@ func WithoutLog() func(*MockHandler) {
 	return func(s *MockHandler) {
 		s.logDisabled = true
 	}
+}
+
+func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
+	matches, err := filepath.Glob(sourcePath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, match := range matches {
+		stat, err := os.Stat(filepath.Clean(match))
+		if err != nil {
+			continue
+		}
+
+		if stat.IsDir() {
+			dirRequests, err := readMocks(match)
+			if err == nil && len(dirRequests) > 0 {
+				requests = append(requests, dirRequests...)
+			}
+
+			continue
+		}
+
+		if mock, err := readMock(match); err == nil {
+			requests = append(requests, mock)
+		}
+	}
+
+	return requests, nil
+}
+
+// readMocks reads all mock definitions from a directory.
+// Processes files with .json, .yaml, or .yml extensions.
+// Subdirectories are skipped.
+func readMocks(dir string) ([]*Mock, error) {
+	files, err := os.ReadDir(filepath.Clean(dir))
+	if err != nil {
+		return nil, err
+	}
+
+	requests := make([]*Mock, 0, len(files))
+	for _, file := range files {
+		ext := strings.ToLower(path.Ext(file.Name()))
+		// Skip directories and non-mock files
+		if file.IsDir() || (ext != ".json" && ext != ".yaml" && ext != ".yml") {
+			continue
+		}
+
+		mock, err := readMock(path.Join(dir, file.Name()))
+		if err != nil {
+			return nil, err
+		}
+
+		requests = append(requests, mock)
+	}
+
+	return requests, nil
+}
+
+// readMock reads and parses a mock definition from a JSON or YAML file.
+// It first attempts JSON parsing, then falls back to YAML if JSON fails.
+func readMock(path string) (*Mock, error) {
+	file, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, err
+	}
+
+	mock, err := unmarshalMock(file)
+	if err == nil {
+		// Use filename as mock name if not specified
+		if mock.Name == "" {
+			mock.Name = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		}
+
+		mock.source = path
+	}
+
+	return mock, err
+}
+
+// unmarshalMock unmarshals mock data from JSON or YAML format.
+func unmarshalMock(data []byte) (request *Mock, err error) {
+	if len(data) == 0 {
+		return nil, errors.New("empty mock data")
+	}
+
+	var mock Mock
+	if data[0] == '{' {
+		err = json.Unmarshal(data, &mock)
+	} else {
+		err = yaml.Unmarshal(data, &mock)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json/yaml: %w", err)
+	}
+
+	return &mock, nil
 }

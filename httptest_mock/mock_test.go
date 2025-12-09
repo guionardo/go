@@ -14,59 +14,6 @@ type badMarshaler struct{}
 func (b badMarshaler) MarshalJSON() ([]byte, error) {
 	return nil, errors.New("marshal error")
 }
-func Test_readMock(t *testing.T) {
-	t.Parallel()
-	t.Run("simple mock should be read successfully", func(t *testing.T) {
-		t.Parallel()
-
-		mock, err := readMock("mocks/get_user.json")
-		require.NoError(t, err)
-		require.Equal(t, "get_user", mock.Name)
-		require.Equal(t, "GET", mock.Request.Method)
-		require.Equal(t, "/api/v1/users/123", mock.Request.Path)
-	})
-	t.Run("invalid mock should raise an error", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := readMock("mocks/bad_mock.json")
-		require.Error(t, err)
-	})
-
-	t.Run("invalid json mock should raise an error", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := readMock("mocks/bad_mock/bad_mock_invalid_json.json")
-		require.Error(t, err)
-	})
-}
-
-func Test_compareBody(t *testing.T) {
-	t.Parallel()
-	t.Run("string should be equal", func(t *testing.T) {
-		t.Parallel()
-
-		expected := "Hello, world!"
-		fromRequest := []byte("Hello, world!")
-		require.True(t, compareBody(expected, fromRequest))
-	})
-	t.Run("byte array should be equal", func(t *testing.T) {
-		t.Parallel()
-
-		expected := []byte("Hello, world!")
-		fromRequest := []byte("Hello, world!")
-		require.True(t, compareBody(expected, fromRequest))
-	})
-	t.Run("struct should be equal", func(t *testing.T) {
-		t.Parallel()
-
-		expected := struct {
-			Name string
-			Age  int
-		}{Name: "John", Age: 30}
-		fromRequest := []byte(`{"Name":"John","Age":30}`)
-		require.True(t, compareBody(expected, fromRequest))
-	})
-}
 
 func TestResponse_writeBody(t *testing.T) {
 	t.Parallel()

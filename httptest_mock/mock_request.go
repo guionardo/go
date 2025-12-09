@@ -85,6 +85,7 @@ func (m *Request) match(r *http.Request) requestMatchLevel {
 	return matchLevelPartial
 }
 
+// setMatchLog is a helper to append a formatted no-match message to the match log.
 func (m *Request) setMatchLog(part string, expected string, actual string) {
 	if expected == "" && actual != "" {
 		m.matchLog = append(m.matchLog, fmt.Sprintf("%s %s expected empty but got %s", noMatchEmoji, part, actual))
@@ -198,31 +199,23 @@ func compareBody(expected any, fromRequest []byte) bool {
 		return bytes.Equal(fromRequest, expected)
 	default:
 		// For any other type (maps, structs, etc.), encode as JSON
-		expectedMarshaled, err := marshalSorted(expected)
-		if err != nil {
-			return false
-		}
+		expectedMarshaled, errExp := marshalSorted(expected)
+		requestBody, errReq := marshalSorted(fromRequest)
 
-		requestBody, err := marshalSorted(fromRequest)
-		if err != nil {
-			return false
-		}
-
-		return bytes.Equal(expectedMarshaled, requestBody)
+		return (errExp == nil) && (errReq == nil) && bytes.Equal(expectedMarshaled, requestBody)
 	}
 }
 
-func marshalSorted(data any) ([]byte, error) {
+func marshalSorted(data any) (sortedBytes []byte, err error) {
 	// if data is []byte, unmarshal to any
 	if bytes, ok := data.([]byte); ok {
 		var anyData any
 
-		err := json.Unmarshal(bytes, &anyData)
-		if err != nil {
+		if err := json.Unmarshal(bytes, &anyData); err != nil {
 			return nil, err
 		}
 
-		data = anyData
+		return json.Marshal(anyData)
 	}
 	// first marshal to json
 	jsonData, err := json.Marshal(data)
@@ -233,9 +226,10 @@ func marshalSorted(data any) ([]byte, error) {
 	var sortedData any
 
 	err = json.Unmarshal(jsonData, &sortedData)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		// then marshal the sorted data to json
+		sortedBytes, err = json.Marshal(sortedData)
 	}
-	// then marshal the sorted data to json
-	return json.Marshal(sortedData)
+
+	return sortedBytes, err
 }

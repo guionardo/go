@@ -161,12 +161,12 @@ The server automatically closes when the test context ends.
 
 ### Options
 
-#### WithRequestsFromDir
+#### WithRequestsFrom
 
-Loads all mock definitions from a directory. Supports `.json`, `.yaml`, and `.yml` files.
+Loads all mock definitions from files and directories. Supports `.json`, `.yaml`, and `.yml` files.
 
 ```go
-httptestmock.WithRequestsFromDir("path/to/mocks")
+httptestmock.WithRequestsFrom("path/to/mocks","path/to/explicit_mock.json")
 ```
 
 #### WithRequests
@@ -174,7 +174,7 @@ httptestmock.WithRequestsFromDir("path/to/mocks")
 Provides mock definitions programmatically.
 
 ```go
-httptestmock.WithRequests(&httptestmock.MockRequest{
+httptestmock.WithRequests(&httptestmock.Mock{
     {
         Name: "health_check",
         Request:  httptestmock.Request{Method: "GET", Path: "/health"},
@@ -188,7 +188,7 @@ httptestmock.WithRequests(&httptestmock.MockRequest{
 Adds a hook function that is called before sending the response. This allows you to modify the response or perform additional actions.
 
 ```go
-httptestmock.WithPostRequestHook(func(mr *httptestmock.MockRequest, w http.ResponseWriter) {
+httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWriter) {
     w.Header().Set("X-Custom-Header", "custom-value")
     // Log or perform other actions
 })
@@ -414,7 +414,7 @@ Instead of using files, you can define mocks in code:
 
 ```go
 server, assertFunc := httptestmock.SetupServer(t,
-    httptestmock.WithRequests(&httptestmock.MockRequest{
+    httptestmock.WithRequests(&httptestmock.Mock{
         Name: "health_check",
         Request: httptestmock.Request{
             Method: "GET",

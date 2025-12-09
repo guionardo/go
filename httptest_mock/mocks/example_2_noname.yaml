@@ -1,0 +1,10 @@
+# name: no name provided, this mock will receive a default name based on the file name
+request:
+  method: GET
+  path: /api/v1/example
+response:
+  status: 200
+  body:
+    message: "Hello, world!"
+  headers:
+    Content-Type: "application/json"
