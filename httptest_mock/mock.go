@@ -170,9 +170,8 @@ func readMocks(dir string) ([]*MockRequest, error) {
 
 		if mock, err := readMock(path.Join(dir, file.Name())); err != nil {
 			return nil, err
-		} else {
-			requests = append(requests, mock)
 		}
+		requests = append(requests, mock)
 	}
 
 	return requests, nil
