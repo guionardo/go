@@ -30,7 +30,7 @@ func TestRequest_matchBody(t *testing.T) {
 		assert.False(t, r.matchBody(request))
 	})
 
-	t.Run("should match when body is nil", func(t *testing.T) {
+	t.Run("should not match when request body is nil but mock expects body", func(t *testing.T) {
 		t.Parallel()
 
 		r := Request{
