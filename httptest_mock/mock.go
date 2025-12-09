@@ -97,13 +97,13 @@ func (m *MockRequest) Assert(t *testing.T) {
 	}
 
 	m.assertionLock.Lock()
+	defer m.assertionLock.Unlock()
 
 	if m.assertionActual == nil {
 		m.assertionActual = make(map[string]uint)
 	}
 
 	count := m.assertionActual[t.Name()]
-	m.assertionLock.Unlock()
 	assert.Equalf(t, m.ExpectedHits, count, "%s: expected %d hits, got %d", m.String(), m.ExpectedHits, count)
 }
 
