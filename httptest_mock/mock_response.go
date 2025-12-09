@@ -19,7 +19,7 @@ type (
 		Headers map[string]string `json:"headers" yaml:"headers"`
 
 		// DelayMs is an optional delay in milliseconds before sending the response
-		DelayMs int `json:"delay_ms" yaml:"delay_ms"` //nolint:unused
+		DelayMs int `json:"delay_ms" yaml:"delay_ms"`
 	}
 )
 
