@@ -226,7 +226,7 @@ A request is considered a **full match** when:
 2. **Path** matches exactly or all path parameters match
 3. **Query parameters** (if specified in mock) all match
 4. **Path parameters** (if specified in mock) all match
-5. **Headers** (if specified in mock) all match (case-insensitive)
+5. **Headers**: header names are matched case-insensitively (per HTTP spec), but header values are matched case-sensitively
 6. **Body** (if specified in mock) matches
 
 ### Partial Match
