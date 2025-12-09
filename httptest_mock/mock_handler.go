@@ -9,7 +9,7 @@ import (
 )
 
 // MockHandler is the internal HTTP handler that manages mock requests.
-// It implements http.Handler to serve as the handler for httptest.MockHandler.
+// It implements http.Handler to serve as the handler for httptest.Server.
 type MockHandler struct {
 	// requests holds all registered mock definitions to match against incoming requests.
 	requests []*Mock
