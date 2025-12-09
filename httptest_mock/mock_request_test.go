@@ -20,7 +20,7 @@ func (b *bodyWithError) Read(p []byte) (n int, err error) {
 func TestRequest_matchBody(t *testing.T) {
 	t.Parallel()
 
-	t.Run("when_spected_body_but_invalid_received_should_return_false", func(t *testing.T) {
+	t.Run("when_expected_body_but_invalid_received_should_return_false", func(t *testing.T) {
 		t.Parallel()
 
 		r := Request{
@@ -31,7 +31,7 @@ func TestRequest_matchBody(t *testing.T) {
 		assert.False(t, r.matchBody(request))
 	})
 
-	t.Run("when_spected_body_but_nil_received_should_return_false", func(t *testing.T) {
+	t.Run("when_expected_body_but_nil_received_should_return_false", func(t *testing.T) {
 		t.Parallel()
 
 		r := Request{

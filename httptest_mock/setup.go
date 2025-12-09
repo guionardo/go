@@ -22,7 +22,7 @@ const defaultLogHeader = "HTTPTestMock"
 //
 // Example:
 //
-//	server := httptestmock.SetupServer(t, httptestmock.WithRequestsFromDir("mocks"))
+//	server := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
 //	response, err := http.Get(server.URL + "/api/v1/example")
 //	require.NoError(t, err)
 //	defer func() { _ = response.Body.Close() }()
@@ -30,7 +30,7 @@ const defaultLogHeader = "HTTPTestMock"
 //
 // Available options:
 //   - WithRequests: Provide mock definitions programmatically
-//   - WithRequestsFromDir: Load mock definitions from a directory of JSON/YAML files
+//   - WithRequestsFrom: Load mock definitions from a directory of JSON/YAML files or specific files
 //   - WithPostRequestHook: Add a hook to modify the response before sending it
 //   - WithAddMockInfoToResponse: Add mock information to response headers
 //   - WithoutLog: Disable logging for the mock handler

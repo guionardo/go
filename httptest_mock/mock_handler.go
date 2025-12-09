@@ -116,7 +116,7 @@ func (s *MockHandler) DoPreResponseHook(m *Mock, r http.ResponseWriter) {
 // Call this at the end of your test to verify all mocks were hit.
 // Example usage:
 //
-//	mockHandler, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFromDir("testdata/mocks"))
+//	mockHandler, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("testdata/mocks"))
 //	defer assertFunc(t)
 func (s *MockHandler) Assert(t *testing.T) {
 	for _, request := range s.requests {

@@ -387,7 +387,7 @@ expected_hits: 1
 In your test:
 
 ```go
-server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFromDir("mocks"))
+server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
 defer assertFunc(t) // This will fail the test if health_check wasn't called exactly once
 
 // ... make your requests ...
