@@ -7,6 +7,10 @@ import (
 
 // GetMockHandlerFromServer retrieves the MockHandler from the given http.Server.
 func GetMockHandlerFromServer(server *httptest.Server) (*MockHandler, error) {
+	if server == nil {
+		return nil, errors.New("server is nil")
+	}
+
 	mockHandler, ok := server.Config.Handler.(*MockHandler)
 	if !ok {
 		return nil, errors.New("handler is not of type MockHandler")

@@ -50,7 +50,7 @@ func TestGetMockHandlerFromServer(t *testing.T) {
 		require.Equal(t, "Hello, appending", string(body))
 	})
 
-	t.Run("nil_server", func(t *testing.T) {
+	t.Run("unknown_handler", func(t *testing.T) {
 		t.Parallel()
 
 		server := httptest.NewServer(nil)
@@ -59,5 +59,32 @@ func TestGetMockHandlerFromServer(t *testing.T) {
 		handler, err := httptestmock.GetMockHandlerFromServer(server)
 		require.Error(t, err)
 		require.Nil(t, handler)
+	})
+
+	t.Run("nil_server", func(t *testing.T) {
+		t.Parallel()
+
+		var server *httptest.Server
+
+		handler, err := httptestmock.GetMockHandlerFromServer(server)
+		require.Error(t, err)
+		require.Nil(t, handler)
+	})
+}
+
+func TestGetMocksFrom(t *testing.T) {
+	t.Parallel()
+
+	t.Run("various_paths", func(t *testing.T) {
+		t.Parallel()
+
+		mocks, err := httptestmock.GetMocksFrom(
+			"mocks/example_1.yaml",
+			"mocks/assertions",
+			"mocks/nonexistent.yaml", // this should produce an error
+		)
+
+		require.Error(t, err)
+		require.Len(t, mocks, 2) // assuming there are 4 valid mocks in the provided paths
 	})
 }

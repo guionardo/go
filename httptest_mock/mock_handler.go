@@ -151,12 +151,13 @@ func (s *MockHandler) log(format string, args ...any) {
 // AddMocks appends new mock requests to the existing ones in the handler.
 func (s *MockHandler) AddMocks(requests ...*Mock) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.requests = append(s.requests, requests...)
-	s.mu.Unlock()
 
 	for _, req := range requests {
 		s.log("%s registered %s", s.logHeader, req.String())
-		s.extraLogger.Info(s.logHeader+"registered", slog.String("mock", req.String()))
+		s.extraLogger.Info(s.logHeader+" registered", slog.String("mock", req.String()))
 	}
 
 	return s.Validate()

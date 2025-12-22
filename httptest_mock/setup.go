@@ -94,6 +94,8 @@ func WithRequests(requests ...*Mock) func(*MockHandler) {
 // Path can be a mix of files and directories and contain patterns.
 // If a directory is provided, all valid mock files within it will be loaded.
 // Subdirectories are not traversed.
+// When some invalid mock is found, the setup error will contain details about all issues encountered,
+// but the valid mocks will still be loaded.
 //
 // Example:
 //
@@ -102,7 +104,7 @@ func WithRequestsFrom(paths ...string) func(*MockHandler) {
 	return func(s *MockHandler) {
 		requests, err := GetMocksFrom(paths...)
 		if err != nil {
-			s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks from paths %v: %w", paths, err))
+			s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks: %w", err))
 		}
 		WithRequests(requests...)(s)
 	}
@@ -159,10 +161,11 @@ func WithoutLog() func(*MockHandler) {
 }
 
 // WithExtraLogger allows setting an additional logger for the MockHandler.
-// This can be any type that implements the ILogger interface, such as slog.Logger or log.Logger.
 // The extra logger can be used for custom logging needs alongside the default logging behavior.
 //
 // Example:
+//
+//	httptestmock.WithExtraLogger(slog.New(slog.NewTextHandler(os.Stdout, nil)))
 func WithExtraLogger(logger *slog.Logger) func(*MockHandler) {
 	return func(s *MockHandler) {
 		if logger == nil {
@@ -197,6 +200,10 @@ func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
 		if mock, err := readMock(match); err == nil {
 			requests = append(requests, mock)
 		}
+	}
+
+	if len(requests) == 0 {
+		return nil, fmt.Errorf("no valid mock definitions found in path: %s", sourcePath)
 	}
 
 	return requests, nil
