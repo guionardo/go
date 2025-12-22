@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,8 +39,10 @@ const defaultLogHeader = "HTTPTestMock"
 // The function will call t.Fatalf if server validation fails (no mocks or invalid mock definitions).
 func SetupServer(t *testing.T, options ...func(*MockHandler)) (server *httptest.Server, assertFunc func(*testing.T)) {
 	mockHandler := &MockHandler{
-		T:         t,
-		logHeader: defaultLogHeader}
+		T:           t,
+		logHeader:   defaultLogHeader,
+		extraLogger: slog.New(slog.DiscardHandler),
+	}
 	for _, option := range options {
 		option(mockHandler)
 	}
@@ -91,24 +94,18 @@ func WithRequests(requests ...*Mock) func(*MockHandler) {
 // Path can be a mix of files and directories and contain patterns.
 // If a directory is provided, all valid mock files within it will be loaded.
 // Subdirectories are not traversed.
+// When some invalid mock is found, the setup error will contain details about all issues encountered,
+// but the valid mocks will still be loaded.
 //
 // Example:
 //
 //	server := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("testdata/mocks"))
 func WithRequestsFrom(paths ...string) func(*MockHandler) {
 	return func(s *MockHandler) {
-		var requests []*Mock
-
-		for _, p := range paths {
-			mocks, err := readMocksFromPath(p)
-			if err != nil {
-				s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks from path %q: %w", p, err))
-				continue
-			}
-
-			requests = append(requests, mocks...)
+		requests, err := GetMocksFrom(paths...)
+		if err != nil {
+			s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks: %w", err))
 		}
-
 		WithRequests(requests...)(s)
 	}
 }
@@ -163,6 +160,22 @@ func WithoutLog() func(*MockHandler) {
 	}
 }
 
+// WithExtraLogger allows setting an additional logger for the MockHandler.
+// The extra logger can be used for custom logging needs alongside the default logging behavior.
+//
+// Example:
+//
+//	httptestmock.WithExtraLogger(slog.New(slog.NewTextHandler(os.Stdout, nil)))
+func WithExtraLogger(logger *slog.Logger) func(*MockHandler) {
+	return func(s *MockHandler) {
+		if logger == nil {
+			s.extraLogger = slog.New(slog.DiscardHandler)
+		} else {
+			s.extraLogger = logger
+		}
+	}
+}
+
 func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
 	matches, err := filepath.Glob(sourcePath)
 	if err != nil {
@@ -187,6 +200,10 @@ func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
 		if mock, err := readMock(match); err == nil {
 			requests = append(requests, mock)
 		}
+	}
+
+	if len(requests) == 0 {
+		return nil, fmt.Errorf("no valid mock definitions found in path: %s", sourcePath)
 	}
 
 	return requests, nil
@@ -256,6 +273,10 @@ func unmarshalMock(data []byte) (request *Mock, err error) {
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json/yaml: %w", err)
+	}
+
+	if err := mock.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid mock definition: %w", err)
 	}
 
 	return &mock, nil
