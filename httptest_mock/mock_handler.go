@@ -131,3 +131,21 @@ func (s *MockHandler) log(format string, args ...any) {
 
 	s.T.Logf("%s "+format, append([]any{s.logHeader}, args...)...)
 }
+
+func (s *MockHandler) AddRequests(requests ...*Mock) {
+	s.requests = append(s.requests, requests...)
+}
+
+// GetMockHandlerFromServer retrieves the MockHandler from the given http.Server.
+func GetMockHandlerFromServer(server *http.Server) (*MockHandler, error) {
+	if server == nil || server.Handler == nil {
+		return nil, errors.New("server or handler is nil")
+	}
+
+	mockHandler, ok := server.Handler.(*MockHandler)
+	if !ok {
+		return nil, errors.New("handler is not of type MockHandler")
+	}
+
+	return mockHandler, nil
+}
