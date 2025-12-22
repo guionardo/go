@@ -3,34 +3,43 @@ package httptestmock
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 )
 
 // MockHandler is the internal HTTP handler that manages mock requests.
 // It implements http.Handler to serve as the handler for httptest.Server.
-type MockHandler struct {
-	// requests holds all registered mock definitions to match against incoming requests.
-	requests []*Mock
+type (
+	MockHandler struct {
+		// requests holds all registered mock definitions to match against incoming requests.
+		requests []*Mock
 
-	// T is the testing context, used for logging and cleanup.
-	T *testing.T
+		// T is the testing context, used for logging and cleanup.
+		T *testing.T
 
-	// logHeader is the prefix used for all log messages from this server.
-	logHeader string
+		// logHeader is the prefix used for all log messages from this server.
+		logHeader string
 
-	// preResponseHook is called before a response is sent.
-	preResponseHooks []func(*Mock, http.ResponseWriter)
+		// preResponseHook is called before a response is sent.
+		preResponseHooks []func(*Mock, http.ResponseWriter)
 
-	// logDisabled indicates whether logging is enabled for this handler.
-	logDisabled bool
+		// logDisabled indicates whether logging is enabled for this handler.
+		logDisabled bool
 
-	// setupError is set if there was an error during setup.
-	// This is used to fail the test if the setup fails.
-	// It should be checked after calling SetupServer.
-	setupError error
-}
+		// setupError is set if there was an error during setup.
+		// This is used to fail the test if the setup fails.
+		// It should be checked after calling SetupServer.
+		setupError error
+
+		// mu protects concurrent access to the handler's requests.
+		mu sync.RWMutex
+
+		extraLogger *slog.Logger
+	}
+)
 
 // ServeHTTP implements the http.Handler interface.
 // It iterates through registered mocks and returns the response for the first match.
@@ -39,10 +48,13 @@ type MockHandler struct {
 func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	partialMatchRequests := make([]*Mock, 0)
 
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for _, request := range s.requests {
 		switch request.Request.match(r) {
 		case matchLevelFull:
 			s.log("%s request matched %s", s.logHeader, request.String())
+			s.extraLogger.Info(s.logHeader+" matched", slog.String("mock", request.String()))
 			s.DoPreResponseHook(request, w)
 			request.Response.writeResponse(w)
 			request.RegisterHit(s.T)
@@ -52,6 +64,7 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case matchLevelPartial:
 			if request.Request.PartialMatch {
 				s.log("%s request partially matched %s", s.logHeader, request.String())
+				s.extraLogger.Info(s.logHeader+" partially matched", slog.String("mock", request.String()))
 				s.DoPreResponseHook(request, w)
 				request.Response.writeResponse(w)
 				request.RegisterHit(s.T)
@@ -63,6 +76,9 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// the request did not match, let's continue to the next one
 			s.log("%s request did not match %s:\n%s", s.logHeader,
 				request.String(), strings.Join(request.Request.matchLog, "\n"))
+			s.extraLogger.Warn(s.logHeader+" request did not match",
+				slog.String("request", request.String()),
+				slog.String("log", strings.Join(request.Request.matchLog, "\n")))
 		}
 	}
 
@@ -132,20 +148,16 @@ func (s *MockHandler) log(format string, args ...any) {
 	s.T.Logf("%s "+format, append([]any{s.logHeader}, args...)...)
 }
 
-func (s *MockHandler) AddRequests(requests ...*Mock) {
+// AddMocks appends new mock requests to the existing ones in the handler.
+func (s *MockHandler) AddMocks(requests ...*Mock) error {
+	s.mu.Lock()
 	s.requests = append(s.requests, requests...)
-}
+	s.mu.Unlock()
 
-// GetMockHandlerFromServer retrieves the MockHandler from the given http.Server.
-func GetMockHandlerFromServer(server *http.Server) (*MockHandler, error) {
-	if server == nil || server.Handler == nil {
-		return nil, errors.New("server or handler is nil")
+	for _, req := range requests {
+		s.log("%s registered %s", s.logHeader, req.String())
+		s.extraLogger.Info(s.logHeader+"registered", slog.String("mock", req.String()))
 	}
 
-	mockHandler, ok := server.Handler.(*MockHandler)
-	if !ok {
-		return nil, errors.New("handler is not of type MockHandler")
-	}
-
-	return mockHandler, nil
+	return s.Validate()
 }

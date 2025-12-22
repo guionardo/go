@@ -20,7 +20,6 @@ func TestCollect(t *testing.T) {
 		{"collectHostnamectl", collectHostnamectl, false},
 		{"collectDbusMachineId", collectDbusMachineId, false},
 		{"collectEtcMachineId", collectEtcMachineId, false},
-		// {"emptyResult", func() (string, error) { return outErr("", "empty") }, true},
 	}
 	previous := collectFuncs
 
