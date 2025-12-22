@@ -18,6 +18,9 @@ A Go library for creating HTTP mock servers in tests using declarative JSON/YAML
 - **Request assertions**: Verify that mocks were called the expected number of times
 - **Post-request hooks**: Modify responses or perform actions before sending responses
 - **Debugging support**: Add mock information to response headers for easier debugging
+- **Dynamic mock management**: Add new mocks to running servers at runtime
+- **Structured logging**: Optional slog.Logger integration for structured logging
+- **Helper utilities**: Load mocks from files, retrieve handlers from servers, and more
 
 ## Installation
 
@@ -212,6 +215,67 @@ Disables logging output from the mock handler. Useful when you want to suppress 
 
 ```go
 httptestmock.WithoutLog()
+```
+
+#### WithExtraLogger
+
+Allows setting an additional structured logger (slog.Logger) for the MockHandler. This provides structured logging alongside the default test logging.
+
+```go
+logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+httptestmock.WithExtraLogger(logger)
+```
+
+## Helper Functions
+
+### GetMockHandlerFromServer
+
+Retrieves the MockHandler from an httptest.Server instance. This is useful when you need to dynamically add more mocks to an existing server.
+
+```go
+server, _ := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+handler, err := httptestmock.GetMockHandlerFromServer(server)
+if err != nil {
+    t.Fatal(err)
+}
+```
+
+### AddMocks
+
+Dynamically adds new mock requests to an existing MockHandler. This allows you to modify the server behavior during test execution.
+
+```go
+server, _ := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+handler, _ := httptestmock.GetMockHandlerFromServer(server)
+
+newMock := &httptestmock.Mock{
+    Name: "dynamic_mock",
+    Request: httptestmock.Request{
+        Method: "GET",
+        Path:   "/dynamic",
+    },
+    Response: httptestmock.Response{
+        Status: 200,
+        Body:   "Added at runtime",
+    },
+}
+
+err := handler.AddMocks(newMock)
+if err != nil {
+    t.Fatal(err)
+}
+```
+
+### GetMocksFrom
+
+Loads mock definitions from file paths or directories without creating a server. This is useful when you want to load and inspect mocks before server setup.
+
+```go
+mocks, err := httptestmock.GetMocksFrom("mocks", "custom_mock.yaml")
+if err != nil {
+    t.Fatal(err)
+}
+// Use mocks as needed
 ```
 
 ## Request Matching
@@ -430,6 +494,54 @@ server, assertFunc := httptestmock.SetupServer(t,
     }),
 )
 defer assertFunc(t)
+```
+
+### Dynamic Mock Management
+
+Add new mocks to a running server dynamically:
+
+```go
+func TestDynamicMockManagement(t *testing.T) {
+    // Start server with initial mocks
+    server, assertFunc := httptestmock.SetupServer(t,
+        httptestmock.WithRequestsFrom("mocks"))
+    defer assertFunc(t)
+
+    // Get the handler from the server
+    handler, err := httptestmock.GetMockHandlerFromServer(server)
+    require.NoError(t, err)
+
+    // Make initial request
+    resp, err := http.Get(server.URL + "/api/v1/users")
+    require.NoError(t, err)
+    require.Equal(t, http.StatusOK, resp.StatusCode)
+    resp.Body.Close()
+
+    // Add a new mock at runtime
+    newMock := &httptestmock.Mock{
+        Name: "dynamic_endpoint",
+        Request: httptestmock.Request{
+            Method: "POST",
+            Path:   "/api/v1/users",
+        },
+        Response: httptestmock.Response{
+            Status: 201,
+            Body:   map[string]any{"id": 123, "created": true},
+            Headers: map[string]string{
+                "Content-Type": "application/json",
+            },
+        },
+    }
+
+    err = handler.AddMocks(newMock)
+    require.NoError(t, err)
+
+    // Now the new endpoint is available
+    resp, err = http.Post(server.URL+"/api/v1/users", "application/json", nil)
+    require.NoError(t, err)
+    require.Equal(t, http.StatusCreated, resp.StatusCode)
+    resp.Body.Close()
+}
 ```
 
 ## License
