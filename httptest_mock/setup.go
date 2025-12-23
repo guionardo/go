@@ -176,6 +176,15 @@ func WithExtraLogger(logger *slog.Logger) func(*MockHandler) {
 	}
 }
 
+// WithDisabledPartialMatch disables partial matching for requests.
+// When partial matching is disabled, requests must fully match to be considered a match.
+// Partial matches will be treated as no match.
+func WithDisabledPartialMatch() func(*MockHandler) {
+	return func(s *MockHandler) {
+		s.disablePartialMatch = true
+	}
+}
+
 func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
 	matches, err := filepath.Glob(sourcePath)
 	if err != nil {

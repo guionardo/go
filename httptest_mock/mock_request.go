@@ -65,7 +65,7 @@ func (m Request) String() string {
 
 // match checks if the HTTP request matches the defined criteria.
 // Compares method, path, query parameters, headers, and body.
-func (m *Request) match(r *http.Request) requestMatchLevel {
+func (m *Request) match(r *http.Request, disablePartialMatch bool) requestMatchLevel {
 	if m.Method != r.Method {
 		m.setMatchLog("METHOD", m.Method, r.Method)
 		return matchLevelNone
@@ -80,6 +80,10 @@ func (m *Request) match(r *http.Request) requestMatchLevel {
 	if m.matchQueryParams(r) && m.matchPathParams(r) && m.matchHeaders(r) && m.matchBody(r) {
 		m.matchLog = append(m.matchLog, matchEmoji+" MATCH")
 		return matchLevelFull
+	}
+
+	if disablePartialMatch {
+		return matchLevelNone
 	}
 
 	return matchLevelPartial

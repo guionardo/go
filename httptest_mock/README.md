@@ -226,6 +226,16 @@ logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 httptestmock.WithExtraLogger(logger)
 ```
 
+#### WithDisabledPartialMatch
+
+Disables partial matching for requests. When partial matching is disabled, requests must fully match all criteria to be considered a match. Partial matches will be treated as no match and return `404 Not Found` instead of `400 Bad Request`.
+
+This is useful when you want strict matching behavior and don't want to see candidate mocks in logs or responses.
+
+```go
+httptestmock.WithDisabledPartialMatch()
+```
+
 ## Helper Functions
 
 ### GetMockHandlerFromServer
@@ -299,6 +309,8 @@ When a request matches method and path but not all other criteria, it's a **part
 
 If no full match is found and partial matches exist without `partial_match: true`, the server returns `400 Bad Request` with details about candidate mocks.
 
+**Note**: You can disable partial matching entirely using the `WithDisabledPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
+
 ### Path Parameters
 
 Path parameters are defined using curly braces in the path:
@@ -318,6 +330,7 @@ When a request doesn't match any mock:
 
 - **No match at all**: Returns `404 Not Found`
 - **Partial match exists** (but `partial_match` not enabled): Returns `400 Bad Request` with logging of candidate mocks for debugging
+- **Partial matching disabled** (using `WithDisabledPartialMatch()`): All non-full matches return `404 Not Found`
 
 ## Response Body Types
 
@@ -541,6 +554,32 @@ func TestDynamicMockManagement(t *testing.T) {
     require.NoError(t, err)
     require.Equal(t, http.StatusCreated, resp.StatusCode)
     resp.Body.Close()
+}
+```
+
+### Strict Matching (Disable Partial Match)
+
+Enforce strict matching where requests must fully match all criteria:
+
+```go
+func TestStrictMatching(t *testing.T) {
+    // Setup server with strict matching enabled
+    server, assertFunc := httptestmock.SetupServer(t,
+        httptestmock.WithRequestsFrom("mocks"),
+        httptestmock.WithDisabledPartialMatch())
+    defer assertFunc(t)
+
+    // This request will only match if ALL criteria match
+    // Partial matches will return 404 instead of 400
+    resp, err := http.Get(server.URL + "/api/v1/users/123")
+    require.NoError(t, err)
+    defer resp.Body.Close()
+
+    // If the mock doesn't fully match (e.g., missing headers),
+    // it returns 404 instead of showing candidate mocks
+    if resp.StatusCode == http.StatusNotFound {
+        t.Log("No full match found - strict matching enforced")
+    }
 }
 ```
 
