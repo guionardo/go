@@ -37,7 +37,11 @@ type (
 		// mu protects concurrent access to the handler's requests.
 		mu sync.RWMutex
 
+		// extraLogger is an optional additional logger for more detailed logs.
 		extraLogger *slog.Logger
+
+		// disablePartialMatch indicates whether partial matching is disabled.
+		disablePartialMatch bool
 	}
 )
 
@@ -51,7 +55,7 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, request := range s.requests {
-		switch request.Request.match(r) {
+		switch request.Request.match(r, s.disablePartialMatch) {
 		case matchLevelFull:
 			s.log("%s request matched %s", s.logHeader, request.String())
 			s.extraLogger.Info(s.logHeader+" matched", slog.String("mock", request.String()))

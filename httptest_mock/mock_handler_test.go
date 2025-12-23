@@ -184,3 +184,18 @@ func TestMockHandler_Validate(t *testing.T) {
 		require.Error(t, s.Validate())
 	})
 }
+
+func TestMockHandlerNoPartialRequests(t *testing.T) {
+	t.Parallel()
+
+	s, assertFunc := httptestmock.SetupServer(t,
+		httptestmock.WithRequestsFrom(path.Join("mocks", "examples")),
+		httptestmock.WithDisabledPartialMatch(),
+		httptestmock.WithAddMockInfoToResponse("TestNoPartialMatch"))
+	defer assertFunc(t)
+
+	req, _ := http.NewRequest("GET", s.URL+"/api/v1/users/123", nil)
+	resp, _, _, err := doRequest(t, req) //nolint:bodyclose
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
