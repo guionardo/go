@@ -228,7 +228,7 @@ httptestmock.WithExtraLogger(logger)
 
 #### WithDisabledPartialMatch
 
-Disables partial matching for requests. When enabled, requests must fully match all criteria to be considered a match. Partial matches will be treated as no match and return `404 Not Found` instead of `400 Bad Request`.
+Disables partial matching for requests. When partial matching is disabled, requests must fully match all criteria to be considered a match. Partial matches will be treated as no match and return `404 Not Found` instead of `400 Bad Request`.
 
 This is useful when you want strict matching behavior and don't want to see candidate mocks in logs or responses.
 
