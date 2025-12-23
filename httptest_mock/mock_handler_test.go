@@ -194,7 +194,10 @@ func TestMockHandlerNoPartialRequests(t *testing.T) {
 		httptestmock.WithAddMockInfoToResponse("TestNoPartialMatch"))
 	defer assertFunc(t)
 
-	req, _ := http.NewRequest("GET", s.URL+"/api/v1/users/123", nil)
+	// Send a POST request to /api/v1/users/123 (matches example_1's method and path)
+	// but without the required query params, headers, or body to trigger partial match logic.
+	// With WithDisabledPartialMatch(), this should return 404 instead of a partial match.
+	req, _ := http.NewRequest("POST", s.URL+"/api/v1/users/123", nil)
 	resp, _, _, err := doRequest(t, req) //nolint:bodyclose
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
