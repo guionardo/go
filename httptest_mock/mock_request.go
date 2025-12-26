@@ -189,6 +189,8 @@ func (m *Request) matchBody(r *http.Request) bool {
 
 	if !compareBody(m.Body, body) {
 		m.matchLog = append(m.matchLog, fmt.Sprintf("%s BODY %s != %s", noMatchEmoji, body, m.Body))
+		// if body does not match, must replace the body so it can be read again
+		r.Body = io.NopCloser(bytes.NewBuffer(body))
 		return false
 	}
 
