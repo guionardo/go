@@ -3,7 +3,7 @@ package brdocs_test
 import (
 	"testing"
 
-	brdocs "github.com/guionardo/go/pkg/br_docs"
+	brdocs "github.com/guionardo/go/br_docs"
 	"github.com/stretchr/testify/assert"
 )
 

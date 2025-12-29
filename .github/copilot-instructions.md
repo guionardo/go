@@ -4,8 +4,9 @@ This repository contains Golang tools, examples, and packages. It's a collection
 
 ## Repository Structure
 
+- `br_docs/` - Brazilian document validation (CPF, CNPJ)
+- `httptest_mock/` - Mocking helper for http requests
 - `pkg/` - Contains all packages organized by functionality:
-  - `br_docs/` - Brazilian document validation (CPF, CNPJ)
   - `flow/` - Logic flow utilities (ternary operator, default values)
   - `fraction/` - Fraction type and operations
   - `mid/` - Machine identification utilities
