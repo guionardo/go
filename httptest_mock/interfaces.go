@@ -41,8 +41,16 @@ type (
 		// Logs returns all log messages associated with the mock.
 		Logs() []string
 
+		// GetPathValue returns the value of the captured path parameter identified by key
+		// from the matched request path. It returns an empty string if the key is not present.
 		GetPathValue(key string) string
+
+		// GetQueryValue returns the value of the query parameter identified by key from the
+		// matched request URL. It returns an empty string if the key is not present.
 		GetQueryValue(key string) string
+
+		// GetHeaderValue returns the value of the request header identified by key from the
+		// matched request. It returns an empty string if the header is not present.
 		GetHeaderValue(key string) string
 	}
 
