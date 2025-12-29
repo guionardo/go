@@ -5,7 +5,7 @@ import (
 	"path"
 	"testing"
 
-	pathtools "github.com/guionardo/go/pkg/path_tools"
+	pathtools "github.com/guionardo/go/path_tools"
 	"github.com/stretchr/testify/require"
 )
 

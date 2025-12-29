@@ -5,14 +5,14 @@ This repository contains Golang tools, examples, and packages. It's a collection
 ## Repository Structure
 
 - `br_docs/` - Brazilian document validation (CPF, CNPJ)
+- `flow/` - Logic flow utilities (ternary operator, default values)
+- `fraction/` - Fraction type and operations
 - `httptest_mock/` - Mocking helper for http requests
-- `pkg/` - Contains all packages organized by functionality:
-  - `flow/` - Logic flow utilities (ternary operator, default values)
-  - `fraction/` - Fraction type and operations
-  - `mid/` - Machine identification utilities
-  - `path_tools/` - File and directory path utilities
-  - `set/` - Generic set implementation
-  - `shell_tools/` - Shell argument parsing utilities
+- `mid/` - Machine identification utilities
+- `path_tools/` - File and directory path utilities
+- `reflect_tools/` - Reflection and typing utilities
+- `set/` - Generic set implementation
+- `shell_tools/` - Shell argument parsing utilities
 
 ## Development Workflow
 
