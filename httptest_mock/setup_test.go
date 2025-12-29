@@ -125,7 +125,7 @@ func Test_unmarshalMock(t *testing.T) {
 
 		mock, err := readMock(path.Join("mocks", "get_user.json"))
 		require.NoError(t, err)
-		require.Equal(t, "get_user", mock.Name)
+		require.Equal(t, "get_user", mock.MockName)
 	})
 
 	t.Run("when_input_is_valid_yaml_then_success", func(t *testing.T) {
@@ -133,7 +133,7 @@ func Test_unmarshalMock(t *testing.T) {
 
 		mock, err := readMock(path.Join("mocks", "example_1.yaml"))
 		require.NoError(t, err)
-		require.Equal(t, "example_1", mock.Name)
+		require.Equal(t, "example_1", mock.MockName)
 	})
 
 	t.Run("when_input_is_invalid_then_error", func(t *testing.T) {
@@ -161,7 +161,7 @@ func Test_readMock(t *testing.T) {
 
 		mock, err := readMock("mocks/example_2_noname.yaml")
 		require.NoError(t, err)
-		require.Equal(t, "example_2_noname", mock.Name)
+		require.Equal(t, "example_2_noname", mock.MockName)
 	})
 
 	t.Run("simple mock should be read successfully", func(t *testing.T) {
@@ -169,7 +169,7 @@ func Test_readMock(t *testing.T) {
 
 		mock, err := readMock("mocks/get_user.json")
 		require.NoError(t, err)
-		require.Equal(t, "get_user", mock.Name)
+		require.Equal(t, "get_user", mock.MockName)
 		require.Equal(t, "GET", mock.Request.Method)
 		require.Equal(t, "/api/v1/users/123", mock.Request.Path)
 	})

@@ -55,17 +55,17 @@ func SetupServer(t *testing.T, options ...func(*MockHandler)) (server *httptest.
 		t.Fatalf("failed to validate server: %v", err) // nocover
 	}
 
-	mockServer := httptest.NewServer(mockHandler)
+	mockHandler.server = httptest.NewServer(mockHandler)
 
 	t.Logf("%s server started", mockHandler.logHeader)
 
 	// Start cleanup goroutine that closes the server when test ends
 	go func() {
 		<-t.Context().Done()
-		mockServer.Close()
+		mockHandler.server.Close()
 	}()
 
-	return mockServer, mockHandler.Assert
+	return mockHandler.server, mockHandler.Assert
 }
 
 // WithRequests configures the server with programmatically defined mock requests.
@@ -80,11 +80,16 @@ func SetupServer(t *testing.T, options ...func(*MockHandler)) (server *httptest.
 //	        Response: httptestmock.Response{Status: 200, Body: "OK"},
 //	    },
 //	))
-func WithRequests(requests ...*Mock) func(*MockHandler) {
+func WithRequests(mocks ...Mocker) func(*MockHandler) {
 	return func(s *MockHandler) {
-		s.requests = requests
-		for _, req := range requests {
-			s.log("%s registered %s", s.logHeader, req.String())
+		s.mocks = make([]Mocker, 0, len(mocks))
+		for _, req := range mocks {
+			if err := req.Validate(); err != nil {
+				s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to validate request: %w", err))
+			} else {
+				s.mocks = append(s.mocks, req)
+				s.log("%s registered %s", s.logHeader, req.String())
+			}
 		}
 	}
 }
@@ -102,11 +107,12 @@ func WithRequests(requests ...*Mock) func(*MockHandler) {
 //	server := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("testdata/mocks"))
 func WithRequestsFrom(paths ...string) func(*MockHandler) {
 	return func(s *MockHandler) {
-		requests, err := GetMocksFrom(paths...)
+		mocks, err := GetMocksFrom(paths...)
 		if err != nil {
 			s.setupError = errors.Join(s.setupError, fmt.Errorf("failed to read mocks: %w", err))
 		}
-		WithRequests(requests...)(s)
+
+		WithRequests(mocks...)(s)
 	}
 }
 
@@ -120,7 +126,7 @@ func WithRequestsFrom(paths ...string) func(*MockHandler) {
 //	httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWriter) {
 //	    w.Header().Set("X-Custom-Header", "value")
 //	})
-func WithPostRequestHook(hook func(*Mock, http.ResponseWriter)) func(*MockHandler) {
+func WithPostRequestHook(hook func(Mocker, http.ResponseWriter)) func(*MockHandler) {
 	return func(s *MockHandler) {
 		s.preResponseHooks = append(s.preResponseHooks, hook)
 	}
@@ -128,7 +134,7 @@ func WithPostRequestHook(hook func(*Mock, http.ResponseWriter)) func(*MockHandle
 
 // WithAddMockInfoToResponse adds mock information to the response headers.
 // This is useful for debugging and tracking which mock was used for the response.
-// The headers will include the mock name and path.
+// The headers will include the mock name.
 // You can customize the header prefix by passing a string argument.
 //
 // Example:
@@ -144,10 +150,9 @@ func WithAddMockInfoToResponse(headerPrefix ...string) func(*MockHandler) {
 
 	prefix = strings.Trim(prefix, "-_.")
 
-	return WithPostRequestHook(func(mr *Mock, w http.ResponseWriter) {
+	return WithPostRequestHook(func(mr Mocker, w http.ResponseWriter) {
 		// Add mock information to the response
-		w.Header().Set(prefix+"-Name", mr.Name)
-		w.Header().Set(prefix+"-Path", mr.Request.Path)
+		w.Header().Set(prefix+"-Name", mr.Name())
 	})
 }
 
@@ -176,16 +181,16 @@ func WithExtraLogger(logger *slog.Logger) func(*MockHandler) {
 	}
 }
 
-// WithDisabledPartialMatch disables partial matching for requests.
+// WithAcceptingPartialMatch enables partial matching for requests.
 // When partial matching is disabled, requests must fully match to be considered a match.
 // Partial matches will be treated as no match.
-func WithDisabledPartialMatch() func(*MockHandler) {
+func WithAcceptingPartialMatch() func(*MockHandler) {
 	return func(s *MockHandler) {
-		s.disablePartialMatch = true
+		s.allowPartialMatch = true
 	}
 }
 
-func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
+func readMocksFromPath(sourcePath string) (requests []Mocker, err error) {
 	matches, err := filepath.Glob(sourcePath)
 	if err != nil {
 		return nil, err
@@ -221,13 +226,13 @@ func readMocksFromPath(sourcePath string) (requests []*Mock, err error) {
 // readMocks reads all mock definitions from a directory.
 // Processes files with .json, .yaml, or .yml extensions.
 // Subdirectories are skipped.
-func readMocks(dir string) ([]*Mock, error) {
+func readMocks(dir string) ([]Mocker, error) {
 	files, err := os.ReadDir(filepath.Clean(dir))
 	if err != nil {
 		return nil, err
 	}
 
-	requests := make([]*Mock, 0, len(files))
+	mocks := make([]Mocker, 0, len(files))
 	for _, file := range files {
 		ext := strings.ToLower(path.Ext(file.Name()))
 		// Skip directories and non-mock files
@@ -240,10 +245,10 @@ func readMocks(dir string) ([]*Mock, error) {
 			return nil, err
 		}
 
-		requests = append(requests, mock)
+		mocks = append(mocks, mock)
 	}
 
-	return requests, nil
+	return mocks, nil
 }
 
 // readMock reads and parses a mock definition from a JSON or YAML file.
@@ -257,8 +262,8 @@ func readMock(path string) (*Mock, error) {
 	mock, err := unmarshalMock(file)
 	if err == nil {
 		// Use filename as mock name if not specified
-		if mock.Name == "" {
-			mock.Name = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		if mock.MockName == "" {
+			mock.MockName = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 		}
 
 		mock.source = path

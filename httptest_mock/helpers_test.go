@@ -26,7 +26,7 @@ func TestGetMockHandlerFromServer(t *testing.T) {
 		handler, err := httptestmock.GetMockHandlerFromServer(server)
 		require.NoError(t, err)
 		err = handler.AddMocks(&httptestmock.Mock{
-			Name: "appended_request",
+			MockName: "appended_request",
 			Request: httptestmock.Request{
 				Method: http.MethodGet,
 				Path:   "/appended",

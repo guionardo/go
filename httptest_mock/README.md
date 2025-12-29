@@ -13,14 +13,17 @@ A Go library for creating HTTP mock servers in tests using declarative JSON/YAML
 - **Request matching**: Match requests by method, path (including path parameters with `{param}` syntax), query parameters, headers, and body
 - **Validation**: Built-in validation for mock definitions using struct tags
 - **Flexible responses**: Support for JSON, string, and byte body responses with custom headers and status codes
+- **Automatic JSON headers**: When `response.body` is an object/map, the library JSON-encodes it and sets `Content-Type: application/json` automatically (unless you override it)
 - **Response delays**: Simulate network latency or processing time with configurable delays
 - **Partial matching**: Accept requests even when not all parameters match (useful for flexible testing)
 - **Request assertions**: Verify that mocks were called the expected number of times
 - **Post-request hooks**: Modify responses or perform actions before sending responses
-- **Debugging support**: Add mock information to response headers for easier debugging
+- **Debugging support**: Add the matched mock name to response headers for easier debugging
 - **Dynamic mock management**: Add new mocks to running servers at runtime
 - **Structured logging**: Optional slog.Logger integration for structured logging
 - **Helper utilities**: Load mocks from files, retrieve handlers from servers, and more
+- **Builder API**: Fluent helpers to build mocks in code (`NewMock`, `FastServe`) and create custom handlers
+- **Captured request values**: Access matched `{path}` params, query params, and headers from inside custom handlers
 
 ## Installation
 
@@ -178,11 +181,9 @@ Provides mock definitions programmatically.
 
 ```go
 httptestmock.WithRequests(&httptestmock.Mock{
-    {
-        Name: "health_check",
-        Request:  httptestmock.Request{Method: "GET", Path: "/health"},
-        Response: httptestmock.Response{Status: 200, Body: "OK"},
-    },
+    MockName: "health_check",
+    Request:  httptestmock.Request{Method: "GET", Path: "/health"},
+    Response: httptestmock.Response{Status: 200, Body: "OK"},
 })
 ```
 
@@ -191,7 +192,7 @@ httptestmock.WithRequests(&httptestmock.Mock{
 Adds a hook function that is called before sending the response. This allows you to modify the response or perform additional actions.
 
 ```go
-httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWriter) {
+httptestmock.WithPostRequestHook(func(mr httptestmock.Mocker, w http.ResponseWriter) {
     w.Header().Set("X-Custom-Header", "custom-value")
     // Log or perform other actions
 })
@@ -199,13 +200,13 @@ httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWrit
 
 #### WithAddMockInfoToResponse
 
-Adds mock debugging information to response headers. By default, adds `HTTPTestMock-Name` and `HTTPTestMock-Path` headers. You can customize the header prefix:
+Adds mock debugging information to response headers. By default, adds `HTTPTestMock-Name` (header names are case-insensitive). You can customize the header prefix:
 
 ```go
-// Default headers: HTTPTestMock-Name and HTTPTestMock-Path
+// Default header: HTTPTestMock-Name
 httptestmock.WithAddMockInfoToResponse()
 
-// Custom headers: X-Mock-Name and X-Mock-Path
+// Custom header: X-Mock-Name
 httptestmock.WithAddMockInfoToResponse("X-Mock")
 ```
 
@@ -226,14 +227,14 @@ logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 httptestmock.WithExtraLogger(logger)
 ```
 
-#### WithDisabledPartialMatch
+#### WithAcceptingPartialMatch
 
-Disables partial matching for requests. When partial matching is disabled, requests must fully match all criteria to be considered a match. Partial matches will be treated as no match and return `404 Not Found` instead of `400 Bad Request`.
+Enables partial matching for requests. When partial matching is enabled, requests that matches at least `method` and `path` will be considered a match. Otherwise, it must fully match all criteria to be considered a match.
 
 This is useful when you want strict matching behavior and don't want to see candidate mocks in logs or responses.
 
 ```go
-httptestmock.WithDisabledPartialMatch()
+httptestmock.WithAcceptingPartialMatch()
 ```
 
 ## Helper Functions
@@ -243,7 +244,8 @@ httptestmock.WithDisabledPartialMatch()
 Retrieves the MockHandler from an httptest.Server instance. This is useful when you need to dynamically add more mocks to an existing server.
 
 ```go
-server, _ := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+defer assertFunc(t)
 handler, err := httptestmock.GetMockHandlerFromServer(server)
 if err != nil {
     t.Fatal(err)
@@ -255,11 +257,12 @@ if err != nil {
 Dynamically adds new mock requests to an existing MockHandler. This allows you to modify the server behavior during test execution.
 
 ```go
-server, _ := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+defer assertFunc(t)
 handler, _ := httptestmock.GetMockHandlerFromServer(server)
 
 newMock := &httptestmock.Mock{
-    Name: "dynamic_mock",
+    MockName: "dynamic_mock",
     Request: httptestmock.Request{
         Method: "GET",
         Path:   "/dynamic",
@@ -307,9 +310,9 @@ A request is considered a **full match** when:
 
 When a request matches method and path but not all other criteria, it's a **partial match**. If `partial_match: true` is set in the mock, the mock will accept the request despite missing parameters. This is useful for flexible testing scenarios.
 
-If no full match is found and partial matches exist without `partial_match: true`, the server returns `400 Bad Request` with details about candidate mocks.
+If no full match is found and partial matches exist without `partial_match: true`, the server returns `404 Not Found` with details about candidate mocks.
 
-**Note**: You can disable partial matching entirely using the `WithDisabledPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
+**Note**: You must enable partial matching entirely using the `WithAcceptingPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
 
 ### Path Parameters
 
@@ -330,7 +333,7 @@ When a request doesn't match any mock:
 
 - **No match at all**: Returns `404 Not Found`
 - **Partial match exists** (but `partial_match` not enabled): Returns `400 Bad Request` with logging of candidate mocks for debugging
-- **Partial matching disabled** (using `WithDisabledPartialMatch()`): All non-full matches return `404 Not Found`
+- **Partial matching disabled** (using `WithAcceptingPartialMatch()`): All non-full matches return `404 Not Found`
 
 ## Response Body Types
 
@@ -341,7 +344,7 @@ The response body supports multiple types:
 - **Bytes**: Written as-is (binary data)
 - **nil**: No body written (empty response)
 
-Note: When using object/map bodies, the `Content-Type` header is not automatically set. You should explicitly set it in the mock definition:
+Note: When using object/map bodies, `Content-Type: application/json` is set automatically. If you want a different content type, set it explicitly in `response.headers`:
 
 ```yaml
 response:
@@ -349,7 +352,7 @@ response:
   body:
     message: "Success"
   headers:
-    Content-Type: "application/json"
+    Content-Type: "application/vnd.myapp+json"
 ```
 
 ## Request Body Matching
@@ -492,7 +495,7 @@ Instead of using files, you can define mocks in code:
 ```go
 server, assertFunc := httptestmock.SetupServer(t,
     httptestmock.WithRequests(&httptestmock.Mock{
-        Name: "health_check",
+        MockName: "health_check",
         Request: httptestmock.Request{
             Method: "GET",
             Path:   "/health",
@@ -506,6 +509,36 @@ server, assertFunc := httptestmock.SetupServer(t,
         },
     }),
 )
+defer assertFunc(t)
+```
+
+### Builder API (NewMock / FastServe) and Custom Handlers
+
+If you prefer defining mocks in code (instead of files), you can use the fluent builder:
+
+```go
+mock := httptestmock.NewMock(http.MethodPost, "/example/{id}").
+    WithQueryParam("key", "value").
+    WithPathParam("id", "123").
+    WithHeader("Authorization", "Bearer token").
+    WithBody(map[string]string{"field": "data"}).
+    WithResponseStatus(http.StatusOK).
+    WithResponseBody(map[string]string{"response": "success"}).
+    WithCustomHandler(func(m httptestmock.Mocker, w http.ResponseWriter, r *http.Request) {
+        // Access captured values from the matched request:
+        id := m.GetPathValue("id")
+        key := m.GetQueryValue("key")
+        token := m.GetHeaderValue("Authorization")
+
+        _ = id
+        _ = key
+        _ = token
+
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write([]byte("custom handler response"))
+    })
+
+server, assertFunc := mock.FastServe(t)
 defer assertFunc(t)
 ```
 
@@ -532,7 +565,7 @@ func TestDynamicMockManagement(t *testing.T) {
 
     // Add a new mock at runtime
     newMock := &httptestmock.Mock{
-        Name: "dynamic_endpoint",
+        MockName: "dynamic_endpoint",
         Request: httptestmock.Request{
             Method: "POST",
             Path:   "/api/v1/users",
@@ -559,14 +592,16 @@ func TestDynamicMockManagement(t *testing.T) {
 
 ### Strict Matching (Disable Partial Match)
 
-Enforce strict matching where requests must fully match all criteria:
+Strict matching requests is enabled by default.
+
+You must individually allow the mocks to accept partial matching setting the `partial_match` key of the `request` object in the mock file, or setting the return of the `AcceptsPartialMatch()` method from custom handlers.
 
 ```go
 func TestStrictMatching(t *testing.T) {
     // Setup server with strict matching enabled
     server, assertFunc := httptestmock.SetupServer(t,
         httptestmock.WithRequestsFrom("mocks"),
-        httptestmock.WithDisabledPartialMatch())
+        httptestmock.WithAcceptingPartialMatch())
     defer assertFunc(t)
 
     // This request will only match if ALL criteria match

@@ -36,7 +36,8 @@ type (
 		// Accept partial matching level
 		PartialMatch bool `json:"partial_match" yaml:"partial_match"`
 
-		pathParams map[string]string // used internally to store path parameters from the request
+		// used internally to store read data from the request
+		readData map[string]string
 
 		// matchLog is used for debugging and logging purposes.
 		// It contains the match log for the request.
@@ -52,66 +53,68 @@ const (
 )
 
 // String returns a human-readable representation of the request for logging.
-func (m Request) String() string {
-	sp := StringParts{}.Set("method", m.Method).
-		Set("path", m.Path).
-		Set("query_params", m.QueryParams).
-		Set("path_params", m.PathParams).
-		Set("headers", m.Headers).
-		Set("body", m.Body)
+func (r Request) String() string {
+	sp := StringParts{}.Set("method", r.Method).
+		Set("path", r.Path).
+		Set("query_params", r.QueryParams).
+		Set("path_params", r.PathParams).
+		Set("headers", r.Headers).
+		Set("body", r.Body)
 
 	return "Req: " + sp.String()
 }
 
 // match checks if the HTTP request matches the defined criteria.
 // Compares method, path, query parameters, headers, and body.
-func (m *Request) match(r *http.Request, disablePartialMatch bool) requestMatchLevel {
-	if m.Method != r.Method {
-		m.setMatchLog("METHOD", m.Method, r.Method)
-		return matchLevelNone
+func (r *Request) match(req *http.Request, allowPartialMatch bool) RequestMatchLevel {
+	r.readData = make(map[string]string)
+
+	r.matchLog = make([]string, 0)
+	if r.Method != req.Method {
+		r.setMatchLog("METHOD", r.Method, req.Method)
+		return MatchLevelNone
 	}
 
-	if !m.matchPath(r) {
-		m.setMatchLog("PATH", m.Path, r.URL.Path)
-		return matchLevelNone
+	if !r.matchPath(req) {
+		r.setMatchLog("PATH", r.Path, req.URL.Path)
+		return MatchLevelNone
 	}
 
 	// The following checks are only performed when method and path match
-	if m.matchQueryParams(r) && m.matchPathParams(r) && m.matchHeaders(r) && m.matchBody(r) {
-		m.matchLog = append(m.matchLog, matchEmoji+" MATCH")
-		return matchLevelFull
+	if r.matchQueryParams(req) && r.matchPathParams(req) && r.matchHeaders(req) && r.matchBody(req) {
+		r.matchLog = append(r.matchLog, matchEmoji+" MATCH")
+		return MatchLevelFull
 	}
 
-	if disablePartialMatch {
-		return matchLevelNone
+	if allowPartialMatch {
+		return MatchLevelPartial
 	}
 
-	return matchLevelPartial
+	return MatchLevelNone
 }
 
 // setMatchLog is a helper to append a formatted no-match message to the match log.
-func (m *Request) setMatchLog(part string, expected string, actual string) {
+func (r *Request) setMatchLog(part string, expected string, actual string) {
 	if expected == "" && actual != "" {
-		m.matchLog = append(m.matchLog, fmt.Sprintf("%s %s expected empty but got %s", noMatchEmoji, part, actual))
+		r.matchLog = append(r.matchLog, fmt.Sprintf("%s %s expected empty but got %s", noMatchEmoji, part, actual))
 		return
 	}
 
 	if expected != "" && actual == "" {
-		m.matchLog = append(m.matchLog, fmt.Sprintf("%s %s expected %s but got empty", noMatchEmoji, part, expected))
+		r.matchLog = append(r.matchLog, fmt.Sprintf("%s %s expected %s but got empty", noMatchEmoji, part, expected))
 		return
 	}
 
-	m.matchLog = append(m.matchLog, fmt.Sprintf("%s %s expected %s but got %s", noMatchEmoji, part, expected, actual))
+	r.matchLog = append(r.matchLog, fmt.Sprintf("%s %s expected %s but got %s", noMatchEmoji, part, expected, actual))
 }
 
 // matchPath checks if the request path matches the defined path.
-func (m *Request) matchPath(r *http.Request) bool {
-	m.pathParams = make(map[string]string)
-	if strings.Contains(m.Path, "{") {
+func (r *Request) matchPath(req *http.Request) bool {
+	if strings.Contains(r.Path, "{") {
 		// path with parameters
-		mParts := strings.Split(m.Path, "/")
+		mParts := strings.Split(r.Path, "/")
 
-		rParts := strings.Split(r.URL.Path, "/")
+		rParts := strings.Split(req.URL.Path, "/")
 		if len(mParts) != len(rParts) {
 			return false
 		}
@@ -120,7 +123,7 @@ func (m *Request) matchPath(r *http.Request) bool {
 			if strings.HasPrefix(mParts[i], "{") && strings.HasSuffix(mParts[i], "}") {
 				// this is a path parameter, store it
 				paramName := strings.Trim(mParts[i], "{}")
-				m.pathParams[paramName] = rParts[i]
+				r.readData[readDataPathParamPrefix+paramName] = rParts[i]
 				// path parameter, skip matching
 				continue
 			}
@@ -133,15 +136,19 @@ func (m *Request) matchPath(r *http.Request) bool {
 		return true
 	}
 	// exact path match
-	return m.Path == r.URL.Path
+	return r.Path == req.URL.Path
 }
 
 // matchPathParams checks if all specified path parameters match the request.
-func (m *Request) matchPathParams(r *http.Request) bool {
-	for key, value := range m.PathParams {
-		pathValue := flow.Default(r.PathValue(key), m.pathParams[key])
+func (r *Request) matchPathParams(req *http.Request) bool {
+	if len(r.PathParams) == 0 {
+		return true
+	}
+
+	for key, value := range r.PathParams {
+		pathValue := flow.Default(req.PathValue(key), r.readData[readDataPathParamPrefix+key])
 		if pathValue != value {
-			m.setMatchLog("PATH PARAM ["+key+"]", value, pathValue)
+			r.setMatchLog("PATH PARAM ["+key+"]", value, pathValue)
 
 			return false
 		}
@@ -151,24 +158,32 @@ func (m *Request) matchPathParams(r *http.Request) bool {
 }
 
 // matchQueryParams checks if all specified query parameters match the request.
-func (m *Request) matchQueryParams(r *http.Request) bool {
-	for key, value := range m.QueryParams {
-		queryValue := r.URL.Query().Get(key)
+func (r *Request) matchQueryParams(req *http.Request) bool {
+	if len(r.QueryParams) == 0 {
+		return true
+	}
+
+	for key, value := range r.QueryParams {
+		queryValue := req.URL.Query().Get(key)
 		if queryValue != value {
-			m.setMatchLog("QUERY PARAM ["+key+"]", value, queryValue)
+			r.setMatchLog("QUERY PARAM ["+key+"]", value, queryValue)
 			return false
 		}
+
+		r.readData[readDataQueryParamPrefix+key] = queryValue
 	}
 
 	return true
 }
 
 // matchHeaders checks if all specified headers match the request.
-func (m *Request) matchHeaders(r *http.Request) bool {
-	for key, value := range m.Headers {
-		if r.Header.Get(key) != value {
-			m.matchLog = append(m.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
+func (r *Request) matchHeaders(req *http.Request) bool {
+	for key, value := range r.Headers {
+		if queryValue := req.Header.Get(key); queryValue != value {
+			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
 			return false
+		} else {
+			r.readData[readDataHeaderPrefix+key] = req.Header.Get(key)
 		}
 	}
 
@@ -176,24 +191,24 @@ func (m *Request) matchHeaders(r *http.Request) bool {
 }
 
 // matchBody checks if the request body matches the expected body.
-func (m *Request) matchBody(r *http.Request) bool {
-	if m.Body == nil {
+func (r *Request) matchBody(req *http.Request) bool {
+	if r.Body == nil {
 		return true
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		m.matchLog = append(m.matchLog, fmt.Sprintf("%s BODY READ ERROR: %v", noMatchEmoji, err))
+		r.matchLog = append(r.matchLog, fmt.Sprintf("%s BODY READ ERROR: %v", noMatchEmoji, err))
 		return false
 	}
 
-	_ = r.Body.Close()
+	_ = req.Body.Close()
 
 	// After reading, must replace the body so it can be read again
-	r.Body = io.NopCloser(bytes.NewBuffer(body))
+	req.Body = io.NopCloser(bytes.NewBuffer(body))
 
-	if !compareBody(m.Body, body) {
-		m.matchLog = append(m.matchLog, fmt.Sprintf("%s BODY %s != %s", noMatchEmoji, body, m.Body))
+	if !compareBody(r.Body, body) {
+		r.matchLog = append(r.matchLog, fmt.Sprintf("%s BODY %s != %s", noMatchEmoji, body, r.Body))
 		return false
 	}
 
