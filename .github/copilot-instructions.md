@@ -11,8 +11,8 @@ This repository contains Golang tools, examples, and packages. It's a collection
 - `mid/` - Machine identification utilities
 - `path_tools/` - File and directory path utilities
 - `reflect_tools/` - Reflection and typing tools
+- `set/` - Generic set implementation
 - `pkg/` - Contains all packages organized by functionality:
-  - `set/` - Generic set implementation
   - `shell_tools/` - Shell argument parsing utilities
 
 ## Development Workflow
