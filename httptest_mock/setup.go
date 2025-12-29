@@ -134,7 +134,7 @@ func WithPostRequestHook(hook func(Mocker, http.ResponseWriter)) func(*MockHandl
 
 // WithAddMockInfoToResponse adds mock information to the response headers.
 // This is useful for debugging and tracking which mock was used for the response.
-// The headers will include the mock name and path.
+// The headers will include the mock name.
 // You can customize the header prefix by passing a string argument.
 //
 // Example:
