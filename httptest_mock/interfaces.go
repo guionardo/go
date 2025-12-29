@@ -24,9 +24,9 @@ type (
 		// RegisterHit records that the mock has been hit, to enable assertions.
 		RegisterHit(t *testing.T)
 
-		// AcceptsPartialMatch, when true, indicates that the mock will consider at least path with parameters and
-		// method
-		// matches as valid.
+		// AcceptsPartialMatch returns true when the mock accepts partial matches as valid, requiring only the
+		// HTTP method and path with parameters to match, without requiring all query params, headers, and body
+		// to match.
 		AcceptsPartialMatch() bool
 
 		// Validate checks if the mock's configuration is valid.
