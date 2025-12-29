@@ -15,7 +15,7 @@ func NewMock(method string, path string) *Mock {
 			QueryParams: make(map[string]string),
 			PathParams:  make(map[string]string),
 			Headers:     make(map[string]string),
-			readenData:  make(map[string]string),
+			readData:    make(map[string]string),
 		},
 		Response: Response{
 			Headers: make(map[string]string),

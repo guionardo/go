@@ -49,10 +49,10 @@ const (
 	// MatchLevelFull indicates a full match.
 	MatchLevelFull
 
-	// readenDataPrefixes are used to store readen data from the request.
-	readenDataPathParamPrefix  = "__path_param__"
-	readenDataQueryParamPrefix = "__query_param__"
-	readenDataHeaderPrefix     = "__header__"
+	// readDataPrefixes are used to store read data from the request.
+	readDataPathParamPrefix  = "__path_param__"
+	readDataQueryParamPrefix = "__query_param__"
+	readDataHeaderPrefix     = "__header__"
 )
 
 var (
@@ -75,7 +75,7 @@ func (m *Mock) String() string {
 // Validate validates the mock definition using struct validation tags.
 // Returns an error if required fields are missing or have invalid values.
 func (m *Mock) Validate() error {
-	m.Request.readenData = make(map[string]string)
+	m.Request.readData = make(map[string]string)
 	return validate.Struct(m)
 }
 
@@ -141,11 +141,11 @@ func (m *Mock) Name() string {
 }
 
 func (m *Mock) GetPathValue(key string) (value string) {
-	return m.Request.readenData[readenDataPathParamPrefix+key]
+	return m.Request.readData[readDataPathParamPrefix+key]
 }
 func (m *Mock) GetQueryValue(key string) (value string) {
-	return m.Request.readenData[readenDataQueryParamPrefix+key]
+	return m.Request.readData[readDataQueryParamPrefix+key]
 }
 func (m *Mock) GetHeaderValue(key string) (value string) {
-	return m.Request.readenData[readenDataHeaderPrefix+key]
+	return m.Request.readData[readDataHeaderPrefix+key]
 }

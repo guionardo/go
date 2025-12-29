@@ -36,7 +36,7 @@ type (
 		// Accept partial matching level
 		PartialMatch bool `json:"partial_match" yaml:"partial_match"`
 
-		readenData map[string]string // used internally to store readen data from the request
+		readData map[string]string // used internally to store read data from the request
 
 		// matchLog is used for debugging and logging purposes.
 		// It contains the match log for the request.
@@ -66,7 +66,7 @@ func (m Request) String() string {
 // match checks if the HTTP request matches the defined criteria.
 // Compares method, path, query parameters, headers, and body.
 func (m *Request) match(r *http.Request, disablePartialMatch bool) RequestMatchLevel {
-	m.readenData = make(map[string]string)
+	m.readData = make(map[string]string)
 
 	m.matchLog = make([]string, 0)
 	if m.Method != r.Method {
@@ -122,7 +122,7 @@ func (m *Request) matchPath(r *http.Request) bool {
 			if strings.HasPrefix(mParts[i], "{") && strings.HasSuffix(mParts[i], "}") {
 				// this is a path parameter, store it
 				paramName := strings.Trim(mParts[i], "{}")
-				m.readenData[readenDataPathParamPrefix+paramName] = rParts[i]
+				m.readData[readDataPathParamPrefix+paramName] = rParts[i]
 				// path parameter, skip matching
 				continue
 			}
@@ -145,7 +145,7 @@ func (m *Request) matchPathParams(r *http.Request) bool {
 	}
 
 	for key, value := range m.PathParams {
-		pathValue := flow.Default(r.PathValue(key), m.readenData[readenDataPathParamPrefix+key])
+		pathValue := flow.Default(r.PathValue(key), m.readData[readDataPathParamPrefix+key])
 		if pathValue != value {
 			m.setMatchLog("PATH PARAM ["+key+"]", value, pathValue)
 
@@ -169,7 +169,7 @@ func (m *Request) matchQueryParams(r *http.Request) bool {
 			return false
 		}
 
-		m.readenData[readenDataQueryParamPrefix+key] = queryValue
+		m.readData[readDataQueryParamPrefix+key] = queryValue
 	}
 
 	return true
@@ -182,7 +182,7 @@ func (m *Request) matchHeaders(r *http.Request) bool {
 			m.matchLog = append(m.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
 			return false
 		} else {
-			m.readenData[readenDataHeaderPrefix+key] = r.Header.Get(key)
+			m.readData[readDataHeaderPrefix+key] = r.Header.Get(key)
 		}
 	}
 

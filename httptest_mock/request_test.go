@@ -68,7 +68,7 @@ func TestRequest_matchPath(t *testing.T) {
 		r := Request{
 			Path:       "/api/v1/resource/{id}",
 			PathParams: map[string]string{"id": "123"},
-			readenData: make(map[string]string),
+			readData:   make(map[string]string),
 		}
 		req := httptest.NewRequest("GET", "http://localhost/api/v1/resource/123", nil)
 		assert.True(t, r.matchPath(req))
@@ -80,7 +80,7 @@ func TestRequest_matchPath(t *testing.T) {
 		r := Request{
 			Path:       "/api/v1/resource/{id}",
 			PathParams: map[string]string{"id": "123"},
-			readenData: make(map[string]string),
+			readData:   make(map[string]string),
 		}
 		req := httptest.NewRequest("GET", "http://localhost/api/v1/other/123", nil)
 		assert.False(t, r.matchPath(req))
