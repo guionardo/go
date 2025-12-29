@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -14,8 +15,8 @@ import (
 // It implements http.Handler to serve as the handler for httptest.Server.
 type (
 	MockHandler struct {
-		// requests holds all registered mock definitions to match against incoming requests.
-		requests []*Mock
+		// mocks holds all registered mock definitions to match against incoming mocks.
+		mocks []Mocker
 
 		// T is the testing context, used for logging and cleanup.
 		T *testing.T
@@ -24,7 +25,7 @@ type (
 		logHeader string
 
 		// preResponseHook is called before a response is sent.
-		preResponseHooks []func(*Mock, http.ResponseWriter)
+		preResponseHooks []func(Mocker, http.ResponseWriter)
 
 		// logDisabled indicates whether logging is enabled for this handler.
 		logDisabled bool
@@ -42,6 +43,9 @@ type (
 
 		// disablePartialMatch indicates whether partial matching is disabled.
 		disablePartialMatch bool
+
+		// server is the httptest.Server instance that is used to serve the requests.
+		server *httptest.Server
 	}
 )
 
@@ -50,39 +54,40 @@ type (
 // If no mock matches, the handler returns 404 Not Found.
 // If there are partial matches, the handler returns 400 Bad Request.
 func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	partialMatchRequests := make([]*Mock, 0)
+	partialMatchRequests := make([]Mocker, 0)
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, request := range s.requests {
-		switch request.Request.match(r, s.disablePartialMatch) {
+
+	for _, mock := range s.mocks {
+		switch mock.Matches(r, s.disablePartialMatch) {
 		case matchLevelFull:
-			s.log("%s request matched %s", s.logHeader, request.String())
-			s.extraLogger.Info(s.logHeader+" matched", slog.String("mock", request.String()))
-			s.DoPreResponseHook(request, w)
-			request.Response.writeResponse(w)
-			request.RegisterHit(s.T)
+			s.log("%s request matched %s", s.logHeader, mock.String())
+			s.extraLogger.Info(s.logHeader+" matched", slog.String("mock", mock.String()))
+			s.DoPreResponseHook(mock, w)
+			mock.WriteResponse(r, w)
+			mock.RegisterHit(s.T)
 
 			return
 
 		case matchLevelPartial:
-			if request.Request.PartialMatch {
-				s.log("%s request partially matched %s", s.logHeader, request.String())
-				s.extraLogger.Info(s.logHeader+" partially matched", slog.String("mock", request.String()))
-				s.DoPreResponseHook(request, w)
-				request.Response.writeResponse(w)
-				request.RegisterHit(s.T)
+			if mock.AcceptsPartialMatch() {
+				s.log("%s request partially matched %s", s.logHeader, mock.String())
+				s.extraLogger.Info(s.logHeader+" partially matched", slog.String("mock", mock.String()))
+				s.DoPreResponseHook(mock, w)
+				mock.WriteResponse(r, w)
+				mock.RegisterHit(s.T)
 
 				return
 			}
 
-			partialMatchRequests = append(partialMatchRequests, request)
+			partialMatchRequests = append(partialMatchRequests, mock)
 			// the request did not match, let's continue to the next one
 			s.log("%s request did not match %s:\n%s", s.logHeader,
-				request.String(), strings.Join(request.Request.matchLog, "\n"))
+				mock.String(), strings.Join(mock.Logs(), "\n"))
 			s.extraLogger.Warn(s.logHeader+" request did not match",
-				slog.String("request", request.String()),
-				slog.String("log", strings.Join(request.Request.matchLog, "\n")))
+				slog.String("request", mock.String()),
+				slog.String("log", strings.Join(mock.Logs(), "\n")))
 		}
 	}
 
@@ -105,14 +110,14 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Validate ensures the server has valid configuration before starting.
 // Returns an error if no mocks are registered or if any mock fails validation.
 func (s *MockHandler) Validate() error {
-	if len(s.requests) == 0 {
+	if len(s.mocks) == 0 {
 		return errors.New("no requests found")
 	}
 
 	// Collect all validation errors to report them together
-	reqValidateErrors := make([]error, 0, len(s.requests))
-	for _, request := range s.requests {
-		if err := request.Validate(); err != nil {
+	reqValidateErrors := make([]error, 0, len(s.mocks))
+	for _, mock := range s.mocks {
+		if err := mock.Validate(); err != nil {
 			reqValidateErrors = append(reqValidateErrors, err)
 		}
 	}
@@ -124,7 +129,7 @@ func (s *MockHandler) Validate() error {
 	return nil
 }
 
-func (s *MockHandler) DoPreResponseHook(m *Mock, r http.ResponseWriter) {
+func (s *MockHandler) DoPreResponseHook(m Mocker, r http.ResponseWriter) {
 	for _, hook := range s.preResponseHooks {
 		hook(m, r)
 	}
@@ -139,9 +144,24 @@ func (s *MockHandler) DoPreResponseHook(m *Mock, r http.ResponseWriter) {
 //	mockHandler, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("testdata/mocks"))
 //	defer assertFunc(t)
 func (s *MockHandler) Assert(t *testing.T) {
-	for _, request := range s.requests {
-		request.Assert(t)
+	for _, mock := range s.mocks {
+		mock.Assert(t)
 	}
+}
+
+// AddMocks appends new mock requests to the existing ones in the handler.
+func (s *MockHandler) AddMocks(mocks ...Mocker) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.mocks = append(s.mocks, mocks...)
+
+	for _, req := range mocks {
+		s.log("%s registered %s", s.logHeader, req.String())
+		s.extraLogger.Info(s.logHeader+" registered", slog.String("mock", req.String()))
+	}
+
+	return s.Validate()
 }
 
 func (s *MockHandler) log(format string, args ...any) {
@@ -150,19 +170,4 @@ func (s *MockHandler) log(format string, args ...any) {
 	}
 
 	s.T.Logf("%s "+format, append([]any{s.logHeader}, args...)...)
-}
-
-// AddMocks appends new mock requests to the existing ones in the handler.
-func (s *MockHandler) AddMocks(requests ...*Mock) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.requests = append(s.requests, requests...)
-
-	for _, req := range requests {
-		s.log("%s registered %s", s.logHeader, req.String())
-		s.extraLogger.Info(s.logHeader+" registered", slog.String("mock", req.String()))
-	}
-
-	return s.Validate()
 }

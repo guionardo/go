@@ -3,6 +3,7 @@ package httptestmock
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -51,26 +52,23 @@ func (m *Response) writeHeaderAndBody(w http.ResponseWriter) {
 		bodyContent []byte
 		statusCode  = m.Status
 	)
-	if m.Body != nil {
-		switch body := m.Body.(type) {
-		case string:
-			bodyContent = []byte(body)
-		case []byte:
-			bodyContent = body
-		default:
-			var err error
 
-			bodyContent, err = json.Marshal(body)
-			if err != nil {
-				bodyContent = []byte(err.Error())
-				statusCode = http.StatusInternalServerError
-			} else {
-				// Set Content-Type to application/json if body is JSON
-				if m.Headers == nil {
-					m.Headers = make(map[string]string)
-				}
-				m.Headers["Content-Type"] = "application/json"
-			}
+	switch body := m.Body.(type) {
+	case nil:
+		bodyContent = nil
+	case string:
+		bodyContent = []byte(body)
+	case []byte:
+		bodyContent = body
+	default:
+		var err error
+
+		bodyContent, err = json.Marshal(body)
+		if err != nil {
+			bodyContent = []byte(err.Error())
+			statusCode = http.StatusInternalServerError
+		} else {
+			m.setContentTypeIfNotSet("application/json")
 		}
 	}
 
@@ -83,4 +81,18 @@ func (m *Response) writeHeaderAndBody(w http.ResponseWriter) {
 	if len(bodyContent) > 0 {
 		_, _ = w.Write(bodyContent)
 	}
+}
+
+func (r *Response) setContentTypeIfNotSet(contentType string) {
+	if r.Headers == nil {
+		r.Headers = make(map[string]string)
+	}
+
+	for k := range r.Headers {
+		if strings.EqualFold(k, "Content-Type") {
+			return
+		}
+	}
+
+	r.Headers["Content-Type"] = contentType
 }

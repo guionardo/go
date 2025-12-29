@@ -80,7 +80,7 @@ test: ## Run tests
 	@go test ./... -v
 
 coverage: check-go-test-coverage ## Check test coverage
-	@go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+	@go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./... -count=1
 	@go-test-coverage --config=./.testcoverage.yml
 
 ##@ Linting

@@ -36,7 +36,7 @@ type (
 		// Accept partial matching level
 		PartialMatch bool `json:"partial_match" yaml:"partial_match"`
 
-		pathParams map[string]string // used internally to store path parameters from the request
+		readenData map[string]string // used internally to store readen data from the request
 
 		// matchLog is used for debugging and logging purposes.
 		// It contains the match log for the request.
@@ -65,7 +65,10 @@ func (m Request) String() string {
 
 // match checks if the HTTP request matches the defined criteria.
 // Compares method, path, query parameters, headers, and body.
-func (m *Request) match(r *http.Request, disablePartialMatch bool) requestMatchLevel {
+func (m *Request) match(r *http.Request, disablePartialMatch bool) RequestMatchLevel {
+	m.readenData = make(map[string]string)
+
+	m.matchLog = make([]string, 0)
 	if m.Method != r.Method {
 		m.setMatchLog("METHOD", m.Method, r.Method)
 		return matchLevelNone
@@ -106,7 +109,6 @@ func (m *Request) setMatchLog(part string, expected string, actual string) {
 
 // matchPath checks if the request path matches the defined path.
 func (m *Request) matchPath(r *http.Request) bool {
-	m.pathParams = make(map[string]string)
 	if strings.Contains(m.Path, "{") {
 		// path with parameters
 		mParts := strings.Split(m.Path, "/")
@@ -120,7 +122,7 @@ func (m *Request) matchPath(r *http.Request) bool {
 			if strings.HasPrefix(mParts[i], "{") && strings.HasSuffix(mParts[i], "}") {
 				// this is a path parameter, store it
 				paramName := strings.Trim(mParts[i], "{}")
-				m.pathParams[paramName] = rParts[i]
+				m.readenData[readenDataPathParamPrefix+paramName] = rParts[i]
 				// path parameter, skip matching
 				continue
 			}
@@ -138,8 +140,12 @@ func (m *Request) matchPath(r *http.Request) bool {
 
 // matchPathParams checks if all specified path parameters match the request.
 func (m *Request) matchPathParams(r *http.Request) bool {
+	if len(m.PathParams) == 0 {
+		return true
+	}
+
 	for key, value := range m.PathParams {
-		pathValue := flow.Default(r.PathValue(key), m.pathParams[key])
+		pathValue := flow.Default(r.PathValue(key), m.readenData[readenDataPathParamPrefix+key])
 		if pathValue != value {
 			m.setMatchLog("PATH PARAM ["+key+"]", value, pathValue)
 
@@ -152,12 +158,18 @@ func (m *Request) matchPathParams(r *http.Request) bool {
 
 // matchQueryParams checks if all specified query parameters match the request.
 func (m *Request) matchQueryParams(r *http.Request) bool {
+	if len(m.QueryParams) == 0 {
+		return true
+	}
+
 	for key, value := range m.QueryParams {
 		queryValue := r.URL.Query().Get(key)
 		if queryValue != value {
 			m.setMatchLog("QUERY PARAM ["+key+"]", value, queryValue)
 			return false
 		}
+
+		m.readenData[readenDataQueryParamPrefix+key] = queryValue
 	}
 
 	return true
@@ -166,9 +178,11 @@ func (m *Request) matchQueryParams(r *http.Request) bool {
 // matchHeaders checks if all specified headers match the request.
 func (m *Request) matchHeaders(r *http.Request) bool {
 	for key, value := range m.Headers {
-		if r.Header.Get(key) != value {
+		if queryValue := r.Header.Get(key); queryValue != value {
 			m.matchLog = append(m.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
 			return false
+		} else {
+			m.readenData[readenDataHeaderPrefix+key] = r.Header.Get(key)
 		}
 	}
 

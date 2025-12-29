@@ -13,14 +13,17 @@ A Go library for creating HTTP mock servers in tests using declarative JSON/YAML
 - **Request matching**: Match requests by method, path (including path parameters with `{param}` syntax), query parameters, headers, and body
 - **Validation**: Built-in validation for mock definitions using struct tags
 - **Flexible responses**: Support for JSON, string, and byte body responses with custom headers and status codes
+- **Automatic JSON headers**: When `response.body` is an object/map, the library JSON-encodes it and sets `Content-Type: application/json` automatically (unless you override it)
 - **Response delays**: Simulate network latency or processing time with configurable delays
 - **Partial matching**: Accept requests even when not all parameters match (useful for flexible testing)
 - **Request assertions**: Verify that mocks were called the expected number of times
 - **Post-request hooks**: Modify responses or perform actions before sending responses
-- **Debugging support**: Add mock information to response headers for easier debugging
+- **Debugging support**: Add the matched mock name to response headers for easier debugging
 - **Dynamic mock management**: Add new mocks to running servers at runtime
 - **Structured logging**: Optional slog.Logger integration for structured logging
 - **Helper utilities**: Load mocks from files, retrieve handlers from servers, and more
+- **Builder API**: Fluent helpers to build mocks in code (`NewMock`, `FastServe`) and create custom handlers
+- **Captured request values**: Access matched `{path}` params, query params, and headers from inside custom handlers
 
 ## Installation
 
@@ -178,11 +181,9 @@ Provides mock definitions programmatically.
 
 ```go
 httptestmock.WithRequests(&httptestmock.Mock{
-    {
-        Name: "health_check",
-        Request:  httptestmock.Request{Method: "GET", Path: "/health"},
-        Response: httptestmock.Response{Status: 200, Body: "OK"},
-    },
+    MockName: "health_check",
+    Request:  httptestmock.Request{Method: "GET", Path: "/health"},
+    Response: httptestmock.Response{Status: 200, Body: "OK"},
 })
 ```
 
@@ -191,7 +192,7 @@ httptestmock.WithRequests(&httptestmock.Mock{
 Adds a hook function that is called before sending the response. This allows you to modify the response or perform additional actions.
 
 ```go
-httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWriter) {
+httptestmock.WithPostRequestHook(func(mr httptestmock.Mocker, w http.ResponseWriter) {
     w.Header().Set("X-Custom-Header", "custom-value")
     // Log or perform other actions
 })
@@ -199,13 +200,13 @@ httptestmock.WithPostRequestHook(func(mr *httptestmock.Mock, w http.ResponseWrit
 
 #### WithAddMockInfoToResponse
 
-Adds mock debugging information to response headers. By default, adds `HTTPTestMock-Name` and `HTTPTestMock-Path` headers. You can customize the header prefix:
+Adds mock debugging information to response headers. By default, adds `HTTPTestMock-Name` (header names are case-insensitive). You can customize the header prefix:
 
 ```go
-// Default headers: HTTPTestMock-Name and HTTPTestMock-Path
+// Default header: HTTPTestMock-Name
 httptestmock.WithAddMockInfoToResponse()
 
-// Custom headers: X-Mock-Name and X-Mock-Path
+// Custom header: X-Mock-Name
 httptestmock.WithAddMockInfoToResponse("X-Mock")
 ```
 
@@ -243,7 +244,8 @@ httptestmock.WithDisabledPartialMatch()
 Retrieves the MockHandler from an httptest.Server instance. This is useful when you need to dynamically add more mocks to an existing server.
 
 ```go
-server, _ := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+defer assertFunc(t)
 handler, err := httptestmock.GetMockHandlerFromServer(server)
 if err != nil {
     t.Fatal(err)
@@ -255,11 +257,12 @@ if err != nil {
 Dynamically adds new mock requests to an existing MockHandler. This allows you to modify the server behavior during test execution.
 
 ```go
-server, _ := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+server, assertFunc := httptestmock.SetupServer(t, httptestmock.WithRequestsFrom("mocks"))
+defer assertFunc(t)
 handler, _ := httptestmock.GetMockHandlerFromServer(server)
 
 newMock := &httptestmock.Mock{
-    Name: "dynamic_mock",
+    MockName: "dynamic_mock",
     Request: httptestmock.Request{
         Method: "GET",
         Path:   "/dynamic",
@@ -341,7 +344,7 @@ The response body supports multiple types:
 - **Bytes**: Written as-is (binary data)
 - **nil**: No body written (empty response)
 
-Note: When using object/map bodies, the `Content-Type` header is not automatically set. You should explicitly set it in the mock definition:
+Note: When using object/map bodies, `Content-Type: application/json` is set automatically. If you want a different content type, set it explicitly in `response.headers`:
 
 ```yaml
 response:
@@ -349,7 +352,7 @@ response:
   body:
     message: "Success"
   headers:
-    Content-Type: "application/json"
+    Content-Type: "application/vnd.myapp+json"
 ```
 
 ## Request Body Matching
@@ -492,7 +495,7 @@ Instead of using files, you can define mocks in code:
 ```go
 server, assertFunc := httptestmock.SetupServer(t,
     httptestmock.WithRequests(&httptestmock.Mock{
-        Name: "health_check",
+        MockName: "health_check",
         Request: httptestmock.Request{
             Method: "GET",
             Path:   "/health",
@@ -506,6 +509,36 @@ server, assertFunc := httptestmock.SetupServer(t,
         },
     }),
 )
+defer assertFunc(t)
+```
+
+### Builder API (NewMock / FastServe) and Custom Handlers
+
+If you prefer defining mocks in code (instead of files), you can use the fluent builder:
+
+```go
+mock := httptestmock.NewMock(http.MethodPost, "/example/{id}").
+    WithQueryParam("key", "value").
+    WithPathParam("id", "123").
+    WithHeader("Authorization", "Bearer token").
+    WithBody(map[string]string{"field": "data"}).
+    WithResponseStatus(http.StatusOK).
+    WithResponseBody(map[string]string{"response": "success"}).
+    WithCustomHandler(func(m httptestmock.Mocker, w http.ResponseWriter, r *http.Request) {
+        // Access captured values from the matched request:
+        id := m.GetPathValue("id")
+        key := m.GetQueryValue("key")
+        token := m.GetHeaderValue("Authorization")
+
+        _ = id
+        _ = key
+        _ = token
+
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write([]byte("custom handler response"))
+    })
+
+server, assertFunc := mock.FastServe(t)
 defer assertFunc(t)
 ```
 
@@ -532,7 +565,7 @@ func TestDynamicMockManagement(t *testing.T) {
 
     // Add a new mock at runtime
     newMock := &httptestmock.Mock{
-        Name: "dynamic_endpoint",
+        MockName: "dynamic_endpoint",
         Request: httptestmock.Request{
             Method: "POST",
             Path:   "/api/v1/users",

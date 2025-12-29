@@ -4,6 +4,7 @@
 package httptestmock
 
 import (
+	"net/http"
 	"sync"
 	"testing"
 
@@ -15,9 +16,9 @@ type (
 	// Mock represents a complete mock definition containing both
 	// the expected request to match and the response to return.
 	Mock struct {
-		// Name is an optional identifier for the mock, used in logging.
+		// MockName is an optional identifier for the mock, used in logging.
 		// If not specified, defaults to the file path.
-		Name string `json:"name" yaml:"name"`
+		MockName string `json:"name" yaml:"name"`
 
 		// Request defines the criteria for matching incoming HTTP requests.
 		Request Request `json:"request" yaml:"request" validate:"required"`
@@ -34,26 +35,36 @@ type (
 
 		assertionActual map[string]uint
 		assertionLock   sync.Mutex
+		customHandler   CustomHandlerFunc
 	}
 
-	requestMatchLevel uint8
+	RequestMatchLevel uint8
 )
 
 const (
 	// matchLevelNone indicates no match.
-	matchLevelNone requestMatchLevel = iota
+	matchLevelNone RequestMatchLevel = iota
 	// matchLevelPartial indicates a partial match.
 	matchLevelPartial
 	// matchLevelFull indicates a full match.
 	matchLevelFull
+
+	// readenDataPrefixes are used to store readen data from the request.
+	readenDataPathParamPrefix  = "__path_param__"
+	readenDataQueryParamPrefix = "__query_param__"
+	readenDataHeaderPrefix     = "__header__"
 )
 
-// validate is the validator instance used to validate mock definitions.
-var validate = validator.New(validator.WithRequiredStructEnabled())
+var (
+	// validate is the validator instance used to validate mock definitions.
+	validate = validator.New(validator.WithRequiredStructEnabled())
+
+	_ Mocker = (*Mock)(nil)
+)
 
 // String returns a human-readable representation of the mock for logging.
 func (m *Mock) String() string {
-	sp := StringParts{}.Set("name", m.Name).
+	sp := StringParts{}.Set("name", m.MockName).
 		Set("from", m.source).
 		Set("req", m.Request.String()).
 		Set("resp", m.Response.String())
@@ -64,6 +75,7 @@ func (m *Mock) String() string {
 // Validate validates the mock definition using struct validation tags.
 // Returns an error if required fields are missing or have invalid values.
 func (m *Mock) Validate() error {
+	m.Request.readenData = make(map[string]string)
 	return validate.Struct(m)
 }
 
@@ -98,4 +110,42 @@ func (m *Mock) Assert(t *testing.T) {
 
 	count := m.assertionActual[t.Name()]
 	assert.Equalf(t, m.ExpectedHits, count, "%s: expected %d hits, got %d", m.String(), m.ExpectedHits, count)
+}
+
+func (m *Mock) Matches(r *http.Request, allowPartialMatch bool) RequestMatchLevel {
+	return m.Request.match(r, allowPartialMatch)
+}
+
+func (m *Mock) WriteResponse(r *http.Request, w http.ResponseWriter) {
+	if m.customHandler != nil {
+		m.customHandler(m, w, r)
+	} else {
+		m.Response.writeResponse(w)
+	}
+}
+
+func (m *Mock) AcceptsPartialMatch() bool {
+	return m.Request.PartialMatch
+}
+
+func (m *Mock) AppendLog(log string) {
+	m.Request.matchLog = append(m.Request.matchLog, log)
+}
+
+func (m *Mock) Logs() []string {
+	return m.Request.matchLog
+}
+
+func (m *Mock) Name() string {
+	return m.MockName
+}
+
+func (m *Mock) GetPathValue(key string) (value string) {
+	return m.Request.readenData[readenDataPathParamPrefix+key]
+}
+func (m *Mock) GetQueryValue(key string) (value string) {
+	return m.Request.readenData[readenDataQueryParamPrefix+key]
+}
+func (m *Mock) GetHeaderValue(key string) (value string) {
+	return m.Request.readenData[readenDataHeaderPrefix+key]
 }
