@@ -42,12 +42,12 @@ type (
 )
 
 const (
-	// matchLevelNone indicates no match.
-	matchLevelNone RequestMatchLevel = iota
-	// matchLevelPartial indicates a partial match.
-	matchLevelPartial
-	// matchLevelFull indicates a full match.
-	matchLevelFull
+	// MatchLevelNone indicates no match.
+	MatchLevelNone RequestMatchLevel = iota
+	// MatchLevelPartial indicates a partial match.
+	MatchLevelPartial
+	// MatchLevelFull indicates a full match.
+	MatchLevelFull
 
 	// readenDataPrefixes are used to store readen data from the request.
 	readenDataPathParamPrefix  = "__path_param__"

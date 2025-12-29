@@ -61,7 +61,7 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	for _, mock := range s.mocks {
 		switch mock.Matches(r, s.disablePartialMatch) {
-		case matchLevelFull:
+		case MatchLevelFull:
 			s.log("%s request matched %s", s.logHeader, mock.String())
 			s.extraLogger.Info(s.logHeader+" matched", slog.String("mock", mock.String()))
 			s.DoPreResponseHook(mock, w)
@@ -70,7 +70,7 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			return
 
-		case matchLevelPartial:
+		case MatchLevelPartial:
 			if mock.AcceptsPartialMatch() {
 				s.log("%s request partially matched %s", s.logHeader, mock.String())
 				s.extraLogger.Info(s.logHeader+" partially matched", slog.String("mock", mock.String()))

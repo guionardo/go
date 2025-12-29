@@ -71,25 +71,25 @@ func (m *Request) match(r *http.Request, disablePartialMatch bool) RequestMatchL
 	m.matchLog = make([]string, 0)
 	if m.Method != r.Method {
 		m.setMatchLog("METHOD", m.Method, r.Method)
-		return matchLevelNone
+		return MatchLevelNone
 	}
 
 	if !m.matchPath(r) {
 		m.setMatchLog("PATH", m.Path, r.URL.Path)
-		return matchLevelNone
+		return MatchLevelNone
 	}
 
 	// The following checks are only performed when method and path match
 	if m.matchQueryParams(r) && m.matchPathParams(r) && m.matchHeaders(r) && m.matchBody(r) {
 		m.matchLog = append(m.matchLog, matchEmoji+" MATCH")
-		return matchLevelFull
+		return MatchLevelFull
 	}
 
 	if disablePartialMatch {
-		return matchLevelNone
+		return MatchLevelNone
 	}
 
-	return matchLevelPartial
+	return MatchLevelPartial
 }
 
 // setMatchLog is a helper to append a formatted no-match message to the match log.
