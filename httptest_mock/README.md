@@ -227,14 +227,14 @@ logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 httptestmock.WithExtraLogger(logger)
 ```
 
-#### WithDisabledPartialMatch
+#### WithAcceptingPartialMatch
 
-Disables partial matching for requests. When partial matching is disabled, requests must fully match all criteria to be considered a match. Partial matches will be treated as no match and return `404 Not Found` instead of `400 Bad Request`.
+Enables partial matching for requests. When partial matching is enabled, requests that matches at least `method` and `path` will be considered a match. Otherwise, it must fully match all criteria to be considered a match.
 
 This is useful when you want strict matching behavior and don't want to see candidate mocks in logs or responses.
 
 ```go
-httptestmock.WithDisabledPartialMatch()
+httptestmock.WithAcceptingPartialMatch()
 ```
 
 ## Helper Functions
@@ -312,7 +312,7 @@ When a request matches method and path but not all other criteria, it's a **part
 
 If no full match is found and partial matches exist without `partial_match: true`, the server returns `400 Bad Request` with details about candidate mocks.
 
-**Note**: You can disable partial matching entirely using the `WithDisabledPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
+**Note**: You must enable partial matching entirely using the `WithAllowingPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
 
 ### Path Parameters
 
@@ -333,7 +333,7 @@ When a request doesn't match any mock:
 
 - **No match at all**: Returns `404 Not Found`
 - **Partial match exists** (but `partial_match` not enabled): Returns `400 Bad Request` with logging of candidate mocks for debugging
-- **Partial matching disabled** (using `WithDisabledPartialMatch()`): All non-full matches return `404 Not Found`
+- **Partial matching disabled** (using `WithAllowingPartialMatch()`): All non-full matches return `404 Not Found`
 
 ## Response Body Types
 
@@ -592,14 +592,16 @@ func TestDynamicMockManagement(t *testing.T) {
 
 ### Strict Matching (Disable Partial Match)
 
-Enforce strict matching where requests must fully match all criteria:
+Strict matching requests is enabled by default.
+
+You must individually allow the mocks to accept partial matching setting the `partial_match` key of the `request` object in the mock file, or setting the return of the `AcceptsPartialMatch()` method from custom handlers.
 
 ```go
 func TestStrictMatching(t *testing.T) {
     // Setup server with strict matching enabled
     server, assertFunc := httptestmock.SetupServer(t,
         httptestmock.WithRequestsFrom("mocks"),
-        httptestmock.WithDisabledPartialMatch())
+        httptestmock.WithAllowingPartialMatch())
     defer assertFunc(t)
 
     // This request will only match if ALL criteria match

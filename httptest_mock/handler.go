@@ -41,8 +41,8 @@ type (
 		// extraLogger is an optional additional logger for more detailed logs.
 		extraLogger *slog.Logger
 
-		// disablePartialMatch indicates whether partial matching is disabled.
-		disablePartialMatch bool
+		// allowPartialMatch indicates whether partial matching is enabled.
+		allowPartialMatch bool
 
 		// server is the httptest.Server instance that is used to serve the requests.
 		server *httptest.Server
@@ -60,7 +60,7 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.RUnlock()
 
 	for _, mock := range s.mocks {
-		switch mock.Matches(r, s.disablePartialMatch) {
+		switch mock.Matches(r, s.allowPartialMatch) {
 		case MatchLevelFull:
 			s.log("%s request matched %s", s.logHeader, mock.String())
 			s.extraLogger.Info(s.logHeader+" matched", slog.String("mock", mock.String()))
@@ -97,13 +97,9 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		for _, req := range partialMatchRequests {
 			s.log("%s partial match details: %s", s.logHeader, req.String())
 		}
-
-		w.WriteHeader(http.StatusBadRequest)
-
-		return
+	} else {
+		s.log("%s request not matched %s", s.logHeader, r.URL.String())
 	}
-
-	s.log("%s request not matched %s", s.logHeader, r.URL.String())
 	w.WriteHeader(http.StatusNotFound)
 }
 

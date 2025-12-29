@@ -32,7 +32,8 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 
 	s, assertFunc := httptestmock.SetupServer(t,
 		httptestmock.WithRequestsFrom(path.Join("mocks", "examples")),
-		httptestmock.WithAddMockInfoToResponse())
+		httptestmock.WithAddMockInfoToResponse(),
+		httptestmock.WithAcceptingPartialMatch())
 	defer assertFunc(t)
 
 	t.Run("example_1_exactly_matching_should_return_200_OK", func(t *testing.T) {
@@ -64,9 +65,9 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.NotNil(t, resp)
 		assert.Empty(t, mockName)
 
-		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
-	t.Run("example_1_path_unmatch_should_return_400_Bad_Request", func(t *testing.T) {
+	t.Run("example_1_path_unmatch_should_return_404", func(t *testing.T) {
 		t.Parallel()
 
 		req := httptestmock.CreateTestRequest(t, s,
@@ -79,9 +80,9 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.NotNil(t, resp)
 		assert.Empty(t, mockName)
 
-		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
-	t.Run("example_1_body_unmatch_should_return_400_Bad_Request", func(t *testing.T) {
+	t.Run("example_1_body_unmatch_should_return_404", func(t *testing.T) {
 		t.Parallel()
 
 		req := httptestmock.CreateTestRequest(t, s,
@@ -94,7 +95,7 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.NotNil(t, resp)
 		assert.Empty(t, mockName)
 
-		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("ServeHTTP with non-matching request", func(t *testing.T) {
 		t.Parallel()
@@ -120,14 +121,13 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.NotNil(t, resp)
 		assert.Empty(t, mockName)
 
-		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("example_3_partial_match_should_return_200_OK", func(t *testing.T) {
 		t.Parallel()
 
 		req := httptestmock.CreateTestRequest(t, s,
-			http.MethodPost, "/api/v1/owners",
-			"TEST_BODY")
+			http.MethodPost, "/api/v1/owners", nil)
 		req.Header.Add("Api_key", "unexpected key")
 		resp, _, mockName, err := doRequest(t, req) //nolint:bodyclose
 		require.NoError(t, err)
@@ -199,13 +199,11 @@ func TestMockHandlerNoPartialRequests(t *testing.T) {
 
 	s, assertFunc := httptestmock.SetupServer(t,
 		httptestmock.WithRequestsFrom(path.Join("mocks", "examples")),
-		httptestmock.WithDisabledPartialMatch(),
 		httptestmock.WithAddMockInfoToResponse("TestNoPartialMatch"))
 	defer assertFunc(t)
 
 	// Send a POST request to /api/v1/users/123 (matches example_1's method and path)
 	// but without the required query params, headers, or body to trigger partial match logic.
-	// With WithDisabledPartialMatch(), this should return 404 instead of a partial match.
 	req := httptestmock.CreateTestRequest(t, s,
 		http.MethodPost, "/api/v1/users/123", nil)
 	resp, _, _, err := doRequest(t, req) //nolint:bodyclose
