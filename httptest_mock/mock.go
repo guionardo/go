@@ -112,8 +112,9 @@ func (m *Mock) Assert(t *testing.T) {
 	assert.Equalf(t, m.ExpectedHits, count, "%s: expected %d hits, got %d", m.String(), m.ExpectedHits, count)
 }
 
-func (m *Mock) Matches(r *http.Request, allowPartialMatch bool) RequestMatchLevel {
-	return m.Request.match(r, allowPartialMatch)
+func (m *Mock) Matches(r *http.Request, disablePartialMatch bool) RequestMatchLevel {
+	// disablePartialMatch=true must disable partial matching; invert to get allowPartialMatch.
+	return m.Request.match(r, !disablePartialMatch)
 }
 
 func (m *Mock) WriteResponse(r *http.Request, w http.ResponseWriter) {
