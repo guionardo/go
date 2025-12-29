@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/guionardo/go/pkg/flow"
+	"github.com/guionardo/go/flow"
 )
 
 type (

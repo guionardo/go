@@ -3,7 +3,7 @@ package flow_test
 import (
 	"testing"
 
-	"github.com/guionardo/go/pkg/flow"
+	"github.com/guionardo/go/flow"
 	"github.com/stretchr/testify/assert"
 )
 
