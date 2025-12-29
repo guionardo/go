@@ -310,9 +310,9 @@ A request is considered a **full match** when:
 
 When a request matches method and path but not all other criteria, it's a **partial match**. If `partial_match: true` is set in the mock, the mock will accept the request despite missing parameters. This is useful for flexible testing scenarios.
 
-If no full match is found and partial matches exist without `partial_match: true`, the server returns `400 Bad Request` with details about candidate mocks.
+If no full match is found and partial matches exist without `partial_match: true`, the server returns `404 Not Found` with details about candidate mocks.
 
-**Note**: You must enable partial matching entirely using the `WithAllowingPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
+**Note**: You must enable partial matching entirely using the `WithAcceptingPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
 
 ### Path Parameters
 
@@ -333,7 +333,7 @@ When a request doesn't match any mock:
 
 - **No match at all**: Returns `404 Not Found`
 - **Partial match exists** (but `partial_match` not enabled): Returns `400 Bad Request` with logging of candidate mocks for debugging
-- **Partial matching disabled** (using `WithAllowingPartialMatch()`): All non-full matches return `404 Not Found`
+- **Partial matching disabled** (using `WithAcceptingPartialMatch()`): All non-full matches return `404 Not Found`
 
 ## Response Body Types
 
@@ -601,7 +601,7 @@ func TestStrictMatching(t *testing.T) {
     // Setup server with strict matching enabled
     server, assertFunc := httptestmock.SetupServer(t,
         httptestmock.WithRequestsFrom("mocks"),
-        httptestmock.WithAllowingPartialMatch())
+        httptestmock.WithAcceptingPartialMatch())
     defer assertFunc(t)
 
     // This request will only match if ALL criteria match
