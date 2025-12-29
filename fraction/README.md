@@ -9,7 +9,7 @@ go-fractions is a Go library for working with fractions. It provides a `Fraction
 To use go-fractions, import the package in your Go code:
 
 ```go
-import "github.com/guionardo/go/pkg/fraction"
+import "github.com/guionardo/go/fraction"
 ```
 
 You can create a new fraction using the `New` function
