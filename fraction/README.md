@@ -37,6 +37,7 @@ f7, err := fraction.FromFloat64(0.5) // 1/2, nil
 ```
 
 ### 🤔 Rationale
+
 The Fraction type in go-fractions aims to provide a lightweight, primitive-like representation of fractions. As a
 result, it has limitations in terms of precision and can overflow when performing certain operations. If you need a
 type that can represent all rational numbers without regard for memory and CPU consumption, consider using the
@@ -47,5 +48,6 @@ and efficient way to work with fractions in Go. However, it is important to be a
 the appropriate type based on your specific needs.
 
 ## 📜 Documentation
+
 For more detailed documentation and a full list of functions, see the
 [reference page](https://pkg.go.dev/github.com/guionardo/go).
