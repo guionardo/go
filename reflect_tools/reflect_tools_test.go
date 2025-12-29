@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	reflecttools "github.com/guionardo/go/pkg/reflect_tools"
+	reflecttools "github.com/guionardo/go/reflect_tools"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -10,6 +10,7 @@ This repository contains Golang tools, examples, and packages. It's a collection
 - `httptest_mock/` - Mocking helper for http requests
 - `mid/` - Machine identification utilities
 - `path_tools/` - File and directory path utilities
+- `reflect_tools/` - Reflection and typing tools
 - `pkg/` - Contains all packages organized by functionality:
   - `set/` - Generic set implementation
   - `shell_tools/` - Shell argument parsing utilities

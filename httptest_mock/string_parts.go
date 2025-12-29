@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	reflecttools "github.com/guionardo/go/pkg/reflect_tools"
+	reflecttools "github.com/guionardo/go/reflect_tools"
 )
 
 type (
