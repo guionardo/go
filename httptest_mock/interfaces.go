@@ -10,9 +10,9 @@ type (
 	Mocker interface {
 		// Matches checks if the given HTTP request matches the mock's criteria.
 		// It returns the level of match: none, partial, or full.
-		// If the disablePartialMatch parameter is true, partial matching is disabled; otherwise, at least path with
-		// parameters and method must match.
-		Matches(r *http.Request, disablePartialMatch bool) RequestMatchLevel
+		// If the allowPartialMatch parameter is true, partial matching is enabled; otherwise, at least the HTTP method
+		// and path with parameters must fully match, including all relevant details.
+		Matches(r *http.Request, allowPartialMatch bool) RequestMatchLevel
 
 		Name() string
 
