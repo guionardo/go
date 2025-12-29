@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/guionardo/go/pkg/set"
+	"github.com/guionardo/go/set"
 	"github.com/stretchr/testify/require"
 )
 

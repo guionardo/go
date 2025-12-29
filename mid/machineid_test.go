@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/guionardo/go/pkg/mid"
+	"github.com/guionardo/go/mid"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -102,7 +102,7 @@ func FromFloat64(f float64) (Fraction, error) { //nolint:cyclop
 	// Decompose float64
 	bits := math.Float64bits(f)
 	isNegative := bits&(1<<shift63) != 0
-	exp := int64((bits>>shift52)&(1<<11-1)) - 1023
+	exp := int64((bits>>shift52)&(1<<11-1)) - 1023     // nolint:gosec
 	mantissa := (bits & (1<<shift52 - 1)) | 1<<shift52 // Since we discarded tiny values, it'll never be denormalized.
 
 	// Amount of times to shift the mantissa to the right to compensate for the exponent
@@ -132,7 +132,7 @@ func FromFloat64(f float64) (Fraction, error) { //nolint:cyclop
 		shiftD = shift - shift52
 	}
 
-	numerator, denominator := int64(mantissa), int64(1)
+	numerator, denominator := int64(mantissa), int64(1) //nolint:gosec
 	denominator <<= shiftD
 
 	if shiftN < 0 {

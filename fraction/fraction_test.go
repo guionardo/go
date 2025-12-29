@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/guionardo/go/pkg/fraction"
+	"github.com/guionardo/go/fraction"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
