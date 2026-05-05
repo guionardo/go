@@ -5,13 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // FindFileInPath searches for a file in the paths from the PATH environment variable
 // returns the first occurrence or error
 // Handles OS-specific path separators
 func FindFileInPath(filename string) (string, error) {
-	pathEnv := os.Getenv("PATH")
+	pathEnv, ok := os.LookupEnv("PATH")
+	if !ok {
+		// Try to read PATH from the system environment
+		for _, env := range os.Environ() {
+			if value, ok := strings.CutPrefix(env, "PATH="); ok {
+				pathEnv = value
+				break
+			}
+		}
+	}
 	if pathEnv == "" {
 		return "", errors.New("PATH environment variable not set")
 	}
