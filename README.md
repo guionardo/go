@@ -143,6 +143,32 @@ Utilities for mocking HTTP servers in tests.
 - More [documentation](httptest_mock/README.md)
 
 
+## Package time_tools
+
+Flexible time parsing utility that tries multiple common layouts automatically, promoting successful templates for faster subsequent parses.
+
+```go
+// Parse attempts to parse a time string using multiple common layouts
+// (RFC3339, DateTime, DateOnly, Kitchen, ANSIC, etc.).
+// The matched template is promoted to the front for future calls.
+func Parse(s string) (time.Time, error)
+
+// SetLayouts replaces the global layouts list with a custom set of
+// time format strings, in priority order.
+func SetLayouts(newLayouts []string)
+```
+
+Example:
+
+```go
+t, err := timetools.Parse("2024-03-15T10:20:30Z")
+// t = 2024-03-15 10:20:30 +0000 UTC
+
+timetools.SetLayouts([]string{"2006-01-02", time.RFC3339})
+t, err = timetools.Parse("2024-12-25")
+// t = 2024-12-25 00:00:00 +0000 UTC
+```
+
 ## Package reflect_tools
 
 Utilities for working with Go's reflection, including zero value checks.
