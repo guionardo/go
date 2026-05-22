@@ -1,3 +1,6 @@
+// Package mid provides cross-platform machine identifier retrieval.
+// On Linux, it attempts hostnamectl, /var/lib/dbus/machine-id, and /etc/machine-id in order.
+// On macOS, it uses system_profiler. On Windows, it reads the SQMClient registry key.
 package mid
 
 import (
@@ -5,13 +8,23 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
-var collectFuncs = []func() (string, error){collectHostnamectl, collectEtcMachineId, collectDbusMachineId}
+var (
+	collectFuncsMu sync.RWMutex
+	collectFuncs   = []func() (string, error){collectHostnamectl, collectEtcMachineId, collectDbusMachineId}
+)
 
 // MachineID in linux use hostnamectl, /var/lib/dbus/machine-id, or /etc/machine-id
 func MachineID() string {
-	for _, cf := range collectFuncs {
+	collectFuncsMu.RLock()
+
+	funcs := collectFuncs
+
+	collectFuncsMu.RUnlock()
+
+	for _, cf := range funcs {
 		if c, err := cf(); err == nil {
 			return c
 		}

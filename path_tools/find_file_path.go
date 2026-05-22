@@ -12,6 +12,10 @@ import (
 // returns the first occurrence or error
 // Handles OS-specific path separators
 func FindFileInPath(filename string) (string, error) {
+	if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
+		return "", errors.New("filename must not contain path separators or parent directory references")
+	}
+
 	pathEnv, ok := os.LookupEnv("PATH")
 	if !ok {
 		// Try to read PATH from the system environment

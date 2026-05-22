@@ -38,7 +38,6 @@ func (m *Response) String() string {
 // writeResponse writes the response headers, status code, and body to the ResponseWriter.
 func (m *Response) writeResponse(w http.ResponseWriter) {
 	if m.DelayMs > 0 {
-		// Introduce delay before sending response
 		time.Sleep(time.Duration(m.DelayMs) * time.Millisecond)
 	}
 
@@ -73,12 +72,14 @@ func (m *Response) writeHeaderAndBody(w http.ResponseWriter) {
 	}
 
 	for key, value := range m.Headers {
-		w.Header().Add(key, value)
+		sanitized := strings.ReplaceAll(strings.ReplaceAll(value, "\r", ""), "\n", "")
+		w.Header().Add(key, sanitized)
 	}
 
 	w.WriteHeader(statusCode)
 
 	if len(bodyContent) > 0 {
+		// #nosec G705 - test-only mock server, no XSS risk
 		_, _ = w.Write(bodyContent)
 	}
 }

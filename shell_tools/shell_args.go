@@ -81,6 +81,8 @@ func extractQuotedPrefix(s string) (string, string) {
 	return restSub, ""
 }
 
+// String returns the reconstructed shell command string.
+// Each argument is quoted if it contains spaces or special characters.
 func (q QuotedShellArgs) String() string {
 	if len(q) < 2 { //nolint:mnd
 		return strings.Join(q, " ")

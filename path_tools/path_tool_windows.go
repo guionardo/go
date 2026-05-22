@@ -5,5 +5,5 @@ import (
 )
 
 func createPath(path string) error {
-	return os.MkdirAll(path, os.ModeSticky|os.ModePerm)
+	return os.MkdirAll(path, 0750)
 }

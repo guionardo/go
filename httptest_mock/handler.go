@@ -54,6 +54,13 @@ type (
 // If no mock matches, the handler returns 404 Not Found.
 // If there are partial matches, the handler returns 400 Bad Request.
 func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			s.log("%s PANIC in handler: %v", s.logHeader, rec)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}()
+
 	partialMatchRequests := make([]Mocker, 0)
 
 	s.mu.RLock()
