@@ -5,6 +5,28 @@ Golang tools, examples, and packages
 [![Go Tests](https://github.com/guionardo/go/actions/workflows/go_tests.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go_tests.yml)
 ![coverage](https://raw.githubusercontent.com/guionardo/go/badges/.badges/main/coverage.svg)
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
+[![Go Report Card](https://goreportcard.com/badge/github.com/guionardo/go)](https://goreportcard.com/report/github.com/guionardo/go)
+
+## Table of Contents
+
+- [go](#go)
+	- [Table of Contents](#table-of-contents)
+	- [Development](#development)
+	- [Package brdocs](#package-brdocs)
+	- [Package flow](#package-flow)
+	- [Package fraction](#package-fraction)
+	- [Package mid](#package-mid)
+	- [Package path\_tools](#package-path_tools)
+	- [Package shell\_tools](#package-shell_tools)
+	- [Package set](#package-set)
+	- [Package httptest\_mock](#package-httptest_mock)
+	- [Package time\_tools](#package-time_tools)
+	- [Package reflect\_tools](#package-reflect_tools)
+	- [Package config](#package-config)
+		- [Provider](#provider)
+		- [Options](#options)
+		- [Sub-packages](#sub-packages)
+	- [🤝 Contributing](#-contributing)
 
 ## Development
 
@@ -104,7 +126,7 @@ package main
 import (
     "fmt"
 
-    "github.com/guionardo/go/pkg/shell_tools"
+    "github.com/guionardo/go/shell_tools"
 )
 
 func main() {
@@ -179,6 +201,48 @@ Utilities for working with Go's reflection, including zero value checks.
 // Returns true if the value is zero, nil or empty, false otherwise.
 func IsZeroValue(value any) bool
 ```
+
+## Package config
+
+Generic typed configuration provider with YAML profile loading, environment variable overrides, and struct validation.
+
+```go
+import "github.com/guionardo/go/config"
+
+type AppConfig struct {
+	Port   int    `env:"APP_PORT" default:"8080"`
+	Host   string `env:"APP_HOST" default:"localhost"`
+	DBPath string `env:"DB_PATH"`
+}
+
+func main() {
+	provider := config.NewProvider[AppConfig]()
+	cfg, err := provider.GetConfiguration()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Listening on %s:%d\n", cfg.Host, cfg.Port)
+}
+```
+
+### Provider
+
+`Provider[T]` loads configuration from YAML profiles (with scope-based layering) and environment variables. Supports thread-safe `GetConfiguration()` and `UpdateConfiguration()`.
+
+### Options
+
+- `WithProfilesPath(path)` — set base directory for YAML profile files
+- `WithScope(scope)` — set active scope name (e.g. "production", "development")
+- `WithDefaultScope(scope)` — set fallback scope name
+- `WithLogger(logger)` — inject a custom Logger
+- `WithDebugLogger()` — enable debug logging (not for production)
+
+### Sub-packages
+
+- `environment` — reads configuration from environment variables into struct fields via `env` and `default` struct tags
+- `profile` — loads and merges YAML profile files by scope (default + scope-specific)
+- `merger` — recursive deep-merge of `map[string]any` maps
+- `validation` — struct validation via `go-playground/validator` and the `Validator` interface
 
 ## 🤝 Contributing
 
