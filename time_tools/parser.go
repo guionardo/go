@@ -48,32 +48,32 @@ var (
 // Returns ErrTimeParser if no layout matches the input.
 func Parse(s string) (time.Time, error) {
 	layoutsLock.RLock()
-	defer layoutsLock.RUnlock()
 
 	for index := range layouts {
 		t, err := time.Parse(layouts[index], s)
 		if err == nil {
 			if index > 0 {
-				go func(index int, layout string) {
-					layoutsLock.Lock()
-					defer layoutsLock.Unlock()
+				layout := layouts[index]
 
-					if index >= len(layouts) || layouts[index] != layout {
-						return
-					}
+				layoutsLock.RUnlock()
 
+				layoutsLock.Lock()
+				if index < len(layouts) && layouts[index] == layout {
 					for n := index; n > 0; n-- {
 						layouts[n] = layouts[n-1]
 					}
-
 					layouts[0] = layout
-				}(index, layouts[index])
+				}
+				layoutsLock.Unlock()
+			} else {
+				layoutsLock.RUnlock()
 			}
 
 			return t, nil
 		}
 	}
 
+	layoutsLock.RUnlock()
 	return time.Time{}, ErrTimeParser
 }
 
