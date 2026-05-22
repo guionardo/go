@@ -36,6 +36,8 @@ type (
 		assertionActual map[string]uint
 		assertionLock   sync.Mutex
 		customHandler   CustomHandlerFunc
+		matchMu         sync.Mutex
+		responseMu      sync.Mutex
 	}
 
 	RequestMatchLevel uint8
@@ -64,6 +66,9 @@ var (
 
 // String returns a human-readable representation of the mock for logging.
 func (m *Mock) String() string {
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
+
 	sp := StringParts{}.Set("name", m.MockName).
 		Set("from", m.source).
 		Set("req", m.Request.String()).
@@ -75,7 +80,9 @@ func (m *Mock) String() string {
 // Validate validates the mock definition using struct validation tags.
 // Returns an error if required fields are missing or have invalid values.
 func (m *Mock) Validate() error {
+	m.matchMu.Lock()
 	m.Request.readData = make(map[string]string)
+	m.matchMu.Unlock()
 	return validate.Struct(m)
 }
 
@@ -113,11 +120,15 @@ func (m *Mock) Assert(t *testing.T) {
 }
 
 func (m *Mock) Matches(r *http.Request, allowPartialMatch bool) RequestMatchLevel {
-	// disablePartialMatch=true must disable partial matching; invert to get allowPartialMatch.
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
 	return m.Request.match(r, allowPartialMatch)
 }
 
 func (m *Mock) WriteResponse(r *http.Request, w http.ResponseWriter) {
+	m.responseMu.Lock()
+	defer m.responseMu.Unlock()
+
 	if m.customHandler != nil {
 		m.customHandler(m, w, r)
 	} else {
@@ -130,11 +141,16 @@ func (m *Mock) AcceptsPartialMatch() bool {
 }
 
 func (m *Mock) AppendLog(log string) {
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
 	m.Request.matchLog = append(m.Request.matchLog, log)
 }
 
 func (m *Mock) Logs() []string {
-	return m.Request.matchLog
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
+
+	return append([]string{}, m.Request.matchLog...)
 }
 
 func (m *Mock) Name() string {
@@ -142,11 +158,17 @@ func (m *Mock) Name() string {
 }
 
 func (m *Mock) GetPathValue(key string) (value string) {
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
 	return m.Request.readData[readDataPathParamPrefix+key]
 }
 func (m *Mock) GetQueryValue(key string) (value string) {
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
 	return m.Request.readData[readDataQueryParamPrefix+key]
 }
 func (m *Mock) GetHeaderValue(key string) (value string) {
+	m.matchMu.Lock()
+	defer m.matchMu.Unlock()
 	return m.Request.readData[readDataHeaderPrefix+key]
 }

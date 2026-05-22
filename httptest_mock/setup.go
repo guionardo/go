@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"os"
 	"path"
 	"path/filepath"
@@ -148,7 +149,7 @@ func WithAddMockInfoToResponse(headerPrefix ...string) func(*MockHandler) {
 		prefix = headerPrefix[0]
 	}
 
-	prefix = strings.Trim(prefix, "-_.")
+	prefix = textproto.CanonicalMIMEHeaderKey(strings.Trim(prefix, "-_."))
 
 	return WithPostRequestHook(func(mr Mocker, w http.ResponseWriter) {
 		// Add mock information to the response

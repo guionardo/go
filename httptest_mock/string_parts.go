@@ -8,6 +8,8 @@ import (
 	reflecttools "github.com/guionardo/go/reflect_tools"
 )
 
+// StringParts builds key-value pair representations for structured logging output.
+// Each Set call appends a [key: value] segment; String() joins them separated by spaces.
 type (
 	StringParts []stringPart
 

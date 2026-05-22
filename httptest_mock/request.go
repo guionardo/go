@@ -196,7 +196,7 @@ func (r *Request) matchBody(req *http.Request) bool {
 		return true
 	}
 
-	body, err := io.ReadAll(req.Body)
+	body, err := io.ReadAll(io.LimitReader(req.Body, 10<<20)) // nolint: mnd
 	if err != nil {
 		r.matchLog = append(r.matchLog, fmt.Sprintf("%s BODY READ ERROR: %v", noMatchEmoji, err))
 		return false
