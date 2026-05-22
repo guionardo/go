@@ -54,6 +54,8 @@ jobs:
 
   update-report-card:
     name: Update report card
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Request and extract Report Card
