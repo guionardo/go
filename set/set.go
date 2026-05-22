@@ -1,3 +1,6 @@
+// Package set provides a generic Set implementation backed by a Go map.
+// Supports standard set operations (Add, Remove, Union, Diff, Intersection),
+// iteration, filtering, JSON/YAML marshaling, and SQL database scanning.
 package set
 
 import (
@@ -22,6 +25,8 @@ func (s Set[T]) Add(v T) {
 	s[v] = emptyStruct
 }
 
+// AddMultiple adds all the given values to the set. Returns the set
+// for method chaining.
 func (s Set[T]) AddMultiple(values ...T) Set[T] {
 	for _, value := range values {
 		s.Add(value)
@@ -151,8 +156,5 @@ func (s Set[T]) Equals(another Set[T]) bool {
 
 // Clear empties all itens
 func (s Set[T]) Clear() {
-	keys := s.ToArray()
-	for _, key := range keys {
-		delete(s, key)
-	}
+	clear(s)
 }
