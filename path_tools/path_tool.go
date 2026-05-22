@@ -1,3 +1,6 @@
+// Package pathtools provides utilities for file and directory path operations,
+// including existence checks, creation with proper permissions, root directory
+// detection, and PATH environment variable searching.
 package pathtools
 
 import (

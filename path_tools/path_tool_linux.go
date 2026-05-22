@@ -2,12 +2,10 @@ package pathtools
 
 import (
 	"os"
-	"syscall"
 )
 
-func createPath(path string) error {
-	oldmask := syscall.Umask(0)
-	defer syscall.Umask(oldmask)
+const directoryPermission = 0750
 
-	return os.MkdirAll(path, os.ModeSticky|os.ModePerm)
+func createPath(path string) error {
+	return os.MkdirAll(path, directoryPermission)
 }
