@@ -1,3 +1,5 @@
+// Package reflecttools provides reflection utilities for common introspection
+// patterns, such as zero-value checking across all Go types.
 package reflecttools
 
 import (
