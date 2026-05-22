@@ -5,15 +5,19 @@ import (
 	"maps"
 	"reflect"
 	"strings"
+	"sync"
 )
 
-var logger *slog.Logger
+var (
+	logger     *slog.Logger
+	loggerOnce sync.Once
+)
 
 // log returns a new logger for this package
 func log() *slog.Logger {
-	if logger == nil {
+	loggerOnce.Do(func() {
 		logger = slog.With(slog.String("module", "config"))
-	}
+	})
 
 	return logger
 }

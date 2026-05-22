@@ -1,3 +1,5 @@
+// Package environment provides utilities for reading configuration from
+// environment variables into struct fields using struct tags.
 package environment
 
 import (
@@ -22,8 +24,8 @@ func GetEnv(env string, defaultValue ...string) string {
 		return value
 	}
 
-	for _, env := range os.Environ() {
-		if parts := strings.SplitN(env, "=", kvCount); len(parts) == kvCount && strings.EqualFold(parts[0], env) {
+	for _, entry := range os.Environ() {
+		if parts := strings.SplitN(entry, "=", kvCount); len(parts) == kvCount && strings.EqualFold(parts[0], env) {
 			return parts[1]
 		}
 	}

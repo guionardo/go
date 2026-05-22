@@ -10,22 +10,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type (
-	providerOption  func(*provider)
-	Provider[T any] struct {
-		provider
+// providerOption is a functional option for configuring a Provider.
+type providerOption func(*provider)
 
-		lock          sync.RWMutex
-		configuration T
-		loaded        bool
-	}
-	Logger interface {
-		Info(msg string, args ...any)
-		Error(msg string, args ...any)
-		Debug(msg string, args ...any)
-		Warn(msg string, args ...any)
-	}
-)
+// Provider is a generic typed configuration provider that loads configuration
+// from YAML profiles and environment variables, with struct validation.
+//
+// The zero value is not usable directly; use NewProvider to create an instance.
+type Provider[T any] struct {
+	provider
+
+	lock          sync.RWMutex
+	configuration T
+	loaded        bool
+}
+
+// Logger defines the logging interface used by Provider for configuration events.
+// Implementations can use log/slog, testing.T.Logf, or any custom logger.
+type Logger interface {
+	// Info logs a message at info level.
+	Info(msg string, args ...any)
+	// Error logs a message at error level.
+	Error(msg string, args ...any)
+	// Debug logs a message at debug level.
+	Debug(msg string, args ...any)
+	// Warn logs a message at warn level.
+	Warn(msg string, args ...any)
+}
 
 func NewProvider[T any](options ...providerOption) *Provider[T] {
 	typeOf := reflect.TypeFor[T]()
@@ -45,18 +56,30 @@ func NewProvider[T any](options ...providerOption) *Provider[T] {
 	return &Provider[T]{provider: *provider.postInit()}
 }
 
+// GetConfiguration returns the current configuration, loading it from YAML
+// profiles and environment variables on the first call. Subsequent calls
+// return the cached configuration. Safe for concurrent use.
 func (p *Provider[T]) GetConfiguration() (T, error) {
-	if !p.loaded {
-		err := p.loadStaticConfiguration()
-		return p.configuration, err
-	}
-
 	p.lock.RLock()
-	defer p.lock.RUnlock()
+	if p.loaded {
+		defer p.lock.RUnlock()
+		return p.configuration, nil
+	}
+	p.lock.RUnlock()
 
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if !p.loaded {
+		if err := p.loadStaticConfiguration(); err != nil {
+			return p.configuration, err
+		}
+	}
 	return p.configuration, nil
 }
 
+// UpdateConfiguration replaces the current configuration and re-validates it.
+// Returns an error if validation fails. Safe for concurrent use.
 func (p *Provider[T]) UpdateConfiguration(configuration T) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()

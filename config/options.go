@@ -32,6 +32,8 @@ func (p *provider) postInit() *provider {
 	return p
 }
 
+// WithProfilesPath sets the base directory for YAML profile files.
+// Panics if the directory does not exist.
 func WithProfilesPath(profilesPath string) providerOption {
 	if _, err := os.Stat(profilesPath); err != nil {
 		panic(fmt.Errorf("profiles path does not exist: %w", err))
@@ -42,12 +44,17 @@ func WithProfilesPath(profilesPath string) providerOption {
 	}
 }
 
+// WithLogger sets a custom logger for configuration events.
+// The logger receives info, debug, warn, and error messages during
+// configuration loading and updates.
 func WithLogger(logger Logger) providerOption {
 	return func(p *provider) {
 		p.logger = logger
 	}
 }
 
+// WithDebugLogger enables debug-level logging for configuration operations.
+// This should NOT be used in production as it may log sensitive configuration values.
 func WithDebugLogger() providerOption {
 	return func(p *provider) {
 		level := slog.LevelDebug
@@ -58,12 +65,16 @@ func WithDebugLogger() providerOption {
 	}
 }
 
+// WithScope sets the configuration scope name used for profile selection.
+// Scope is used to pick a scope-specific YAML file (e.g., "production", "development").
 func WithScope(scope string) providerOption {
 	return func(p *provider) {
 		p.scope = scope
 	}
 }
 
+// WithDefaultScope sets the fallback configuration scope name.
+// The default scope is used when no specific scope is configured.
 func WithDefaultScope(defaultScope string) providerOption {
 	return func(p *provider) {
 		p.defaultScope = defaultScope

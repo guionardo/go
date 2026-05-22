@@ -1,3 +1,4 @@
+// Package profile provides YAML profile loading and merging for configuration scopes.
 package profile
 
 import (
@@ -5,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/guionardo/go/config/merger"
 
@@ -64,6 +66,13 @@ func getProfileFiles(
 	defaultScope string,
 	scope string,
 ) (defaultProfile, scopeProfile string, err error) {
+	for _, s := range []string{defaultScope, scope} {
+		clean := path.Clean(path.Join(basePath, s))
+		if !strings.HasPrefix(clean, path.Clean(basePath)) {
+			return "", "", fmt.Errorf("scope %q escapes base path %q", s, basePath)
+		}
+	}
+
 	defaultProfile, err = findYAMLFile(path.Join(basePath, defaultScope))
 	if err != nil {
 		return "", "", err

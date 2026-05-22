@@ -1,13 +1,10 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
-name: Go Tests
+name: Go tests and checking
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "develop"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "develop"]
 
 jobs:
   test:
@@ -54,3 +51,20 @@ jobs:
           ## name of branch where badges are stored
           ## ideally this should be orphan branch (see below how to create this branch)
           git-branch: badges
+
+  update-report-card:
+    name: Update report card
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request and extract Report Card
+        run: |
+          curl -s -o /dev/null  -w '%{http_code}' 'https://goreportcard.com/checks' --data-raw 'repo=github.com%2Fguionardo%2Fgo'
+          curl -s 'https://goreportcard.com/report/github.com/guionardo/go' | grep "var response = " | awk -F' ' '{for (i=4; i<NF; i++) printf("%s ", $i)}' > report.json
+
+      - name: Generate summary
+        run: |
+          echo "### Resume! :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "Grade        $(cat report.json | jq .grade)" >> $GITHUB_STEP_SUMMARY
+          echo "Average      $(cat report.json | jq .average)" >> $GITHUB_STEP_SUMMARY
+          echo "Last Refresh $(cat report.json | jq .last_refresh)" >> $GITHUB_STEP_SUMMARY
+          echo "Did error    $(cat report.json | jq .did_error)" >> $GITHUB_STEP_SUMMARY

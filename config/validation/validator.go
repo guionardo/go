@@ -1,7 +1,12 @@
+// Package validation provides struct validation using go-playground/validator
+// and a custom Validator interface for per-type validation logic.
 package validation
 
 import "github.com/go-playground/validator/v10"
 
+// Validator is the interface implemented by types that can self-validate.
+// Types implementing this interface receive custom validation logic
+// before the standard struct validation runs.
 type Validator interface {
 	Validate() error
 }
