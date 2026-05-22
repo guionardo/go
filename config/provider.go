@@ -107,10 +107,9 @@ func (p *Provider[T]) updateConfiguration(configuration T) error {
 	return nil
 }
 
-// loadStaticConfiguration loads the static configuration from the scope files and the environment variables
+// loadStaticConfiguration loads the static configuration from the scope files and the environment variables.
+// Caller MUST hold p.lock write lock.
 func (p *Provider[T]) loadStaticConfiguration() error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
 
 	var configuration T
 

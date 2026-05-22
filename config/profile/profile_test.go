@@ -75,6 +75,83 @@ func Test_getProfileFiles(t *testing.T) {
 	})
 }
 
+func TestGetScopedProfileContent_InvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid_default_yaml", func(t *testing.T) {
+		t.Parallel()
+
+		tmp := t.TempDir()
+		require.NoError(t, os.WriteFile(path.Join(tmp, "base.yml"), []byte(":::: invalid ::::"), 0600))
+		require.NoError(t, os.WriteFile(path.Join(tmp, "custom.yml"), []byte("name: valid"), 0600))
+
+		_, err := GetScopedProfileContent(tmp, "base", "custom")
+		require.Error(t, err)
+	})
+
+	t.Run("invalid_scope_yaml", func(t *testing.T) {
+		t.Parallel()
+
+		tmp := t.TempDir()
+		require.NoError(t, os.WriteFile(path.Join(tmp, "base.yml"), []byte("name: valid"), 0600))
+		require.NoError(t, os.WriteFile(path.Join(tmp, "custom.yml"), []byte(":::: invalid ::::"), 0600))
+
+		_, err := GetScopedProfileContent(tmp, "base", "custom")
+		require.Error(t, err)
+	})
+}
+
+func TestGetProfileFiles_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	_, _, err := getProfileFiles(tmp, "../etc", "default")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "escapes base path")
+}
+
+func TestGetScopedProfileContent(t *testing.T) {
+	t.Parallel()
+
+	t.Run("merge_default_and_scope", func(t *testing.T) {
+		t.Parallel()
+
+		tmp := t.TempDir()
+
+		defaultContent := []byte("name: default\nversion: 1")
+		scopeContent := []byte("version: 2\nenabled: true")
+
+		require.NoError(t, os.WriteFile(path.Join(tmp, "base.yml"), defaultContent, 0600))
+		require.NoError(t, os.WriteFile(path.Join(tmp, "custom.yml"), scopeContent, 0600))
+
+		data, err := GetScopedProfileContent(tmp, "base", "custom")
+		require.NoError(t, err)
+		require.Contains(t, string(data), "default")
+		require.Contains(t, string(data), "2")
+		require.Contains(t, string(data), "true")
+	})
+
+	t.Run("missing_default_returns_error", func(t *testing.T) {
+		t.Parallel()
+
+		tmp := t.TempDir()
+		require.NoError(t, os.WriteFile(path.Join(tmp, "custom.yml"), []byte("name: custom"), 0600))
+
+		_, err := GetScopedProfileContent(tmp, "base", "custom")
+		require.Error(t, err)
+	})
+
+	t.Run("missing_scope_returns_error", func(t *testing.T) {
+		t.Parallel()
+
+		tmp := t.TempDir()
+		require.NoError(t, os.WriteFile(path.Join(tmp, "base.yml"), []byte("name: base"), 0600))
+
+		_, err := GetScopedProfileContent(tmp, "base", "custom")
+		require.Error(t, err)
+	})
+}
+
 func Test_readProfileMap(t *testing.T) {
 	t.Parallel()
 

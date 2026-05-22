@@ -33,6 +33,44 @@ type (
 	}
 )
 
+func TestGetEnv(t *testing.T) {
+	t.Run("returns_env_value", func(t *testing.T) {
+		t.Setenv("TEST_GETENV_EXISTS", "found")
+		assert.Equal(t, "found", environment.GetEnv("TEST_GETENV_EXISTS"))
+	})
+
+	t.Run("returns_default_when_missing", func(t *testing.T) {
+		assert.Equal(t, "fallback", environment.GetEnv("TEST_GETENV_MISSING", "fallback"))
+	})
+
+	t.Run("returns_empty_when_no_default", func(t *testing.T) {
+		assert.Equal(t, "", environment.GetEnv("TEST_GETENV_EMPTY"))
+	})
+
+	t.Run("empty_env_returns_empty", func(t *testing.T) {
+		assert.Equal(t, "", environment.GetEnv(""))
+	})
+
+	t.Run("case_insensitive_match", func(t *testing.T) {
+		t.Setenv("TESTCASE_ENV", "value")
+		assert.Equal(t, "value", environment.GetEnv("testcase_env"))
+	})
+}
+
+func TestParseEnvironmentErrors(t *testing.T) {
+	t.Run("non_pointer_returns_error", func(t *testing.T) {
+		err := environment.ParseEnvironment(TestStruct{}, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("invalid_int_value_logs_error", func(t *testing.T) {
+		ts := TestStruct{}
+		t.Setenv("INT", "not-a-number")
+		err := environment.ParseEnvironment(&ts, nil)
+		require.Error(t, err)
+	})
+}
+
 func TestParseEnvironment(t *testing.T) { //nolint:paralleltest
 	ts := TestStruct{}
 
