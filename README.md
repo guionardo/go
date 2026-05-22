@@ -2,7 +2,7 @@
 Golang tools, examples, and packages
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/guionardo/go.svg)](https://pkg.go.dev/github.com/guionardo/go)
-[![Go Tests](https://github.com/guionardo/go/actions/workflows/go_tests.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go_tests.yml)
+[![Go tests and checking](https://github.com/guionardo/go/actions/workflows/go.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go.yml)
 ![coverage](https://raw.githubusercontent.com/guionardo/go/badges/.badges/main/coverage.svg)
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
 [![Go Report Card](https://goreportcard.com/badge/github.com/guionardo/go)](https://goreportcard.com/report/github.com/guionardo/go)
