@@ -23,7 +23,7 @@ make coverage-quick
 
 This enforces the thresholds in `.testcoverage-quick.yml`: packages ≥80%, files ≥70%, total ≥75%. Do not commit if it fails. Fix uncovered code or add tests first. (Note: cache providers tested via E2E with Docker — threshold overrides apply.)
 
-Then regenerate and stage the quality report:
+Then regenerate and stage the quality report before pushing a tag (not before every commit — too time consuming):
 
 ```bash
 make quality-report
