@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,6 +14,18 @@ import (
 
 	"github.com/guionardo/go/cache"
 )
+
+var (
+	logger     *slog.Logger
+	loggerOnce sync.Once
+)
+
+func log() *slog.Logger {
+	loggerOnce.Do(func() {
+		logger = slog.With(slog.String("module", "cache/postgres"))
+	})
+	return logger
+}
 
 // Cache implements cache.Cache[K, V] using a PostgreSQL backend.
 type Cache[K comparable, V any] struct {
@@ -38,6 +52,10 @@ func New[K comparable, V any](opts ...Option) (*Cache[K, V], error) {
 
 	if _, err := pool.Exec(context.Background(), CreateTableSQL); err != nil {
 		return nil, fmt.Errorf("cache/postgres: %w", err)
+	}
+
+	if _, err := pool.Exec(context.Background(), PrewarmSQL); err != nil {
+		log().Warn("pg_prewarm not available, skipping prewarm", "error", err)
 	}
 
 	c := &Cache[K, V]{
