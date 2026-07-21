@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.5] — 2026-07-21
+
+### Added
+- `release` package: complete self-update mechanism for Go CLI tools via GitHub Releases
+  - Version detection from `debug.ReadBuildInfo()` using hashicorp/go-version
+  - `CheckForUpdate`, `DownloadUpdate`, `PerformSelfUpdate` with functional options (`WithOwner`, `WithRepo`, `WithGitHubToken`)
+  - Two-phase SHA256 verification (go-digest at download + stdlib at swap)
+  - File-lock concurrency protection (`.update.lock`)
+  - Swapper binary for atomic backup-rename-replace with automatic rollback
+  - Platform support: Linux amd64, macOS amd64/arm64, Windows amd64
+  - `Asset.Download` with go-digest checksum verification
+  - `Asset.Digest` field for release metadata integration
+- `cmd/example-updater`: minimal CLI demo of the self-update flow
+- `doc.go` for every library package (21 packages) with comprehensive Go documentation
+- `release/README.md` with full API reference, architecture diagram, and GitHub workflow examples (Go, Python, .NET)
+- GitHub Actions release workflow with multi-platform asset building and digest computation
+
+### Changed
+- Makefile: added `swapper`, `swapper-linux`, `swapper-darwin`, `swapper-windows`, `swapper-clean` targets
+- `.gitignore`: swapper binary pattern exclusions
+- README.md: restructured with package index table; added release package section
+- Moved package doc comments from source files to canonical `doc.go` files (resolves godoclint)
+
+### Fixed
+- `release.GetLatestRelease`: added `githubClient` with `CheckRedirect` (SSRF mitigation)
+- `release.GetLatestRelease`: fixed `vnd` typo in Accept header, added `defer response.Body.Close()`
+- Swapper: added `--target` flag for correct self-replacement path
+
 ## [v1.4] — 2026-07-21
 
 ### Added
