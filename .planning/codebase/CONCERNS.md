@@ -278,7 +278,10 @@ w.Header().Add(key, sanitized)
 | ~~Failed config loading returns nil error~~ | ~~`config/provider.go:72-78`~~ | ~~High~~ | ✅ Fixed |
 | ~~Inconsistent case-insensitive env lookup~~ | ~~`config/environment/environment.go:18-38`~~ | ~~Medium~~ | ✅ Fixed |
 | ~~MID file content not trimmed~~ | ~~`mid/machineid_linux.go:58-71`~~ | ~~Low~~ | ✅ Fixed |
-| No HTTP timeout on Asset.Download | `release/release.go:124` | Medium | Next |
+| ~~No HTTP timeout on Asset.Download~~ | ~~`release/release.go:124`~~ | ~~Medium~~ | ✅ Fixed |
+| ~~Duplicate nested struct validation~~ | ~~`config/provider_base.go:38-47`~~ | ~~Low~~ | ✅ Fixed |
+| ~~Redundant CRLF sanitization in httptest\_mock~~ | ~~`httptest_mock/response.go:75`~~ | ~~Low~~ | ✅ Fixed |
+| ~~release/release.go: No Tests (stale — 56 tests exist)~~ | ~~`release/release.go`~~ | ~~Stale~~ | ✅ Fixed |
 | MID package untested on macOS/Windows | `mid/machineid_darwin.go` etc. | Medium | Soon |
 | Duplicate GetEnv implementations | `config/environment/` and `shell_tools/` | Low | Soon |
 

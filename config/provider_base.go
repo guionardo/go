@@ -2,7 +2,6 @@ package config
 
 import (
 	"log/slog"
-	"reflect"
 
 	"github.com/guionardo/go/config/environment"
 	"github.com/guionardo/go/config/validation"
@@ -32,17 +31,6 @@ func (p *provider) validateConfiguration(configuration any) error {
 	if validator, ok := configuration.(validation.Validator); ok {
 		if err := validator.Validate(); err != nil {
 			return err
-		}
-	}
-
-	// Iterate over the fields of the configuration and validate them when the field is a struct
-	for i := 0; i < reflect.TypeOf(configuration).NumField(); i++ {
-		field := reflect.TypeOf(configuration).Field(i)
-		if field.Type.Kind() == reflect.Struct {
-			fieldValue := reflect.ValueOf(configuration).Field(i).Interface()
-			if err := validation.Validate(fieldValue); err != nil {
-				return err
-			}
 		}
 	}
 

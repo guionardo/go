@@ -87,18 +87,23 @@ func GetThisLatestRelease() (*Release, error) {
 	return GetLatestRelease(owner, repo)
 }
 
-var githubClient = &http.Client{
-	Timeout: 30 * time.Second,
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return errors.New("too many redirects")
-		}
-		if req.URL.Host != "api.github.com" && req.URL.Host != "github.com" {
-			return fmt.Errorf("redirect to untrusted host: %s", req.URL.Host)
-		}
-		return nil
-	},
-}
+var (
+	githubClient = &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("too many redirects")
+			}
+			if req.URL.Host != "api.github.com" && req.URL.Host != "github.com" {
+				return fmt.Errorf("redirect to untrusted host: %s", req.URL.Host)
+			}
+			return nil
+		},
+	}
+	downloadClient = &http.Client{
+		Timeout: 30 * time.Second,
+	}
+)
 
 func GetLatestRelease(owner, repo string) (*Release, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
@@ -121,7 +126,7 @@ func GetLatestRelease(owner, repo string) (*Release, error) {
 }
 
 func (asset *Asset) Download(w io.Writer) error {
-	resp, err := http.Get(asset.BrowserDownloadURL)
+	resp, err := downloadClient.Get(asset.BrowserDownloadURL)
 	if err != nil {
 		return err
 	}

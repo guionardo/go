@@ -72,8 +72,7 @@ func (m *Response) writeHeaderAndBody(w http.ResponseWriter) {
 	}
 
 	for key, value := range m.Headers {
-		sanitized := strings.ReplaceAll(strings.ReplaceAll(value, "\r", ""), "\n", "")
-		w.Header().Add(key, sanitized)
+		w.Header().Add(key, value)
 	}
 
 	w.WriteHeader(statusCode)
