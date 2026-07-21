@@ -155,10 +155,18 @@ func (c *Cache[K, V]) Close() error {
 // Returns 0 for no expiry (memcache protocol: 0 means no expiry).
 func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) int32 {
 	if len(ttl) > 0 && ttl[0] > 0 {
-		return int32(ttl[0].Seconds())
+		seconds := int32(ttl[0].Seconds())
+		if seconds < 1 {
+			return 1
+		}
+		return seconds
 	}
 	if c.defaultTTL > 0 {
-		return int32(c.defaultTTL.Seconds())
+		seconds := int32(c.defaultTTL.Seconds())
+		if seconds < 1 {
+			return 1
+		}
+		return seconds
 	}
 	return 0
 }

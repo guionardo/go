@@ -77,7 +77,10 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Durat
 	}
 
 	expiration := c.resolveTTL(ttl...)
-	cmd := c.client.B().Set().Key(fmt.Sprint(key)).Value(string(data)).Ex(expiration).Build()
+	cmd := c.client.B().Set().Key(fmt.Sprint(key)).Value(string(data)).Build()
+	if expiration > 0 {
+		cmd = c.client.B().Set().Key(fmt.Sprint(key)).Value(string(data)).Px(expiration).Build()
+	}
 	if err := c.client.Do(ctx, cmd).Error(); err != nil {
 		return fmt.Errorf("cache/valkey: %w", err)
 	}
