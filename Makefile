@@ -128,13 +128,9 @@ lint-fix: check_golangci ## Run linters and fix issues
 
 ##@ Quality Report
 
-.quality-report.md: ## Generate quality report (lint, security, coverage, metrics)
-	@bash .planning/spikes/001-golangci-lint-report/quality-report.sh quality-report.md .
-
 .PHONY: quality-report
-quality-report: .quality-report.md  ## Generate and open quality report
-	@echo "Report: quality-report.md"
-	@echo "Open with: open quality-report.md"
+quality-report: ## Generate quality report (lint, security, coverage, metrics)
+	@bash scripts/quality-report.sh quality-report.md .
 
 ##@ Self-Update
 
