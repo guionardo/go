@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -46,42 +45,42 @@ func TestPostgresCache_SetGet(t *testing.T) {
 	c := newTestCache(t, connString)
 
 	t.Run("set_and_get_returns_value", func(t *testing.T) {
-		err := c.Set(context.Background(), "postgres_test_set_get", "v")
+		err := c.Set(t.Context(), "postgres_test_set_get", "v")
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "postgres_test_set_get")
+		got, err := c.Get(t.Context(), "postgres_test_set_get")
 		require.NoError(t, err)
 		assert.Equal(t, "v", got)
 	})
 
 	t.Run("get_miss_returns_error", func(t *testing.T) {
-		_, err := c.Get(context.Background(), "nonexistent_key")
+		_, err := c.Get(t.Context(), "nonexistent_key")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "key not found")
 	})
 
 	t.Run("get_expired_returns_error", func(t *testing.T) {
-		err := c.Set(context.Background(), "postgres_test_expired", "v", 1*time.Millisecond)
+		err := c.Set(t.Context(), "postgres_test_expired", "v", 1*time.Millisecond)
 		require.NoError(t, err)
 
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = c.Get(context.Background(), "postgres_test_expired")
+		_, err = c.Get(t.Context(), "postgres_test_expired")
 		require.Error(t, err)
 	})
 
 	t.Run("delete_removes_key", func(t *testing.T) {
-		_ = c.Set(context.Background(), "postgres_test_delete", "v")
+		_ = c.Set(t.Context(), "postgres_test_delete", "v")
 
-		err := c.Delete(context.Background(), "postgres_test_delete")
+		err := c.Delete(t.Context(), "postgres_test_delete")
 		require.NoError(t, err)
 
-		_, err = c.Get(context.Background(), "postgres_test_delete")
+		_, err = c.Get(t.Context(), "postgres_test_delete")
 		require.Error(t, err)
 	})
 
 	t.Run("get_or_set_computes", func(t *testing.T) {
-		got, err := c.GetOrSet(context.Background(), "postgres_test_gos", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "postgres_test_gos", func() (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"os"
@@ -13,9 +12,9 @@ import (
 )
 
 type testConfig struct {
-	Name    string      `yaml:"name" env:"TESTCFG_NAME" validate:"required"`
-	Version int         `yaml:"version" env:"TESTCFG_VERSION"`
-	Secret  string      `yaml:"secret" safe:"true"`
+	Name    string        `yaml:"name" env:"TESTCFG_NAME" validate:"required"`
+	Version int           `yaml:"version" env:"TESTCFG_VERSION"`
+	Secret  string        `yaml:"secret" safe:"true"`
 	Nested  testSubConfig `yaml:"nested"`
 }
 
@@ -42,9 +41,9 @@ type testInvalidConfig struct {
 func TestLog(t *testing.T) {
 	t.Parallel()
 
-	l := log()
+	l := logger()
 	assert.NotNil(t, l)
-	assert.True(t, l.Enabled(context.Background(), slog.LevelInfo))
+	assert.True(t, l.Enabled(t.Context(), slog.LevelInfo))
 }
 
 func TestFieldPath(t *testing.T) {

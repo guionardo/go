@@ -1,7 +1,6 @@
 package valkey_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -19,7 +18,7 @@ func skipIfNoExampleValkey(t *testing.T) {
 	}
 
 	c := valkey.New[string, string](valkey.WithAddr(addr))
-	err := c.Set(context.Background(), "_example_ping", "pong")
+	err := c.Set(t.Context(), "_example_ping", "pong")
 	if err != nil {
 		t.Skip("Valkey not available")
 	}
@@ -31,10 +30,10 @@ func TestValkeyExample_SetGet(t *testing.T) {
 
 	c := valkey.New[string, string](valkey.WithAddr("localhost:6379"))
 
-	err := c.Set(context.Background(), "example", "valkey-value")
+	err := c.Set(t.Context(), "example", "valkey-value")
 	require.NoError(t, err)
 
-	value, err := c.Get(context.Background(), "example")
+	value, err := c.Get(t.Context(), "example")
 	require.NoError(t, err)
 	assert.Equal(t, "valkey-value", value)
 

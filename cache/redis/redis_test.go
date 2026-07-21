@@ -1,7 +1,6 @@
 package redis_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -20,7 +19,7 @@ func skipIfNoRedis(t *testing.T) {
 	}
 
 	c := redis.New[string, string](redis.WithAddr(addr))
-	err := c.Set(context.Background(), "_test_ping", "pong")
+	err := c.Set(t.Context(), "_test_ping", "pong")
 	if err != nil {
 		t.Skipf("Redis not available at %s: %v", addr, err)
 	}
@@ -35,10 +34,10 @@ func TestRedisCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := redis.New[string, string]()
-		err := c.Set(context.Background(), "redis_test_set_get", "v")
+		err := c.Set(t.Context(), "redis_test_set_get", "v")
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "redis_test_set_get")
+		got, err := c.Get(t.Context(), "redis_test_set_get")
 		require.NoError(t, err)
 		assert.Equal(t, "v", got)
 	})
@@ -47,7 +46,7 @@ func TestRedisCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := redis.New[string, string]()
-		_, err := c.Get(context.Background(), "redis_test_nonexistent")
+		_, err := c.Get(t.Context(), "redis_test_nonexistent")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cache/redis")
 	})
@@ -56,10 +55,10 @@ func TestRedisCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := redis.New[string, string]()
-		_ = c.Set(context.Background(), "redis_test_delete", "v")
-		_ = c.Delete(context.Background(), "redis_test_delete")
+		_ = c.Set(t.Context(), "redis_test_delete", "v")
+		_ = c.Delete(t.Context(), "redis_test_delete")
 
-		_, err := c.Get(context.Background(), "redis_test_delete")
+		_, err := c.Get(t.Context(), "redis_test_delete")
 		require.Error(t, err)
 	})
 
@@ -68,7 +67,7 @@ func TestRedisCache_SetGet(t *testing.T) {
 
 		c := redis.New[string, string]()
 		got, err := c.GetOrSet(
-			context.Background(),
+			t.Context(),
 			"redis_test_getorset",
 			func() (string, error) { return "computed", nil },
 		)
@@ -80,10 +79,10 @@ func TestRedisCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := redis.New[string, string]()
-		err := c.Set(context.Background(), "redis_test_ttl", "ttl-value", 0)
+		err := c.Set(t.Context(), "redis_test_ttl", "ttl-value", 0)
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "redis_test_ttl")
+		got, err := c.Get(t.Context(), "redis_test_ttl")
 		require.NoError(t, err)
 		assert.Equal(t, "ttl-value", got)
 	})

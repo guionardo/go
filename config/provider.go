@@ -89,20 +89,20 @@ func (p *Provider[T]) UpdateConfiguration(configuration T) error {
 
 func (p *Provider[T]) updateConfiguration(configuration T) error {
 	if err := p.validateConfiguration(configuration); err != nil {
-		log().Error("error validating configuration", "error", err)
+		logger().Error("error validating configuration", "error", err)
 		return err
 	}
 
 	// Compare the configuration with the previous configuration
 	if reflect.DeepEqual(p.configuration, configuration) {
-		log().Info("configuration is the same as the previous configuration, skipping update")
+		logger().Info("configuration is the same as the previous configuration, skipping update")
 		return nil
 	}
 
 	p.configuration = configuration
 	p.loaded = true
 
-	log().Info("configuration updated", getConfigurationLog(configuration))
+	logger().Info("configuration updated", getConfigurationLog(configuration))
 
 	return nil
 }
@@ -118,14 +118,14 @@ func (p *Provider[T]) loadStaticConfiguration() error {
 	} else {
 		content, err := profile.GetScopedProfileContent(p.profilesPath, p.defaultScope, p.scope)
 		if err != nil {
-			log().Error("error reading profile", "error", err)
+			logger().Error("error reading profile", "error", err)
 		} else if err := yaml.Unmarshal(content, &configuration); err != nil {
-			log().Error("error unmarshalling profile", "error", err)
+			logger().Error("error unmarshalling profile", "error", err)
 		}
 	}
 
 	if err := environment.ParseEnvironment(&configuration, nil); err != nil {
-		log().Error("error parsing environment", "error", err)
+		logger().Error("error parsing environment", "error", err)
 	}
 
 	return p.updateConfiguration(configuration)

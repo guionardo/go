@@ -3,7 +3,6 @@
 package cache_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -32,7 +31,7 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 	for _, p := range providers {
 		t.Run(p.name, func(t *testing.T) {
 			c := p.fn(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			t.Run("set_and_get", func(t *testing.T) {
 				err := c.Set(ctx, "e2e_key", "e2e_value")
@@ -162,7 +161,7 @@ func TestCacheE2E_Redis(t *testing.T) {
 		t.Skip("skipping Redis E2E test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	redisC, err := tcredis.RunContainer(ctx,
 		testcontainers.WithImage("redis:7-alpine"),
 		tcredis.WithSnapshotting(0, 0),
@@ -198,7 +197,7 @@ func TestCacheE2E_Valkey(t *testing.T) {
 		t.Skip("skipping Valkey E2E test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	valkeyC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "valkey/valkey:8-alpine",
@@ -241,7 +240,7 @@ func TestCacheE2E_Memcache(t *testing.T) {
 		t.Skip("skipping Memcache E2E test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	memcacheC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "memcached:1-alpine",
@@ -281,7 +280,7 @@ func TestCacheE2E_Postgres(t *testing.T) {
 		t.Skip("skipping Postgres E2E test in short mode")
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	pgC, err := tcpostgres.RunContainer(ctx,
 		testcontainers.WithImage("postgres:16-alpine"),
 		tcpostgres.WithDatabase("cache_e2e"),

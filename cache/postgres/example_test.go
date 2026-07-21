@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -33,10 +32,10 @@ func TestPostgresExample_SetGet(t *testing.T) {
 	c, err := postgres.New[string, string](postgres.WithConnString(connString))
 	require.NoError(t, err)
 
-	err = c.Set(context.Background(), "example", "pg-value")
+	err = c.Set(t.Context(), "example", "pg-value")
 	require.NoError(t, err)
 
-	value, err := c.Get(context.Background(), "example")
+	value, err := c.Get(t.Context(), "example")
 	require.NoError(t, err)
 	assert.Equal(t, "pg-value", value)
 

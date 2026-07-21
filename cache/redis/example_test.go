@@ -1,7 +1,6 @@
 package redis_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -19,7 +18,7 @@ func skipIfNoExampleRedis(t *testing.T) {
 	}
 
 	c := redis.New[string, string](redis.WithAddr(addr))
-	err := c.Set(context.Background(), "_example_ping", "pong")
+	err := c.Set(t.Context(), "_example_ping", "pong")
 	if err != nil {
 		t.Skip("Redis not available")
 	}
@@ -31,10 +30,10 @@ func TestRedisExample_SetGet(t *testing.T) {
 
 	c := redis.New[string, string](redis.WithAddr("localhost:6379"))
 
-	err := c.Set(context.Background(), "example", "redis-value")
+	err := c.Set(t.Context(), "example", "redis-value")
 	require.NoError(t, err)
 
-	value, err := c.Get(context.Background(), "example")
+	value, err := c.Get(t.Context(), "example")
 	require.NoError(t, err)
 	assert.Equal(t, "redis-value", value)
 

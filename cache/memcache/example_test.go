@@ -1,7 +1,6 @@
 package memcache_test
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -26,10 +25,10 @@ func TestMemcacheExample_SetGet(t *testing.T) {
 
 	c := memcache.New[string, string]()
 
-	err := c.Set(context.Background(), "example", "memcache-value")
+	err := c.Set(t.Context(), "example", "memcache-value")
 	require.NoError(t, err)
 
-	value, err := c.Get(context.Background(), "example")
+	value, err := c.Get(t.Context(), "example")
 	require.NoError(t, err)
 	assert.Equal(t, "memcache-value", value)
 

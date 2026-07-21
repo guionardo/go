@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,9 +11,7 @@ import (
 
 func (p *provider) postInit() *provider {
 	// Set the default scope if not set
-	if p.defaultScope == "" {
-		p.defaultScope = DefaultScope
-	}
+	p.defaultScope = cmp.Or(p.defaultScope, DefaultScope)
 
 	// Set the scope if not set
 	if p.scope == "" {
@@ -24,7 +23,7 @@ func (p *provider) postInit() *provider {
 		p.profilesPath = environment.GetEnv(EnvConfigurationLog, DefaultConfigurationPath)
 	}
 
-	log().Info("configuration provider initialized",
+	logger().Info("configuration provider initialized",
 		slog.String("defaultScope", p.defaultScope),
 		slog.String("scope", p.scope),
 		slog.String("profilesPath", p.profilesPath))

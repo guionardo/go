@@ -221,7 +221,7 @@ func TestCheckForUpdate_InvalidVersion(t *testing.T) {
 	_, _, err := CheckForUpdate(context.Background(), "not-a-version",
 		WithOwner("test"), WithRepo("test"))
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "parsing current version")
+	require.Contains(t, err.Error(), "invalid version string")
 }
 
 func TestCheckForUpdate_APIError(t *testing.T) {

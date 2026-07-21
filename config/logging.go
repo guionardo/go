@@ -8,19 +8,9 @@ import (
 	"sync"
 )
 
-var (
-	logger     *slog.Logger
-	loggerOnce sync.Once
-)
-
-// log returns a new logger for this package
-func log() *slog.Logger {
-	loggerOnce.Do(func() {
-		logger = slog.With(slog.String("module", "config"))
-	})
-
-	return logger
-}
+var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
+	return slog.With(slog.String("module", "config"))
+})
 
 func getConfigurationLog(c any) slog.Attr {
 	configs := getMapFromStruct(c, "")

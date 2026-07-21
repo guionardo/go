@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
@@ -166,21 +167,24 @@ func (c *Cache[K, V]) Close() error {
 // resolveTTL converts the optional TTL to a memcache expiration value.
 // Returns 0 for no expiry (memcache protocol: 0 means no expiry).
 func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) int32 {
-	if len(ttl) > 0 && ttl[0] > 0 {
-		seconds := int32(ttl[0].Seconds())
-		if seconds < 1 {
-			return 1
-		}
-		return seconds
+	var d time.Duration
+	switch {
+	case len(ttl) > 0 && ttl[0] > 0:
+		d = ttl[0]
+	case c.defaultTTL > 0:
+		d = c.defaultTTL
+	default:
+		return 0
 	}
-	if c.defaultTTL > 0 {
-		seconds := int32(c.defaultTTL.Seconds())
-		if seconds < 1 {
-			return 1
-		}
-		return seconds
+
+	seconds := d.Seconds()
+	if seconds < 1 {
+		return 1
 	}
-	return 0
+	if seconds > float64(math.MaxInt32) {
+		return math.MaxInt32
+	}
+	return int32(seconds)
 }
 
 // compile-time interface assertion

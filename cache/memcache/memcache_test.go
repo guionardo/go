@@ -1,7 +1,6 @@
 package memcache_test
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -28,10 +27,10 @@ func TestMemcacheCache_SetGet(t *testing.T) {
 		c := memcache.New[string, string]()
 		defer c.Close()
 
-		err := c.Set(context.Background(), "memcache_test_set_get", "v")
+		err := c.Set(t.Context(), "memcache_test_set_get", "v")
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "memcache_test_set_get")
+		got, err := c.Get(t.Context(), "memcache_test_set_get")
 		require.NoError(t, err)
 		assert.Equal(t, "v", got)
 	})
@@ -40,7 +39,7 @@ func TestMemcacheCache_SetGet(t *testing.T) {
 		c := memcache.New[string, string]()
 		defer c.Close()
 
-		_, err := c.Get(context.Background(), "nonexistent_key")
+		_, err := c.Get(t.Context(), "nonexistent_key")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "key not found")
 	})
@@ -49,12 +48,12 @@ func TestMemcacheCache_SetGet(t *testing.T) {
 		c := memcache.New[string, string]()
 		defer c.Close()
 
-		_ = c.Set(context.Background(), "memcache_test_delete", "v")
+		_ = c.Set(t.Context(), "memcache_test_delete", "v")
 
-		err := c.Delete(context.Background(), "memcache_test_delete")
+		err := c.Delete(t.Context(), "memcache_test_delete")
 		require.NoError(t, err)
 
-		_, err = c.Get(context.Background(), "memcache_test_delete")
+		_, err = c.Get(t.Context(), "memcache_test_delete")
 		require.Error(t, err)
 	})
 
@@ -62,7 +61,7 @@ func TestMemcacheCache_SetGet(t *testing.T) {
 		c := memcache.New[string, string]()
 		defer c.Close()
 
-		got, err := c.GetOrSet(context.Background(), "memcache_test_gos", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "memcache_test_gos", func() (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)

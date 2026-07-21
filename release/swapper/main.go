@@ -1,4 +1,4 @@
-package main
+package main //nolint:wsl // style; block spacing is intentional
 
 import (
 	"crypto/sha256"
@@ -10,16 +10,22 @@ import (
 	"strings"
 )
 
+const usage = "Usage: swapper --new-binary=<path> [--checksum=<sha256>] [--target=<path>] [original args...]"
+
 //nolint:cyclop
 func main() {
-	var newBinary, expectedChecksum string
+	var (
+		newBinary, expectedChecksum, targetPath string
+		err                                     error
+	)
 
 	flag.StringVar(&newBinary, "new-binary", "", "Path to the new binary (required)")
 	flag.StringVar(&expectedChecksum, "checksum", "", "Expected SHA256 hex checksum")
+	flag.StringVar(&targetPath, "target", "", "Path to the binary to replace (optional, defaults to self)")
 	flag.Parse()
 
 	if newBinary == "" {
-		fmt.Fprintln(os.Stderr, "Usage: swapper --new-binary=<path> [--checksum=<sha256>] [original args...]")
+		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(1)
 	}
 
@@ -28,13 +34,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	currentExe, err := os.Executable()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get executable path: %v\n", err)
-		os.Exit(1)
+	if targetPath == "" {
+		targetPath, err = os.Executable()
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to get executable path: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
-	currentExe, err = filepath.EvalSymlinks(currentExe)
+	targetPath, err = filepath.EvalSymlinks(targetPath)
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to resolve symlinks: %v\n", err)
 		os.Exit(1)
@@ -47,22 +57,22 @@ func main() {
 		}
 	}
 
-	if err := atomicReplace(currentExe, newBinary); err != nil {
+	if err := atomicReplace(targetPath, newBinary); err != nil {
 		fmt.Fprintf(os.Stderr, "swap failed: %v\n", err)
 		os.Exit(1)
 	}
 
 	if expectedChecksum != "" {
-		if err := verifyChecksum(currentExe, expectedChecksum); err != nil {
+		if err := verifyChecksum(targetPath, expectedChecksum); err != nil {
 			fmt.Fprintf(os.Stderr, "post-swap verification failed: %v\n", err)
-			restoreBackup(currentExe)
+			restoreBackup(targetPath)
 			os.Exit(1)
 		}
 	}
 
 	originalArgs := flag.Args()
-	relaunchArgs := append([]string{currentExe}, originalArgs...)
-	relaunch(currentExe, relaunchArgs, os.Environ())
+	relaunchArgs := append([]string{targetPath}, originalArgs...)
+	relaunch(targetPath, relaunchArgs, os.Environ())
 }
 
 func restoreBackup(currentExe string) {

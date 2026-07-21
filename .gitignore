@@ -31,3 +31,7 @@ go.work.sum
 # .idea/
 .vscode/
 cover*.out
+
+# Swapper build artifacts
+release/swapper/swapper_*
+release/swapper/*.exe

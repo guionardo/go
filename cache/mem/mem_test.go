@@ -1,7 +1,6 @@
 package mem_test
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -20,10 +19,10 @@ func TestMemCache_SetGet(t *testing.T) { //nolint:funlen
 
 		c := mem.New[string, string]()
 
-		err := c.Set(context.Background(), "k", "v")
+		err := c.Set(t.Context(), "k", "v")
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "k")
+		got, err := c.Get(t.Context(), "k")
 		require.NoError(t, err)
 		assert.Equal(t, "v", got)
 	})
@@ -33,7 +32,7 @@ func TestMemCache_SetGet(t *testing.T) { //nolint:funlen
 
 		c := mem.New[string, string]()
 
-		_, err := c.Get(context.Background(), "missing")
+		_, err := c.Get(t.Context(), "missing")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "key not found")
 	})
@@ -42,10 +41,10 @@ func TestMemCache_SetGet(t *testing.T) { //nolint:funlen
 		t.Parallel()
 
 		c := mem.New[string, string](cache.WithDefaultTTL(1 * time.Millisecond))
-		_ = c.Set(context.Background(), "k", "v")
+		_ = c.Set(t.Context(), "k", "v")
 		time.Sleep(10 * time.Millisecond)
 
-		_, err := c.Get(context.Background(), "k")
+		_, err := c.Get(t.Context(), "k")
 		require.Error(t, err)
 	})
 
@@ -53,11 +52,11 @@ func TestMemCache_SetGet(t *testing.T) { //nolint:funlen
 		t.Parallel()
 
 		c := mem.New[string, string](cache.WithDefaultTTL(1 * time.Hour))
-		err := c.Set(context.Background(), "k", "v", 1*time.Millisecond)
+		err := c.Set(t.Context(), "k", "v", 1*time.Millisecond)
 		require.NoError(t, err)
 		time.Sleep(10 * time.Millisecond)
 
-		_, err = c.Get(context.Background(), "k")
+		_, err = c.Get(t.Context(), "k")
 		require.Error(t, err)
 	})
 
@@ -66,10 +65,10 @@ func TestMemCache_SetGet(t *testing.T) { //nolint:funlen
 
 		c := mem.New[string, string]()
 
-		err := c.Set(context.Background(), "k", "v")
+		err := c.Set(t.Context(), "k", "v")
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "k")
+		got, err := c.Get(t.Context(), "k")
 		require.NoError(t, err)
 		assert.Equal(t, "v", got)
 	})
@@ -82,12 +81,12 @@ func TestMemCache_Delete(t *testing.T) {
 		t.Parallel()
 
 		c := mem.New[string, string]()
-		_ = c.Set(context.Background(), "k", "v")
+		_ = c.Set(t.Context(), "k", "v")
 
-		err := c.Delete(context.Background(), "k")
+		err := c.Delete(t.Context(), "k")
 		require.NoError(t, err)
 
-		_, err = c.Get(context.Background(), "k")
+		_, err = c.Get(t.Context(), "k")
 		require.Error(t, err)
 	})
 
@@ -96,7 +95,7 @@ func TestMemCache_Delete(t *testing.T) {
 
 		c := mem.New[string, string]()
 
-		err := c.Delete(context.Background(), "nonexistent")
+		err := c.Delete(t.Context(), "nonexistent")
 		require.NoError(t, err)
 	})
 }
@@ -108,9 +107,9 @@ func TestMemCache_GetOrSet(t *testing.T) {
 		t.Parallel()
 
 		c := mem.New[string, string]()
-		_ = c.Set(context.Background(), "k", "v")
+		_ = c.Set(t.Context(), "k", "v")
 
-		got, err := c.GetOrSet(context.Background(), "k", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "k", func() (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)
@@ -122,7 +121,7 @@ func TestMemCache_GetOrSet(t *testing.T) {
 
 		c := mem.New[string, string]()
 
-		got, err := c.GetOrSet(context.Background(), "k", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "k", func() (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)
@@ -135,7 +134,7 @@ func TestMemCache_GetOrSet_SetterError(t *testing.T) {
 
 	c := mem.New[string, string]()
 
-	_, err := c.GetOrSet(context.Background(), "k", func() (string, error) {
+	_, err := c.GetOrSet(t.Context(), "k", func() (string, error) {
 		return "", assert.AnError
 	})
 	require.Error(t, err)
@@ -173,20 +172,20 @@ func TestMemCache_Concurrent(t *testing.T) {
 	for i := range 10 {
 		wg.Add(1)
 
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 
 			for j := range 100 {
-				key := id*1000 + j
-				err := c.Set(context.Background(), key, j)
+				key := i*1000 + j
+				err := c.Set(t.Context(), key, j)
 				assert.NoError(t, err)
 
-				got, err := c.Get(context.Background(), key)
+				got, err := c.Get(t.Context(), key)
 				if err == nil {
 					assert.Equal(t, j, got)
 				}
 			}
-		}(i)
+		}()
 	}
 
 	wg.Wait()

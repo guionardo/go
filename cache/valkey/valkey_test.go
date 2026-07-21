@@ -1,7 +1,6 @@
 package valkey_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -20,7 +19,7 @@ func skipIfNoValkey(t *testing.T) {
 	}
 
 	c := valkey.New[string, string](valkey.WithAddr(addr))
-	err := c.Set(context.Background(), "_test_ping", "pong")
+	err := c.Set(t.Context(), "_test_ping", "pong")
 	if err != nil {
 		t.Skipf("Valkey not available at %s: %v", addr, err)
 	}
@@ -35,10 +34,10 @@ func TestValkeyCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := valkey.New[string, string]()
-		err := c.Set(context.Background(), "valkey_test_set_get", "v")
+		err := c.Set(t.Context(), "valkey_test_set_get", "v")
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "valkey_test_set_get")
+		got, err := c.Get(t.Context(), "valkey_test_set_get")
 		require.NoError(t, err)
 		assert.Equal(t, "v", got)
 	})
@@ -47,7 +46,7 @@ func TestValkeyCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := valkey.New[string, string]()
-		_, err := c.Get(context.Background(), "valkey_test_nonexistent")
+		_, err := c.Get(t.Context(), "valkey_test_nonexistent")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cache/valkey")
 	})
@@ -56,10 +55,10 @@ func TestValkeyCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := valkey.New[string, string]()
-		_ = c.Set(context.Background(), "valkey_test_delete", "v")
-		_ = c.Delete(context.Background(), "valkey_test_delete")
+		_ = c.Set(t.Context(), "valkey_test_delete", "v")
+		_ = c.Delete(t.Context(), "valkey_test_delete")
 
-		_, err := c.Get(context.Background(), "valkey_test_delete")
+		_, err := c.Get(t.Context(), "valkey_test_delete")
 		require.Error(t, err)
 	})
 
@@ -68,7 +67,7 @@ func TestValkeyCache_SetGet(t *testing.T) {
 
 		c := valkey.New[string, string]()
 		got, err := c.GetOrSet(
-			context.Background(),
+			t.Context(),
 			"valkey_test_getorset",
 			func() (string, error) { return "computed", nil },
 		)
@@ -80,10 +79,10 @@ func TestValkeyCache_SetGet(t *testing.T) {
 		t.Parallel()
 
 		c := valkey.New[string, string]()
-		err := c.Set(context.Background(), "valkey_test_ttl", "ttl-value", 0)
+		err := c.Set(t.Context(), "valkey_test_ttl", "ttl-value", 0)
 		require.NoError(t, err)
 
-		got, err := c.Get(context.Background(), "valkey_test_ttl")
+		got, err := c.Get(t.Context(), "valkey_test_ttl")
 		require.NoError(t, err)
 		assert.Equal(t, "ttl-value", got)
 	})

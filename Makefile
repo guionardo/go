@@ -120,3 +120,25 @@ lint: check_golangci ## Run linters
 
 lint-fix: check_golangci ## Run linters and fix issues
 	@golangci-lint run --fix ./...
+
+##@ Self-Update
+
+.PHONY: swapper swapper-all swapper-clean
+
+SWAPPER_DIR := release/swapper
+SWAPPER_OUT := release/swapper
+
+swapper: swapper-linux swapper-darwin swapper-windows  ## Build all swapper platform binaries
+
+swapper-linux:
+	GOOS=linux GOARCH=amd64 go build -o $(SWAPPER_OUT)/swapper_linux_amd64 ./$(SWAPPER_DIR)/
+
+swapper-darwin:
+	GOOS=darwin GOARCH=amd64 go build -o $(SWAPPER_OUT)/swapper_darwin_amd64 ./$(SWAPPER_DIR)/
+	GOOS=darwin GOARCH=arm64 go build -o $(SWAPPER_OUT)/swapper_darwin_arm64 ./$(SWAPPER_DIR)/
+
+swapper-windows:
+	GOOS=windows GOARCH=amd64 go build -o $(SWAPPER_OUT)/swapper_windows_amd64.exe ./$(SWAPPER_DIR)/
+
+swapper-clean:  ## Clean swapper binaries
+	rm -f $(SWAPPER_OUT)/swapper_linux_amd64 $(SWAPPER_OUT)/swapper_darwin_amd64 $(SWAPPER_OUT)/swapper_darwin_arm64 $(SWAPPER_OUT)/swapper_windows_amd64.exe
