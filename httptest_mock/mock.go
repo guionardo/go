@@ -1,6 +1,3 @@
-// Package httptestmock provides utilities for creating HTTP mock servers in Go tests.
-// It allows defining request/response mocks in external JSON or YAML files for cleaner,
-// more maintainable integration tests.
 package httptestmock
 
 import (

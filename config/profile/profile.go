@@ -1,4 +1,3 @@
-// Package profile provides YAML profile loading and merging for configuration scopes.
 package profile
 
 import (

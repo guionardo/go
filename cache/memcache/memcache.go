@@ -1,16 +1,3 @@
-// Package memcache provides a Memcache backend for cache.Cache[K, V].
-//
-// Uses gomemcache with configurable timeouts and connection pooling.
-// Since gomemcache does not natively support context.Context, each
-// cache operation is wrapped in a goroutine with context cancellation.
-// Values are serialized via encoding/json. Memcache TTL is in seconds;
-// sub-second values are rounded up to 1 second.
-//
-// Usage:
-//
-//	c := memcache.New[string, string](memcache.WithServers("localhost:11211"))
-//	c.Set(ctx, "key", "value")
-//	v, err := c.Get(ctx, "key")
 package memcache
 
 import (

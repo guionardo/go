@@ -1,5 +1,3 @@
-// Package validation provides struct validation using go-playground/validator
-// and a custom Validator interface for per-type validation logic.
 package validation
 
 import "github.com/go-playground/validator/v10"

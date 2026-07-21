@@ -1,4 +1,5 @@
 # go
+
 Golang tools, examples, and packages
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/guionardo/go.svg)](https://pkg.go.dev/github.com/guionardo/go)
@@ -7,208 +8,54 @@ Golang tools, examples, and packages
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
 [![Go Report Card](https://goreportcard.com/badge/github.com/guionardo/go)](https://goreportcard.com/report/github.com/guionardo/go)
 
-## Table of Contents
+## Package Index
 
-- [go](#go)
-	- [Table of Contents](#table-of-contents)
-	- [Development](#development)
-	- [Package brdocs](#package-brdocs)
-	- [Package flow](#package-flow)
-	- [Package fraction](#package-fraction)
-	- [Package mid](#package-mid)
-	- [Package path\_tools](#package-path_tools)
-	- [Package shell\_tools](#package-shell_tools)
-	- [Package set](#package-set)
-	- [Package httptest\_mock](#package-httptest_mock)
-	- [Package time\_tools](#package-time_tools)
-	- [Package reflect\_tools](#package-reflect_tools)
-	- [Package cache](#package-cache)
-		- [Providers](#providers)
-		- [Interface](#interface-1)
-		- [Basic Usage](#basic-usage)
-		- [Provider Configuration](#provider-configuration)
-		- [Sentinel Errors](#sentinel-errors-1)
-	- [Package config](#package-config)
-		- [Provider](#provider)
-		- [Options](#options)
-		- [Sub-packages](#sub-packages)
-	- [🤝 Contributing](#-contributing)
+| Package | Import | Description |
+|---------|--------|-------------|
+| [brdocs](#package-brdocs) | `br_docs` | Brazilian document validation (CPF, CNPJ) |
+| [cache](#package-cache) | `cache` | Generic key-value cache with pluggable backends |
+| [mem](#package-cache) | `cache/mem` | In-memory cache backend |
+| [redis](#package-cache) | `cache/redis` | Redis cache backend |
+| [valkey](#package-cache) | `cache/valkey` | Valkey cache backend |
+| [memcache](#package-cache) | `cache/memcache` | Memcache cache backend |
+| [postgres](#package-cache) | `cache/postgres` | PostgreSQL cache backend |
+| [config](#package-config) | `config` | Typed configuration provider (YAML + env + validation) |
+| [environment](#package-config) | `config/environment` | Environment variable parsing |
+| [profile](#package-config) | `config/profile` | YAML profile loading and merging |
+| [merger](#package-config) | `config/merger` | Recursive deep-merge of maps |
+| [validation](#package-config) | `config/validation` | Struct validation |
+| [flow](#package-flow) | `flow` | Generic control flow utilities (ternary, defaults) |
+| [fraction](#package-fraction) | `fraction` | Immutable fraction arithmetic |
+| [httptestmock](#package-httptest_mock) | `httptest_mock` | HTTP mock server framework for tests |
+| [mid](#package-mid) | `mid` | Cross-platform machine ID retrieval |
+| [pathtools](#package-path_tools) | `path_tools` | File and directory path utilities |
+| [reflecttools](#package-reflect_tools) | `reflect_tools` | Reflection utilities (zero-value check) |
+| [release](#package-release) | `release` | Self-update mechanism via GitHub Releases |
+| [set](#package-set) | `set` | Generic set with algebra, JSON, SQL support |
+| [shelltools](#package-shell_tools) | `shell_tools` | Shell argument parsing and env lookup |
+| [timetools](#package-time_tools) | `time_tools` | Adaptive time format parsing |
 
 ## Development
 
 Don't forget to install pre-commit and setup the commit hook.
 
-## Package brdocs
+## Packages
+
+### Package brdocs
+
+Import `github.com/guionardo/go/br_docs`
 
 Validation for CPF and CNPJ
 
 ```go
-// IsCPF verifies if the given string is a valid CPF document.
-// Punctuation will be automatically removed
 func IsCPF(doc string) bool
-
-// IsCNPJ verifies if the given string is a valid CNPJ document.
-// Punctuation will be automatically removed. Rules for new alfanumeric format.
 func IsCNPJ(doc string) bool
-
-// RemoveNonDigitAndLetters updates the value, keeping only 0-9, A-Z characters
 func RemoveNonDigitAndLetters(value *string)
 ```
 
-## Package flow
+### Package cache
 
-Simplify logic flows
-
-```go
-// Default returns the second argument (valueIfZero) when the value has the default (zero)
-func Default[T comparable](value T, valueIfZero T) T
-
-// If is a generic ternary operator
-func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T
-```
-
-## Package fraction
-
-This package is originally a work of Miguel Dorta [go-fraction](https://github.com/nethruster/go-fraction).
-
-I needed to encapsulate in this repository due to release name restrictions.
-
-```go
-// Fraction represents a fraction. It is an immutable type.
-//
-// It is always a valid fraction (never x/0) and it is always simplified.
-type Fraction struct
-```
-
-## Package mid
-
-Machine Identification using data from operational system trying to detect unique machine
-
-* Linux: hostnamectl, /var/lib/dbus/machine-id, or /etc/machine-id
-* Windows: MachineID from registry SQMClient
-* MacOS: "{model number}|{serial number}|{hardware uuid}" from system_profiler (under validation)
-
-```go
-// Machine ID
-func MachineID() string
-```
-
-## Package path_tools
-
-```go
-// DirExists simply returns true if the pathName is a existing directory
-func DirExists(pathName string) bool
-
-// CreatePath Create full path, with permissions updated from parent folder.
-func CreatePath(path string) error
-
-// FileExists symply returns true if the fileName is a existing file
-func FileExists(fileName string) bool
-
-// FindFileInPath searches for a file in the paths from the PATH environment variable
-// returns the first occurrence or error
-// Handles OS-specific path separators
-func FindFileInPath(filename string) (string, error)
-```
-
-## Package shell_tools
-
-Utilities to parse and reconstruct simple shell-like argument lists.
-
-- Type: `QuotedShellArgs` — a []string wrapper that holds parsed arguments.
-- Constructor: `NewQuotedShellArgs(s string) QuotedShellArgs` — parse input string into `QuotedShellArgs`.
-- Method: `QuotedShellArgs.String() string` — join arguments back into a shell-safe string (quotes added as needed).
-
-Behavior:
-- Supports single `'` and double `"` quotes. Quotes are removed from parsed arguments.
-- Splits on whitespace.
-- Reconstructs a shell-like string adding quotes only when needed.
-
-Example:
-
-```go
-package main
-
-import (
-    "fmt"
-
-    "github.com/guionardo/go/shell_tools"
-)
-
-func main() {
-    input := `one "two three" 'four five' six\ seven`
-    args := shell_tools.NewQuotedShellArgs(input)
-
-    // args is a QuotedShellArgs (slice of strings)
-    fmt.Printf("%q\n", []string(args)) // ["one" "two three" "four five" "six seven"]
-    fmt.Println(args.String())         // one "two three" "four five" "six seven"
-}
-```
-
-## Package set
-
-Generic set struct
-
-```go
-// Set values methods
-type Set[T comparable] map[T]struct{}
-```
-
-`Set[T]` can be [un]marshaled and respects the Scanner and Valuer interfaces
-
-```go
-type Scanner = database/sql.Scanner
-type Valuer = database/sql/driver.Valuer
-```
-
-## Package httptest_mock
-
-Utilities for mocking HTTP servers in tests.
-
-- Easily create mock HTTP servers with custom handlers.
-- Record requests and responses for assertions.
-- Supports setting up expected responses and verifying received requests.
-- More [documentation](httptest_mock/README.md)
-
-
-## Package time_tools
-
-Flexible time parsing utility that tries multiple common layouts automatically, promoting successful templates for faster subsequent parses.
-
-```go
-// Parse attempts to parse a time string using multiple common layouts
-// (RFC3339, DateTime, DateOnly, Kitchen, ANSIC, etc.).
-// The matched template is promoted to the front for future calls.
-func Parse(s string) (time.Time, error)
-
-// SetLayouts replaces the global layouts list with a custom set of
-// time format strings, in priority order.
-func SetLayouts(newLayouts []string)
-```
-
-Example:
-
-```go
-t, err := timetools.Parse("2024-03-15T10:20:30Z")
-// t = 2024-03-15 10:20:30 +0000 UTC
-
-timetools.SetLayouts([]string{"2006-01-02", time.RFC3339})
-t, err = timetools.Parse("2024-12-25")
-// t = 2024-12-25 00:00:00 +0000 UTC
-```
-
-## Package reflect_tools
-
-Utilities for working with Go's reflection, including zero value checks.
-
-```go
-// IsZeroValue checks if the provided value is considered a zero value.
-// Handles numeric types, strings, booleans, time.Time, time.Duration, slices, arrays, maps, and pointers.
-// Returns true if the value is zero, nil or empty, false otherwise.
-func IsZeroValue(value any) bool
-```
-
-## Package cache
+Import `github.com/guionardo/go/cache`
 
 Generic key-value cache abstraction with pluggable backend providers.
 
@@ -218,7 +65,7 @@ import "github.com/guionardo/go/cache"
 
 The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Close` — all accepting `context.Context`.
 
-### Providers
+#### Providers
 
 Each provider lives in its own sub-package and is independently importable:
 
@@ -230,7 +77,7 @@ Each provider lives in its own sub-package and is independently importable:
 | `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
 | `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
 
-### Interface
+#### Interface
 
 ```go
 type Cache[K comparable, V any] interface {
@@ -242,7 +89,7 @@ type Cache[K comparable, V any] interface {
 }
 ```
 
-### Basic Usage
+#### Basic Usage
 
 Consumer code never imports a provider directly — swap backends by changing the constructor:
 
@@ -258,21 +105,7 @@ c := redis.New[string, string](redis.WithAddr("localhost:6379"))
 v, err := c.Get(ctx, "mykey")
 ```
 
-### Provider Configuration
-
-All providers use functional options:
-
-```go
-c := redis.New[string, string](
-    redis.WithAddr("localhost:6379"),
-    redis.WithPassword("secret"),
-    redis.WithDB(0),
-    redis.WithPoolSize(10),
-    redis.WithDefaultTTL(5*time.Minute),
-)
-```
-
-### Sentinel Errors
+#### Sentinel Errors
 
 ```go
 var ErrMiss   = errors.New("cache: key not found")
@@ -281,7 +114,9 @@ var ErrClosed = errors.New("cache: cache is closed")
 
 Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
 
-### Configuration
+### Package config
+
+Import `github.com/guionardo/go/config`
 
 Generic typed configuration provider with YAML profile loading, environment variable overrides, and struct validation.
 
@@ -304,11 +139,11 @@ func main() {
 }
 ```
 
-### Provider
+#### Provider
 
 `Provider[T]` loads configuration from YAML profiles (with scope-based layering) and environment variables. Supports thread-safe `GetConfiguration()` and `UpdateConfiguration()`.
 
-### Options
+#### Options
 
 - `WithProfilesPath(path)` — set base directory for YAML profile files
 - `WithScope(scope)` — set active scope name (e.g. "production", "development")
@@ -316,12 +151,190 @@ func main() {
 - `WithLogger(logger)` — inject a custom Logger
 - `WithDebugLogger()` — enable debug logging (not for production)
 
-### Sub-packages
+#### Sub-packages
 
 - `environment` — reads configuration from environment variables into struct fields via `env` and `default` struct tags
 - `profile` — loads and merges YAML profile files by scope (default + scope-specific)
 - `merger` — recursive deep-merge of `map[string]any` maps
 - `validation` — struct validation via `go-playground/validator` and the `Validator` interface
+
+### Package flow
+
+Import `github.com/guionardo/go/flow`
+
+Simplify logic flows
+
+```go
+// Default returns the second argument (valueIfZero) when the value has the default (zero)
+func Default[T comparable](value T, valueIfZero T) T
+
+// If is a generic ternary operator
+func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T
+```
+
+### Package fraction
+
+Import `github.com/guionardo/go/fraction`
+
+This package is originally a work of Miguel Dorta [go-fraction](https://github.com/nethruster/go-fraction).
+
+```go
+type Fraction struct  // immutable, always simplified
+
+func New[T, K integer](numerator T, denominator K) (Fraction, error)
+func FromFloat64(f float64) (Fraction, error)
+
+func (Fraction) Add(Fraction) Fraction
+func (Fraction) Subtract(Fraction) Fraction
+func (Fraction) Multiply(Fraction) Fraction
+func (Fraction) Divide(Fraction) (Fraction, error)
+func (Fraction) Float64() float64
+func (Fraction) Equal(Fraction) bool
+func (Fraction) Numerator() int64
+func (Fraction) Denominator() int64
+```
+
+### Package httptest_mock
+
+Import `github.com/guionardo/go/httptest_mock`
+
+Full HTTP mock server framework for tests. Define mocks programmatically or via JSON/YAML files.
+
+More [documentation](httptest_mock/README.md).
+
+```go
+mock := httptestmock.NewMock("GET", "/api/resource").
+    WithResponseStatus(200).
+    WithResponseBody(`{"key": "value"}`)
+
+handler := httptestmock.MockHandler{}
+handler.AddMocks(mock)
+
+server := httptest.NewServer(&handler)
+defer server.Close()
+```
+
+### Package mid
+
+Import `github.com/guionardo/go/mid`
+
+Machine identification using OS-specific sources:
+
+- Linux: hostnamectl, /var/lib/dbus/machine-id, or /etc/machine-id
+- Windows: MachineID from registry SQMClient
+- macOS: "{model number}|{serial number}|{hardware uuid}" from system_profiler
+
+```go
+func MachineID() string
+```
+
+### Package path_tools
+
+Import `github.com/guionardo/go/path_tools`
+
+```go
+func DirExists(pathName string) bool
+func CreatePath(path string) error
+func FileExists(fileName string) bool
+func FindFileInPath(filename string) (string, error)
+func GetRootFolder(base string) (string, error)
+```
+
+### Package reflect_tools
+
+Import `github.com/guionardo/go/reflect_tools`
+
+```go
+// IsZeroValue checks if the provided value is considered a zero value.
+// Handles numeric types, strings, booleans, time.Time, time.Duration,
+// slices, arrays, maps, and pointers.
+func IsZeroValue(value any) bool
+```
+
+### Package release
+
+Import `github.com/guionardo/go/release`
+
+Complete self-update mechanism for Go CLI tools distributed via GitHub Releases. Includes version detection, update checking, SHA256-verified downloads, atomic binary replacement via an embedded swapper process, and automatic relaunch.
+
+Full documentation: [release/README.md](release/README.md)
+
+```go
+result := release.PerformSelfUpdate(context.Background())
+if result.Updated {
+    fmt.Println("Updated to", result.Release.TagName)
+    os.Exit(0)
+}
+if result.Err != nil {
+    log.Fatal(result.Err)
+}
+```
+
+Configure with functional options:
+
+```go
+release.PerformSelfUpdate(
+    context.Background(),
+    release.WithOwner("myorg"),
+    release.WithRepo("mycli"),
+    release.WithGitHubToken(os.Getenv("GITHUB_TOKEN")),
+)
+```
+
+#### Architecture
+
+1. Reads current version from `debug.ReadBuildInfo()`
+2. Checks GitHub Releases for newer version
+3. Downloads the platform-specific asset matching `runtime.GOOS`/`runtime.GOARCH`
+4. Verifies SHA256 digest (go-digest format)
+5. Extracts the embedded swapper binary
+6. Spawns swapper and exits
+7. Swapper performs atomic backup-rename-replace with checksum verification
+8. Swapper relaunches the new binary with original CLI args
+
+See [release/README.md](release/README.md) for GitHub workflow examples in Go, Python, and .NET.
+
+### Package set
+
+Import `github.com/guionardo/go/set`
+
+Generic set struct backed by a Go map.
+
+```go
+type Set[T comparable] map[T]struct{}
+
+s := set.New(1, 2, 3)
+s.Add(4)
+s.Has(2)           // true
+union := s.Union(other)
+```
+
+`Set[T]` supports JSON marshal/unmarshal and database/sql Scanner/Valuer.
+
+### Package shell_tools
+
+Import `github.com/guionardo/go/shell_tools`
+
+Utilities to parse and reconstruct simple shell-like argument lists.
+
+```go
+args := shelltools.NewQuotedShellArgs(`one "two three" 'four five'`)
+// args[0] = "one", args[1] = "two three", args[2] = "four five"
+```
+
+### Package time_tools
+
+Import `github.com/guionardo/go/time_tools`
+
+Flexible time parsing that tries multiple common layouts automatically, promoting successful templates for faster subsequent parses.
+
+```go
+t, err := timetools.Parse("2024-03-15T10:20:30Z")
+// t = 2024-03-15 10:20:30 +0000 UTC
+
+timetools.SetLayouts([]string{"2006-01-02", time.RFC3339})
+t, err = timetools.Parse("2024-12-25")
+```
 
 ## 🤝 Contributing
 

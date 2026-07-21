@@ -1,5 +1,3 @@
-// Package environment provides utilities for reading configuration from
-// environment variables into struct fields using struct tags.
 package environment
 
 import (

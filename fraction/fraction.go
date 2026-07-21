@@ -1,7 +1,4 @@
-// Package fraction provides an immutable fraction type with basic arithmetic operations.
-// Original source code from: https://github.com/nethruster/go-fraction
-// nolint:mnd
-package fraction
+package fraction //nolint:mnd
 
 import (
 	"errors"

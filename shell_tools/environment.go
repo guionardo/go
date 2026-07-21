@@ -1,6 +1,3 @@
-// Package shelltools provides utilities for shell environment interaction,
-// including case-insensitive environment variable lookup and quoted shell
-// argument parsing.
 package shelltools
 
 import (

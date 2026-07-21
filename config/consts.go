@@ -1,5 +1,3 @@
-// Package config provides a generic typed configuration provider with
-// YAML profile loading, environment variable overrides, and struct validation.
 package config
 
 const (

@@ -1,6 +1,3 @@
-// Package set provides a generic Set implementation backed by a Go map.
-// Supports standard set operations (Add, Remove, Union, Diff, Intersection),
-// iteration, filtering, JSON/YAML marshaling, and SQL database scanning.
 package set
 
 import (

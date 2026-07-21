@@ -1,4 +1,3 @@
-// Package merger provides recursive deep-merge of map[string]any maps.
 package merger
 
 import "reflect"

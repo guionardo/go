@@ -1,16 +1,3 @@
-// Package mem provides an in-memory backend for cache.Cache[K, V].
-//
-// The in-memory cache is safe for concurrent use (sync.RWMutex), supports
-// per-key TTL with a background sweep goroutine and a passive TTL check on
-// Get. It requires no external dependencies and is the default choice for
-// testing (swap to a remote provider in production without changing
-// consumer code).
-//
-// Usage:
-//
-//	c := mem.New[string, string]()
-//	c.Set(ctx, "key", "value")
-//	v, err := c.Get(ctx, "key")
 package mem
 
 import (

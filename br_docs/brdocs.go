@@ -1,6 +1,4 @@
-// Package brdocs provides functions to validate Brazilian documents such as CPF and CNPJ.
-// nolint:mnd
-package brdocs
+package brdocs //nolint:mnd
 
 import (
 	"bytes"

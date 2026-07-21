@@ -1,15 +1,3 @@
-// Package redis provides a Redis backend for cache.Cache[K, V].
-//
-// Uses go-redis/v9 with connection pooling. Values are serialized via
-// encoding/json. Supports all cache operations including per-key TTL
-// (Redis EXPIRE). Connect lazily — go-redis dials on first query, not
-// at construction time.
-//
-// Usage:
-//
-//	c := redis.New[string, string](redis.WithAddr("localhost:6379"))
-//	c.Set(ctx, "key", "value")
-//	v, err := c.Get(ctx, "key")
 package redis
 
 import (

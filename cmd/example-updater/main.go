@@ -1,3 +1,12 @@
+// Package main provides an example CLI demonstrating the release self-update package.
+//
+// It calls release.PerformSelfUpdate and exits:
+//   - 0 if the swapper was spawned (update in progress) or already current
+//   - 1 if the update failed
+//
+// Build with ldflags to set version:
+//
+//	go build -ldflags="-X main.version=v1.0.0" ./cmd/example-updater/
 package main
 
 import (

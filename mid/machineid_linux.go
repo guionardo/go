@@ -1,6 +1,3 @@
-// Package mid provides cross-platform machine identifier retrieval.
-// On Linux, it attempts hostnamectl, /var/lib/dbus/machine-id, and /etc/machine-id in order.
-// On macOS, it uses system_profiler. On Windows, it reads the SQMClient registry key.
 package mid
 
 import (

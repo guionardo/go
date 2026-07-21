@@ -1,20 +1,3 @@
-// Package postgres provides a Postgres backend for cache.Cache[K, V].
-//
-// Uses pgx/v5 with connection pooling and automatic table creation
-// (CREATE UNLOGGED TABLE for performance). The schema is a simple
-// key-value table with an optional expires_at column. A background
-// sweep goroutine removes expired rows periodically. Uses pg_prewarm
-// to preload cache data into shared buffers after restarts (best-effort,
-// silently skipped if the extension is not installed).
-// Values are serialized via encoding/json.
-//
-// Usage:
-//
-//	c, err := postgres.New[string, string](
-//	    postgres.WithConnString("postgres://user:pass@localhost:5432/cache?sslmode=disable"),
-//	)
-//	c.Set(ctx, "key", "value")
-//	v, err := c.Get(ctx, "key")
 package postgres
 
 import (

@@ -1,6 +1,3 @@
-// Package timetools provides utilities for parsing time.Time values
-// using multiple common time formats. The parser auto-prioritizes
-// templates based on successful parses, optimizing subsequent calls.
 package timetools
 
 import (

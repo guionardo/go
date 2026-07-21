@@ -1,4 +1,11 @@
-package main //nolint:wsl // style; block spacing is intentional
+// Package main implements the swapper binary for atomic self-update.
+//
+// The swapper performs a backup-rename-replace of the running executable
+// with SHA256 verification before and after the swap. On success it
+// relaunches the new binary with the original CLI arguments.
+//
+//nolint:wsl
+package main // style; block spacing is intentional
 
 import (
 	"crypto/sha256"

@@ -1,5 +1,3 @@
-// Package flow provides generic utilities for control flow patterns,
-// including zero-value default fallback and ternary-like conditional selection.
 package flow
 
 // Default returns valueIfZero if value equals the zero value for type T, otherwise returns value.
