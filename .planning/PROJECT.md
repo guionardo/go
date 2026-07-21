@@ -31,6 +31,7 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ HTTP mock server for tests with request matching from code or files — `httptest_mock/` — existing
 - ✓ GitHub latest release fetcher with asset download and digest verification — `release/` — existing
 - ✓ CI pipeline with golangci-lint, pre-commit, commitlint, coverage enforcement, vulncheck — existing
+- ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — Phase 2: in-memory, Redis, Memcache, Postgres, Valkey
 
 ### Active
 
@@ -62,6 +63,7 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | Go stdlib over frameworks | Keep dependencies minimal for a utility library | ✓ Good |
 | Monorepo of independent packages | Each package is usable independently via `go get` | ✓ Good |
 | Conventional commits + pre-commit | Enforce consistent commit history and code quality | ✓ Good |
+| Generic Cache interface over 5 backends | Swap providers without code changes; memory cache for zero-dep testing | ✓ Phase 2 |
 
 ## Evolution
 
@@ -81,4 +83,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 after initialization*
+*Last updated: 2026-07-21 after Phase 2 completion*
