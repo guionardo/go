@@ -1,16 +1,16 @@
-package memcache_test
+package valkey_test
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/guionardo/go/cache/memcache"
+	"github.com/guionardo/go/cache/valkey"
 )
 
 func ExampleNew() {
-	c := memcache.New[string, string]()
+	c := valkey.New[string, string](valkey.WithAddr("localhost:6379"))
 
-	if err := c.Set(context.Background(), "example", "memcache-value"); err != nil {
+	if err := c.Set(context.Background(), "example", "valkey-value"); err != nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -27,5 +27,5 @@ func ExampleNew() {
 		fmt.Println("error:", err)
 	}
 
-	// Output: memcache-value
+	// Output: valkey-value
 }

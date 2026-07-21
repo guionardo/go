@@ -16,14 +16,26 @@ func ExampleNew() {
 
 	c, err := postgres.New[string, string](postgres.WithConnString(connString))
 	if err != nil {
-		fmt.Println("postgres not available:", err)
+		fmt.Println("error:", err)
 		return
 	}
-	defer c.Close()
 
-	_ = c.Set(context.Background(), "example", "pg-value")
-	val, _ := c.Get(context.Background(), "example")
-	fmt.Println(val)
+	if err := c.Set(context.Background(), "example", "pg-value"); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	value, err := c.Get(context.Background(), "example")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	fmt.Println(value)
+
+	if err := c.Close(); err != nil {
+		fmt.Println("error:", err)
+	}
 
 	// Output: pg-value
 }
