@@ -31,13 +31,14 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ HTTP mock server for tests with request matching from code or files — `httptest_mock/` — existing
 - ✓ GitHub latest release fetcher with asset download and digest verification — `release/` — existing
 - ✓ CI pipeline with golangci-lint, pre-commit, commitlint, coverage enforcement, vulncheck — existing
-- ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — Phase 2: in-memory, Redis, Memcache, Postgres, Valkey
+- ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — v1.0: in-memory, Redis, Memcache, Postgres, Valkey
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] [New requirement — to be defined in questioning]
+- [ ] String utilities package (truncation, padding, join/split)
+- [ ] Retry package with backoff strategies and jitter support
 
 ### Out of Scope
 
@@ -46,6 +47,14 @@ Provide reliable, well-tested utility packages that solve common Go development 
 | Feature | Reason |
 |---------|--------|
 | Slices utility package | Go 1.26 stdlib `slices` package covers common operations — not needed |
+
+## Current State
+
+**v1.0 — Core Packages** (shipped 2026-07-21)
+
+The first planned milestone shipped the generic `Cache[K, V]` package with 5 backends. The codebase has ~13 utility packages with 6,600+ lines of code across the cache subsystem. CI enforces linting, conventional commits, and E2E test separation via build tags.
+
+**Tech stack:** Go 1.26, testcontainers-go for E2E, go-redis/v9, valkey-go, gomemcache, pgx/v5
 
 ## Context
 
@@ -67,7 +76,7 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | Go stdlib over frameworks | Keep dependencies minimal for a utility library | ✓ Good |
 | Monorepo of independent packages | Each package is usable independently via `go get` | ✓ Good |
 | Conventional commits + pre-commit | Enforce consistent commit history and code quality | ✓ Good |
-| Generic Cache interface over 5 backends | Swap providers without code changes; memory cache for zero-dep testing | ✓ Phase 2 |
+| Generic Cache interface over 5 backends | Swap providers without code changes; memory cache for zero-dep testing | ✓ Good (v1.0) |
 
 ## Evolution
 
@@ -87,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 after Phase 2 completion*
+*Last updated: 2026-07-21 after v1.0 milestone*

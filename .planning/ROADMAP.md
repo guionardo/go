@@ -1,16 +1,28 @@
 # Roadmap: go
 
-## Milestone: 1 — Core Packages
+## Milestones
 
-### Phase 1: Cache Package
+- ✅ **v1.0 Core Packages** — Phase 1 (shipped 2026-07-21)
+- 📋 **v1.1** — STRNG + RETRY packages (planned)
 
-**Requirements:** CACHE-01 through CACHE-11
-**Goal:** A generic `Cache[K, V]` abstraction over multiple backends (in-memory, Redis, Memcache, Postgres, Valkey) with each provider in its own sub-package — pluggable without code changes.
-**Status:** Planned
-**Plans:** 3/3 plans complete
+## Phases
 
-Plans:
+<details>
+<summary>✅ v1.0 Core Packages (Phase 1) — SHIPPED 2026-07-21</summary>
 
-- [x] 02-01-PLAN.md — Base cache interface + in-memory provider + go.mod dependencies
-- [x] 02-02-PLAN.md — Redis + Valkey cache providers
-- [x] 02-03-PLAN.md — Memcache + Postgres cache providers
+- [x] Phase 1: Cache Package (3/3 plans) — completed 2026-07-21
+
+</details>
+
+### 📋 v1.1 (Planned)
+
+- [ ] Phase 2: Strings Package — string truncation, padding, join/split
+- [ ] Phase 3: Retry Package — retry with backoff strategies and jitter
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Cache Package | v1.0 | 3/3 | Complete | 2026-07-21 |
+| 2. Strings Package | v1.1 | 0/0 | Not started | - |
+| 3. Retry Package | v1.1 | 0/0 | Not started | - |
