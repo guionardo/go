@@ -15,9 +15,20 @@ Branch name: `gsd/v{VERSION}-{slug}` (e.g., `gsd/v1.6-retry-package`).
 
 - **Spike findings for go** (implementation patterns, constraints, gotchas) → `Skill("spike-findings-go")`
 
-## Before Every Commit
-
 Run the coverage check and verify it passes:
+
+```bash
+make coverage-quick
+```
+
+This enforces the thresholds in `.testcoverage-quick.yml`: packages ≥80%, files ≥70%, total ≥75%. Do not commit if it fails. Fix uncovered code or add tests first. (Note: cache providers tested via E2E with Docker — threshold overrides apply.)
+
+Then regenerate and stage the quality report:
+
+```bash
+make quality-report
+git add quality-report.md
+```
 
 ```bash
 make coverage-quick
