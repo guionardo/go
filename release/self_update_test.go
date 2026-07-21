@@ -68,7 +68,10 @@ func TestExtractSwapper(t *testing.T) {
 
 	info, err := os.Stat(path)
 	require.NoError(t, err)
-	require.Equal(t, os.FileMode(swapperExecMode), info.Mode().Perm())
+
+	if runtime.GOOS != "windows" {
+		require.Equal(t, os.FileMode(swapperExecMode), info.Mode().Perm())
+	}
 }
 
 func TestUpdateResultString(t *testing.T) {
