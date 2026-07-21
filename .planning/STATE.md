@@ -5,7 +5,7 @@
 ## Current Session
 
 - **Phase:** 4 — Release self-update with swapper binary
-- **Status:** All 3 plans executed (3/3 summaries), pending verification
+- **Status:** Verified — all gates passing, v1.5 milestone ready to close
 
 ## Accumulated Context
 
