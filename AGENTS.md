@@ -13,6 +13,10 @@ Branch name: `gsd/v{VERSION}-{slug}` (e.g., `gsd/v1.6-retry-package`).
 
 ## Before Every Commit
 
+- **Spike findings for go** (implementation patterns, constraints, gotchas) → `Skill("spike-findings-go")`
+
+## Before Every Commit
+
 Run the coverage check and verify it passes:
 
 ```bash
