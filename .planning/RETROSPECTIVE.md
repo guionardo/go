@@ -2,7 +2,7 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
-## Milestone: v1.0 — Core Packages
+## Milestone: v1.4 — Core Packages
 
 **Shipped:** 2026-07-21
 **Phases:** 1 | **Plans:** 3 | **Commits:** 24

@@ -50,7 +50,7 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 ## Current State
 
-**v1.0 — Core Packages** (shipped 2026-07-21)
+**v1.4 — Core Packages** (shipped 2026-07-21)
 
 The first planned milestone shipped the generic `Cache[K, V]` package with 5 backends. The codebase has ~13 utility packages with 6,600+ lines of code across the cache subsystem. CI enforces linting, conventional commits, and E2E test separation via build tags.
 
@@ -96,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 after v1.0 milestone*
+*Last updated: 2026-07-21 after v1.4 milestone*
