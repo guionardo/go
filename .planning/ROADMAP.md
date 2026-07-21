@@ -23,7 +23,7 @@
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Cache Package | v1.4 | 3/3 | Complete | 2026-07-21 |
-| 4. Self-Update | v1.5 | 0/3 | Not started | - |
+| 4. Self-Update | v1.5 | 3/3 | Implemented | - |
 
 ### Phase 4: Release self-update with swapper binary
 
@@ -33,6 +33,6 @@
 
 Plans:
 
-- [ ] 04-01-PLAN.md — Detection + Download + Core API (version parsing, update check, download, checksum verification, functional options)
-- [ ] 04-02-PLAN.md — Swapper Binary (atomic swap with backup/rollback, cross-platform exec, checksum re-verify)
-- [ ] 04-03-PLAN.md — Integration + CLI (go:embed, self-update orchestrator, example CLI, Makefile targets)
+- [x] 04-01-PLAN.md — Detection + Download + Core API (version parsing, update check, download, checksum verification, functional options)
+- [x] 04-02-PLAN.md — Swapper Binary (atomic swap with backup/rollback, cross-platform exec, checksum re-verify)
+- [x] 04-03-PLAN.md — Integration + CLI (go:embed, self-update orchestrator, example CLI, Makefile targets)
