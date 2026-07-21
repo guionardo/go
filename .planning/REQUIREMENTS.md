@@ -31,6 +31,20 @@
 - **RETRY-01**: Package provides retry with backoff strategies
 - **RETRY-02**: Package provides jitter support
 
+### Cache Package
+
+- [ ] **CACHE-01**: Package provides generic `Cache[K, V]` interface with `Get`, `Set`, `Delete`, `GetOrSet` methods accepting `context.Context`
+- [ ] **CACHE-02**: `Set` accepts per-key TTL (optional); falls back to provider-level default TTL if not specified
+- [ ] **CACHE-03**: All errors are wrapped and returned (not swallowed)
+- [ ] **CACHE-04**: Provides in-memory provider (`cache/mem`)
+- [ ] **CACHE-05**: Provides Redis provider (`cache/redis`)
+- [ ] **CACHE-06**: Provides Memcache provider (`cache/memcache`)
+- [ ] **CACHE-07**: Provides Postgres provider (`cache/postgres`)
+- [ ] **CACHE-08**: Provides Valkey provider (`cache/valkey`)
+- [ ] **CACHE-09**: Each provider lives in its own sub-package importable independently
+- [ ] **CACHE-10**: Package includes runnable examples
+- [ ] **CACHE-11**: Package follows project conventions (lint, 95%+ test coverage, naming)
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -56,10 +70,22 @@
 | SLICE-08 | Phase 1 | Pending |
 | SLICE-09 | Phase 1 | Pending |
 | SLICE-10 | Phase 1 | Pending |
+| CACHE-01 | Phase 2 | Pending |
+| CACHE-02 | Phase 2 | Pending |
+| CACHE-03 | Phase 2 | Pending |
+| CACHE-04 | Phase 2 | Pending |
+| CACHE-05 | Phase 2 | Pending |
+| CACHE-06 | Phase 2 | Pending |
+| CACHE-07 | Phase 2 | Pending |
+| CACHE-08 | Phase 2 | Pending |
+| CACHE-09 | Phase 2 | Pending |
+| CACHE-10 | Phase 2 | Pending |
+| CACHE-11 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 10 total
-- Mapped to phases: 10
+- v2 requirements: 13 total
+- Mapped to phases: 23
 - Unmapped: 0 ✓
 
 ---
