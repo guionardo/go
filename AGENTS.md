@@ -5,6 +5,12 @@
 Go utility packages at `github.com/guionardo/go`. A collection of reusable Go libraries —
 config, data structures, validators, cache, CLI self-update.
 
+## Milestone Branches
+
+Every new milestone must have its own git branch for the pull request flow.
+Work on the milestone branch, then open a PR to `main` when complete.
+Branch name: `gsd/v{VERSION}-{slug}` (e.g., `gsd/v1.6-retry-package`).
+
 ## Before Every Commit
 
 Run the coverage check and verify it passes:
