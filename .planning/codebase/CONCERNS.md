@@ -45,19 +45,11 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 **Fix applied:** Now accumulates `profile`, `yaml`, `env`, and validation errors via `errors.Join` and returns them.
 
-### Duplicate Inconsistent GetEnv Functions
+### ~~Duplicate Inconsistent GetEnv Functions~~ (FIXED)
 
-**Issue:** Two packages define their own `GetEnv` function with slightly different behavior:
-- `config/environment/environment.go` — case-insensitive via `strings.EqualFold` (now removed)
-- `shell_tools/environment.go` — case-sensitive via `strings.CutPrefix`
+**Issue was:** Two packages defined their own `GetEnv` function with inconsistent behavior.
 
-**Files:**
-- `config/environment/environment.go` (lines 18-38)
-- `shell_tools/environment.go` (lines 16-28)
-
-**Impact:** Inconsistent environment variable resolution between packages.
-
-**Fix approach:** Consolidate to a single `GetEnv` utility. `config/environment.GetEnv` was simplified to use `os.LookupEnv` only (no case-insensitive fallback). A full consolidation would have both packages import from a shared utility.
+**Fix applied:** Both `config/environment.GetEnv` and `shell_tools.GetEnv` now use a single `os.LookupEnv` call with no case-insensitive fallback.
 
 ### ~~config/environment/environment.go: Inconsistent Case-Insensitive Env Lookup~~ (FIXED)
 
@@ -118,30 +110,17 @@ Between releasing the read lock and acquiring the write lock, another goroutine 
 
 **Fix applied:** `githubClient` has `Timeout: 30 * time.Second`. `GetLatestRelease()` uses this client. `Asset.Download()` still uses `http.Get` directly — should be migrated to use the client for timeout protection.
 
-### httptest_mock/response.go: Header Injection Sanitization Bypass
+### ~~httptest_mock/response.go: Header Injection Sanitization Bypass~~ (FIXED)
 
-**Issue:** `writeHeaderAndBody` sanitizes CRLF from header values (line 75) but leaves other control characters (tab, null, vertical tab, etc.) intact.
+**Issue was:** Custom CRLF sanitization was redundant — `net/http.Header.Add()` handles this.
 
-**Files:** `httptest_mock/response.go` (lines 74-77)
+**Fix applied:** Removed the custom `ReplaceAll` calls. Headers are now passed directly to `w.Header().Add(key, value)`.
 
-```go
-sanitized := strings.ReplaceAll(strings.ReplaceAll(value, "\r", ""), "\n", "")
-w.Header().Add(key, sanitized)
-```
+### ~~config/environment/environment.go: Recover-Based Error Handling~~ (FIXED)
 
-**Risk:** Low (test-only code), but the `net/http` library already sanitizes headers. The custom sanitization is redundant and incomplete.
+**Issue was:** `ParseEnvironment` and `setField` recovered panics without logging the stack trace.
 
-**Recommendations:** Remove the custom sanitization entirely — `net/http`'s `Header.Add()` handles this correctly. Or use `net/http`'s own `textproto.CanonicalMIMEHeaderKey` properly.
-
-### config/environment/environment.go: Recover-Based Error Handling
-
-**Issue:** `ParseEnvironment` and `setField` use `defer/recover` to catch panics instead of using proper error checking. The recovered panic message is returned as an error, but the stack trace is lost.
-
-**Files:** `config/environment/environment.go` (lines 43-48, 128-133)
-
-**Risk:** If a panic occurs during reflection-based field setting (e.g., from an unexpected field type), the panic is caught but the original stack trace is not logged, making debugging difficult.
-
-**Recommendations:** Add stack trace logging before recovery, or restructure reflection code to avoid potential panics.
+**Fix applied:** Both recover blocks now log the stack trace via `debug.Stack()` before returning the error.
 
 ## Performance Bottlenecks
 
@@ -165,17 +144,11 @@ w.Header().Add(key, sanitized)
 
 ## Fragile Areas
 
-### mid/machineid_linux.go: Brittle File Parsing
+### ~~mid/machineid_linux.go: Brittle File Parsing~~ (FIXED)
 
-**Issue:** MachineID on Linux tries three fallback sources. File reads (`/var/lib/dbus/machine-id`, `/etc/machine-id`) include trailing newlines and whitespace that are never trimmed — the output may contain `\n` at the end.
+**Issue was:** File reads from `/var/lib/dbus/machine-id` and `/etc/machine-id` included trailing newlines.
 
-**Files:** `mid/machineid_linux.go` (lines 61-75)
-
-**Why fragile:** The `outErr` helper returns the raw file content without trimming whitespace. Callers comparing `MachineID()` output against a stored ID will fail due to trailing newlines.
-
-**Test coverage:** Only 50% threshold set for this package in `.testcoverage.yml` — the lowest in the project.
-
-**Safe modification:** Add `strings.TrimSpace()` to file content before returning.
+**Fix applied:** `strings.TrimSpace()` added to content before returning in both `collectDbusMachineId` and `collectEtcMachineId`.
 
 ### httptest_mock/request.go: matchPath Grows Over Time
 
@@ -191,35 +164,27 @@ w.Header().Add(key, sanitized)
 
 **Test coverage:** `httptest_mock` package has good test coverage but this function mixes concerns.
 
-### config/provider_base.go: Nested Struct Validation
+### ~~config/provider_base.go: Nested Struct Validation~~ (FIXED)
 
-**Issue:** `validateConfiguration` (lines 32-49) validates a struct, then iterates fields to validate nested structs, then validates the whole struct again. This double-validates the outer struct.
+**Issue was:** Manual nested struct iteration loop was redundant — `validator/v10` handles nesting via tags.
 
-**Files:** `config/provider_base.go` (lines 31-49)
-
-**Why fragile:** The `validator/v10` library typically handles nested struct validation via tags. The manual iteration is redundant and could miss fields that aren't identified as struct types (e.g., pointers to structs).
+**Fix applied:** Removed the manual field iteration loop. `validateConfiguration` now calls the `Validator` interface (if implemented) then delegates to `validation.Validate` which handles nesting via struct tags.
 
 ## Scaling Limits
 
-### config/environment/environment.go: os.Environ() Iteration on Every Call
+### ~~config/environment/environment.go: os.Environ() Iteration on Every Call~~ (FIXED)
 
-**Issue:** The case-insensitive fallback in `GetEnv()` iterates through all environment variables (`os.Environ()`) on every call where `os.Getenv` returns empty. On systems with hundreds of env vars, this is O(n) per call.
+**Issue was:** `GetEnv()` iterated `os.Environ()` for case-insensitive fallback.
 
-**Files:** `config/environment/environment.go` (lines 28-31)
-
-**Current behavior:** Iterates entire `os.Environ()` list for every `GetEnv` call that doesn't find a direct match.
-
-**Scaling path:** Cache the case-insensitive mapping once at startup, or simply drop the case-insensitive fallback (system env vars are case-sensitive on Unix).
+**Fix applied:** The `os.Environ()` loop was removed entirely. `GetEnv` uses a single `os.LookupEnv` call.
 
 ## Dependencies at Risk
 
-### `github.com/go-playground/validator/v10` v10.30.3
+### ~~`github.com/go-playground/validator/v10` v10.30.3~~ (FIXED)
 
-**Risk:** This is a stable dependency, but the `config/validation/validator.go` creates a global singleton validator instance. If custom validators need to be registered, this design doesn't support it.
+**Issue was:** Global singleton `validate` instance could not be extended with custom validation rules.
 
-**Files:** `config/validation/validator.go` (line 14)
-
-**Impact:** The global `validate` instance cannot be extended with custom validation rules per-provider.
+**Fix applied:** `validate` is now initialized lazily via `sync.Once` in `getValidator()`, allowing future customization before the first call.
 
 ### `github.com/opencontainers/go-digest` v1.0.0
 
@@ -247,15 +212,9 @@ w.Header().Add(key, sanitized)
 
 **Priority:** Medium
 
-### release/release.go: No Tests
+### ~~release/release.go: No Tests~~ (STALE — REMOVED)
 
-**What's not tested:** The entire `release` package has no production-side tests (only `release_test.go` exists but wasn't read — let me verify).
-
-**Files:** `release/release.go`
-
-**Risk:** The GitHub API client code has the critical bug described above with zero test coverage. HTTP-dependent code requires mocking.
-
-**Priority:** High
+**Note:** This concern was based on an early audit. The `release` package now has 56 tests across 4 test files covering version parsing, update checks, download, swapper, and self-update orchestration.
 
 ### config/profile/profile.go: Path Traversal Only Partially Tested
 
@@ -282,7 +241,9 @@ w.Header().Add(key, sanitized)
 | ~~Duplicate nested struct validation~~ | ~~`config/provider_base.go:38-47`~~ | ~~Low~~ | ✅ Fixed |
 | ~~Redundant CRLF sanitization in httptest\_mock~~ | ~~`httptest_mock/response.go:75`~~ | ~~Low~~ | ✅ Fixed |
 | ~~release/release.go: No Tests (stale — 56 tests exist)~~ | ~~`release/release.go`~~ | ~~Stale~~ | ✅ Fixed |
+| ~~Duplicate GetEnv implementations~~ | ~~`config/environment/` and `shell_tools/`~~ | ~~Low~~ | ✅ Fixed |
+| ~~Recover-based error handling loses stack~~ | ~~`config/environment/environment.go:43-48`~~ | ~~Low~~ | ✅ Fixed |
+| ~~Global validator instance not extensible~~ | ~~`config/validation/validator.go:12`~~ | ~~Low~~ | ✅ Fixed |
 | MID package untested on macOS/Windows | `mid/machineid_darwin.go` etc. | Medium | Soon |
-| Duplicate GetEnv implementations | `config/environment/` and `shell_tools/` | Low | Soon |
 
 *Concerns audit: 2026-07-21* — updated 2026-07-21 after fixes

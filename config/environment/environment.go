@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strconv"
 )
 
@@ -32,6 +33,7 @@ func GetEnv(env string, defaultValue ...string) string {
 func ParseEnvironment(s any, parentType reflect.Type) (err error) {
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
+			slog.Error("panic in ParseEnvironment", "panic", panicErr, "stack", string(debug.Stack()))
 			err = fmt.Errorf("panic: %v", panicErr)
 		}
 	}()
@@ -117,7 +119,8 @@ func getFieldEnvValue(field reflect.StructField) (value string, envName string, 
 func setField(field reflect.StructField, fieldValue reflect.Value, envValue string) (err error) {
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
-			err = fmt.Errorf("panic: %v", panicErr)
+			slog.Error("panic in setField", "field", field.Name, "panic", panicErr, "stack", string(debug.Stack()))
+			err = fmt.Errorf("panic setting field %s: %v", field.Name, panicErr)
 		}
 	}()
 
