@@ -99,6 +99,11 @@ coverage: check-go-test-coverage check-gocovmerge ## Check test coverage
 	@echo "\n🚀 \033[30;44m  CHECKING COVERAGE  \033[0m"
 	@go-test-coverage --config=./.testcoverage.yml
 
+coverage-quick: check-go-test-coverage ## Quick coverage check (unit tests only, no E2E)
+	@go test ./... -coverprofile=./cover.out -covermode=atomic -count=1 -timeout=120s
+	@go-test-coverage --config=./.testcoverage.yml
+	@rm -f ./cover.out
+
 check-gocovmerge:
 	@if ! command -v gocovmerge >/dev/null 2>&1; then \
 		echo "\033[31mGOCOVMERGE IS NOT INSTALLED\033[0m"; \
