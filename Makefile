@@ -1,4 +1,5 @@
 GOBIN ?= $$(go env GOPATH)/bin
+DOCKER_HOST ?= unix:///Users/guionardo/.orbstack/run/docker.sock
 
 help: ## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -79,9 +80,31 @@ check-go-test-coverage:
 test: ## Run tests
 	@go test ./... -v
 
-coverage: check-go-test-coverage ## Check test coverage
-	@go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./... -count=1
+test-e2e: gocheck ## Run E2E integration tests (requires Docker)
+	@echo "\n🚀 \033[30;44m  RUNNING E2E TESTS  \033[0m"
+	@DOCKER_HOST=$(DOCKER_HOST) \
+		go test ./cache/ -tags=e2e -run 'TestCacheE2E' -v -count=1 -timeout=300s
+
+coverage: check-go-test-coverage check-gocovmerge ## Check test coverage
+	@echo "\n🚀 \033[30;44m  RUNNING E2E COVERAGE  \033[0m"
+	@DOCKER_HOST=$(DOCKER_HOST) \
+		go test -tags=e2e -count=1 -timeout=300s \
+		-coverprofile=./cover-e2e.out -covermode=atomic -coverpkg=./... \
+		./cache/
+	@echo "\n🚀 \033[30;44m  RUNNING UNIT COVERAGE  \033[0m"
+	@go test ./... -coverprofile=./cover-unit.out -covermode=atomic -coverpkg=./... -count=1 -timeout=120s
+	@echo "\n🚀 \033[30;44m  MERGING COVERAGE PROFILES  \033[0m"
+	@gocovmerge ./cover-e2e.out ./cover-unit.out > ./cover.out
+	@rm -f ./cover-e2e.out ./cover-unit.out
+	@echo "\n🚀 \033[30;44m  CHECKING COVERAGE  \033[0m"
 	@go-test-coverage --config=./.testcoverage.yml
+
+check-gocovmerge:
+	@if ! command -v gocovmerge >/dev/null 2>&1; then \
+		echo "\033[31mGOCOVMERGE IS NOT INSTALLED\033[0m"; \
+		echo " Installing..."; \
+		go install github.com/wadey/gocovmerge@latest; \
+	fi
 
 ##@ Linting
 
