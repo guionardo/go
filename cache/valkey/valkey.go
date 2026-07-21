@@ -1,3 +1,15 @@
+// Package valkey provides a Valkey backend for cache.Cache[K, V].
+//
+// Uses valkey-go (native Valkey client). Wire-compatible with Redis —
+// point a valkey client at a Redis server and it works. Constructors
+// validate connectivity eagerly (valkey-go dials at New time).
+// Values are serialized via encoding/json with per-key TTL.
+//
+// Usage:
+//
+//	c := valkey.New[string, string](valkey.WithAddr("localhost:6379"))
+//	c.Set(ctx, "key", "value")
+//	v, err := c.Get(ctx, "key")
 package valkey
 
 import (

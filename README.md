@@ -22,6 +22,12 @@ Golang tools, examples, and packages
 	- [Package httptest\_mock](#package-httptest_mock)
 	- [Package time\_tools](#package-time_tools)
 	- [Package reflect\_tools](#package-reflect_tools)
+	- [Package cache](#package-cache)
+		- [Providers](#providers)
+		- [Interface](#interface-1)
+		- [Basic Usage](#basic-usage)
+		- [Provider Configuration](#provider-configuration)
+		- [Sentinel Errors](#sentinel-errors-1)
 	- [Package config](#package-config)
 		- [Provider](#provider)
 		- [Options](#options)
@@ -202,7 +208,80 @@ Utilities for working with Go's reflection, including zero value checks.
 func IsZeroValue(value any) bool
 ```
 
-## Package config
+## Package cache
+
+Generic key-value cache abstraction with pluggable backend providers.
+
+```go
+import "github.com/guionardo/go/cache"
+```
+
+The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Close` — all accepting `context.Context`.
+
+### Providers
+
+Each provider lives in its own sub-package and is independently importable:
+
+| Package | Backend | Driver | Connection |
+|---------|---------|--------|------------|
+| `cache/mem` | In-memory | None (stdlib) | None — zero dependency |
+| `cache/redis` | Redis | go-redis/v9 | Lazy — dials on first query |
+| `cache/valkey` | Valkey | valkey-go | Eager — dials at construction |
+| `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
+| `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
+
+### Interface
+
+```go
+type Cache[K comparable, V any] interface {
+    Get(ctx context.Context, key K) (V, error)
+    Set(ctx context.Context, key K, value V, ttl ...time.Duration) error
+    Delete(ctx context.Context, key K) error
+    GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error)
+    Close() error
+}
+```
+
+### Basic Usage
+
+Consumer code never imports a provider directly — swap backends by changing the constructor:
+
+```go
+// In tests — zero-dependency in-memory cache
+c := mem.New[string, string]()
+c.Set(ctx, "mykey", "myvalue")
+
+// In production — Redis
+c := redis.New[string, string](redis.WithAddr("localhost:6379"))
+
+// Same interface, different backend
+v, err := c.Get(ctx, "mykey")
+```
+
+### Provider Configuration
+
+All providers use functional options:
+
+```go
+c := redis.New[string, string](
+    redis.WithAddr("localhost:6379"),
+    redis.WithPassword("secret"),
+    redis.WithDB(0),
+    redis.WithPoolSize(10),
+    redis.WithDefaultTTL(5*time.Minute),
+)
+```
+
+### Sentinel Errors
+
+```go
+var ErrMiss   = errors.New("cache: key not found")
+var ErrClosed = errors.New("cache: cache is closed")
+```
+
+Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
+
+### Configuration
 
 Generic typed configuration provider with YAML profile loading, environment variable overrides, and struct validation.
 
