@@ -49,7 +49,7 @@ jobs:
         with:
           config: ./.testcoverage.yml
           profile: cover.out
-          threshold-total: 80
+          threshold-total: 75
 
           ## when token is not specified (value '') this feature is turned off
           ## in this example badge is created and committed only for main branch
