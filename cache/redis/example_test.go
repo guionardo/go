@@ -1,33 +1,43 @@
-//go:build e2e
-
 package redis_test
 
 import (
 	"context"
-	"fmt"
+	"os"
+	"testing"
 
 	"github.com/guionardo/go/cache/redis"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func ExampleNew() {
+func skipIfNoExampleRedis(t *testing.T) {
+	t.Helper()
+
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+
+	c := redis.New[string, string](redis.WithAddr(addr))
+	err := c.Set(context.Background(), "_example_ping", "pong")
+	if err != nil {
+		t.Skip("Redis not available")
+	}
+	_ = c.Close()
+}
+
+func TestRedisExample_SetGet(t *testing.T) {
+	skipIfNoExampleRedis(t)
+
 	c := redis.New[string, string](redis.WithAddr("localhost:6379"))
 
-	if err := c.Set(context.Background(), "example", "redis-value"); err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	err := c.Set(context.Background(), "example", "redis-value")
+	require.NoError(t, err)
 
 	value, err := c.Get(context.Background(), "example")
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "redis-value", value)
 
-	fmt.Println(value)
-
-	if err := c.Close(); err != nil {
-		fmt.Println("error:", err)
-	}
-
-	// Output: redis-value
+	err = c.Close()
+	require.NoError(t, err)
 }

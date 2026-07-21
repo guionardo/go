@@ -4,6 +4,7 @@ package cache_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -98,6 +99,15 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 				}
 			})
 
+			t.Run("get_or_set_setter_error", func(t *testing.T) {
+				_, err := c.GetOrSet(ctx, "e2e_gos_err", func() (string, error) {
+					return "", errors.New("setter failed")
+				})
+				if err == nil {
+					t.Fatal("expected error from setter")
+				}
+			})
+
 			t.Run("ttl_expiry", func(t *testing.T) {
 				err := c.Set(ctx, "e2e_ttl", "short-lived", 2*time.Second)
 				if err != nil {
@@ -109,6 +119,20 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 				_, err = c.Get(ctx, "e2e_ttl")
 				if err == nil {
 					t.Fatal("expected error for expired key")
+				}
+			})
+
+			t.Run("set_no_ttl_uses_default", func(t *testing.T) {
+				err := c.Set(ctx, "e2e_no_ttl", "val")
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := c.Get(ctx, "e2e_no_ttl")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != "val" {
+					t.Fatalf("got %q, want %q", got, "val")
 				}
 			})
 

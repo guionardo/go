@@ -1,33 +1,43 @@
-//go:build e2e
-
 package valkey_test
 
 import (
 	"context"
-	"fmt"
+	"os"
+	"testing"
 
 	"github.com/guionardo/go/cache/valkey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func ExampleNew() {
+func skipIfNoExampleValkey(t *testing.T) {
+	t.Helper()
+
+	addr := os.Getenv("VALKEY_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+
+	c := valkey.New[string, string](valkey.WithAddr(addr))
+	err := c.Set(context.Background(), "_example_ping", "pong")
+	if err != nil {
+		t.Skip("Valkey not available")
+	}
+	_ = c.Close()
+}
+
+func TestValkeyExample_SetGet(t *testing.T) {
+	skipIfNoExampleValkey(t)
+
 	c := valkey.New[string, string](valkey.WithAddr("localhost:6379"))
 
-	if err := c.Set(context.Background(), "example", "valkey-value"); err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	err := c.Set(context.Background(), "example", "valkey-value")
+	require.NoError(t, err)
 
 	value, err := c.Get(context.Background(), "example")
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "valkey-value", value)
 
-	fmt.Println(value)
-
-	if err := c.Close(); err != nil {
-		fmt.Println("error:", err)
-	}
-
-	// Output: valkey-value
+	err = c.Close()
+	require.NoError(t, err)
 }

@@ -130,6 +130,17 @@ func TestMemCache_GetOrSet(t *testing.T) {
 	})
 }
 
+func TestMemCache_GetOrSet_SetterError(t *testing.T) {
+	t.Parallel()
+
+	c := mem.New[string, string]()
+
+	_, err := c.GetOrSet(context.Background(), "k", func() (string, error) {
+		return "", assert.AnError
+	})
+	require.Error(t, err)
+}
+
 func TestMemCache_Close(t *testing.T) {
 	t.Parallel()
 

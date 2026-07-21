@@ -1,33 +1,38 @@
-//go:build e2e
-
 package memcache_test
 
 import (
 	"context"
-	"fmt"
+	"net"
+	"testing"
+	"time"
 
 	"github.com/guionardo/go/cache/memcache"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func ExampleNew() {
+func skipIfNoExampleMemcache(t *testing.T) {
+	t.Helper()
+
+	conn, err := net.DialTimeout("tcp", "localhost:11211", 100*time.Millisecond)
+	if err != nil {
+		t.Skip("memcache not available")
+	}
+	conn.Close()
+}
+
+func TestMemcacheExample_SetGet(t *testing.T) {
+	skipIfNoExampleMemcache(t)
+
 	c := memcache.New[string, string]()
 
-	if err := c.Set(context.Background(), "example", "memcache-value"); err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	err := c.Set(context.Background(), "example", "memcache-value")
+	require.NoError(t, err)
 
 	value, err := c.Get(context.Background(), "example")
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "memcache-value", value)
 
-	fmt.Println(value)
-
-	if err := c.Close(); err != nil {
-		fmt.Println("error:", err)
-	}
-
-	// Output: memcache-value
+	err = c.Close()
+	require.NoError(t, err)
 }

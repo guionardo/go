@@ -1,16 +1,18 @@
-//go:build e2e
-
 package postgres_test
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"testing"
 
 	"github.com/guionardo/go/cache/postgres"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func ExampleNew() {
+func skipIfNoExamplePostgres(t *testing.T) string {
+	t.Helper()
+
 	connString := os.Getenv("DATABASE_URL")
 	if connString == "" {
 		connString = "postgres://localhost:5432/cache_test?sslmode=disable"
@@ -18,26 +20,26 @@ func ExampleNew() {
 
 	c, err := postgres.New[string, string](postgres.WithConnString(connString))
 	if err != nil {
-		fmt.Println("error:", err)
-		return
+		t.Skip("postgres not available")
 	}
+	_ = c.Close()
 
-	if err := c.Set(context.Background(), "example", "pg-value"); err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	return connString
+}
+
+func TestPostgresExample_SetGet(t *testing.T) {
+	connString := skipIfNoExamplePostgres(t)
+
+	c, err := postgres.New[string, string](postgres.WithConnString(connString))
+	require.NoError(t, err)
+
+	err = c.Set(context.Background(), "example", "pg-value")
+	require.NoError(t, err)
 
 	value, err := c.Get(context.Background(), "example")
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "pg-value", value)
 
-	fmt.Println(value)
-
-	if err := c.Close(); err != nil {
-		fmt.Println("error:", err)
-	}
-
-	// Output: pg-value
+	err = c.Close()
+	require.NoError(t, err)
 }
