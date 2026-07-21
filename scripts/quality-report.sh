@@ -86,6 +86,17 @@ HEALTH=""
   echo
   echo "**Code Health:** $HEALTH"
   echo
+  SHIELDS_BASE="https://img.shields.io/badge"
+  LINT_COLOR=brightgreen; [ "$LINT_ISSUES" -gt 5 ] && LINT_COLOR=yellow; [ "$LINT_ISSUES" -gt 50 ] && LINT_COLOR=red
+  SEC_COLOR=brightgreen; [ "${VULN_COUNT:-0}" -gt 0 ] && SEC_COLOR=red
+  COV_COLOR=brightgreen; [ "${COV_PCT:-0}" -lt 80 ] && COV_COLOR=yellow; [ "${COV_PCT:-0}" -lt 60 ] && COV_COLOR=red
+  BLD_COLOR=brightgreen; [ "$BUILD_OK" -eq 0 ] && BLD_COLOR=red
+  echo "<p>"
+  echo "<img src='${SHIELDS_BASE}/Lint-${LINT_ISSUES}%20issues-${LINT_COLOR}' alt='Lint'>"
+  echo "<img src='${SHIELDS_BASE}/Security-${VULN_COUNT}%20known-${SEC_COLOR}' alt='Security'>"
+  echo "<img src='${SHIELDS_BASE}/Coverage-${COV_PCT}%25-${COV_COLOR}' alt='Coverage'>"
+  echo "<img src='${SHIELDS_BASE}/Build-$([ $BUILD_OK -eq 1 ] && echo passing || echo failing)-${BLD_COLOR}' alt='Build'>"
+  echo "</p>"
   echo "Generated: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "Project: $(go list -m 2>/dev/null || echo 'unknown')"
   echo
