@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyChecksum(t *testing.T) {
@@ -73,6 +75,39 @@ func TestAtomicReplace(t *testing.T) {
 	if _, err := os.Stat(currentExe + ".bak"); !os.IsNotExist(err) {
 		t.Errorf("expected backup to be removed on success, stat err: %v", err)
 	}
+}
+
+func TestRestoreBackup(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	current := filepath.Join(dir, "current.exe")
+	backup := current + ".bak"
+
+	err := os.WriteFile(current, []byte("current"), 0o600)
+	require.NoError(t, err)
+
+	err = os.WriteFile(backup, []byte("backup"), 0o600)
+	require.NoError(t, err)
+
+	os.Remove(current)
+	restoreBackup(current)
+
+	data, err := os.ReadFile(current)
+	require.NoError(t, err)
+	require.Equal(t, "backup", string(data))
+}
+
+func TestRestoreBackup_NoBackup(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	current := filepath.Join(dir, "current.exe")
+
+	restoreBackup(current)
+
+	_, err := os.Stat(current)
+	require.True(t, os.IsNotExist(err))
 }
 
 func TestAtomicReplace_BackupRestoreOnFailure(t *testing.T) {

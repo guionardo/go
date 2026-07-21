@@ -101,7 +101,7 @@ coverage: check-go-test-coverage check-gocovmerge ## Check test coverage
 
 coverage-quick: check-go-test-coverage ## Quick coverage check (unit tests only, no E2E)
 	@go test ./... -coverprofile=./cover.out -covermode=atomic -count=1 -timeout=120s
-	@go-test-coverage --config=./.testcoverage.yml
+	@go-test-coverage --config=./.testcoverage-quick.yml
 	@rm -f ./cover.out
 
 check-gocovmerge:

@@ -1,0 +1,24 @@
+profile: cover.out
+
+threshold:
+  file: 70
+  package: 80
+  total: 75
+
+override:
+  - path: cache/memcache
+    threshold: 0
+  - path: cache/postgres
+    threshold: 0
+  - path: cache/redis
+    threshold: 0
+  - path: cache/valkey
+    threshold: 0
+  - path: cmd/example-updater
+    threshold: 0
+  - path: release/swapper
+    threshold: 0
+  - path: mid
+    threshold: 50
+  - path: release
+    threshold: 70

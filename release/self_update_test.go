@@ -172,6 +172,45 @@ func TestPerformSelfUpdate_LockExists(t *testing.T) {
 	require.False(t, result.Updated)
 }
 
+func TestDownloadAndSwap_NoMatchingAsset(t *testing.T) {
+	t.Parallel()
+
+	rel := &Release{TagName: "v2.0.0", Assets: []Asset{}}
+
+	_, err := downloadAndSwap(context.Background(), rel)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "download update")
+}
+
+//nolint:paralleltest // modifies global state (githubAPIBase, testCurrentVersion)
+func TestPerformSelfUpdate_DownloadFails(t *testing.T) {
+	testCurrentVersion = testVerCurrent
+	defer func() { testCurrentVersion = "" }()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"tag_name": "` + testVerNew + `",
+			"name": "` + testVerNew + `",
+			"draft": false,
+			"prerelease": false,
+			"assets": []
+		}`))
+	}))
+	defer server.Close()
+
+	originalBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = originalBase }()
+
+	result := PerformSelfUpdate(context.Background(), WithOwner("test"), WithRepo("test"))
+	require.Error(t, result.Err)
+	require.Contains(t, result.Err.Error(), "download update")
+	require.Equal(t, UpdateStateDownloaded, result.State)
+}
+
 //nolint:paralleltest // modifies global state (githubAPIBase, testCurrentVersion)
 func TestPerformSelfUpdate_APIError(t *testing.T) {
 	testCurrentVersion = testVerCurrent

@@ -28,9 +28,22 @@ threshold:
 # new threshold to it. If project has multiple rules that match same path,
 # override rules should be listed in order from specific to more general rules.
 override:
-  # Increase coverage threshold to 100% for `foo` package
-  # (default is 80, as configured above in this example).
-  - path: ^pkg/mid/$
+  # Cache providers require real servers (tested via E2E with Docker)
+  - path: ^cache/memcache/
+    threshold: 0
+  - path: ^cache/postgres/
+    threshold: 0
+  - path: ^cache/redis/
+    threshold: 0
+  - path: ^cache/valkey/
+    threshold: 0
+  # CLI main packages with os.Exit() — hard to unit test
+  - path: ^cmd/example-updater/
+    threshold: 0
+  - path: ^release/swapper/
+    threshold: 0
+  # Platform-specific machine ID
+  - path: ^mid/
     threshold: 50
 
 # Holds regexp rules which will exclude matched files or packages
