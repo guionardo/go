@@ -71,20 +71,10 @@ for l, c in sorted(by.items(), key=lambda x: -x[1]):
     print(f'{l}|{c}')
 " 2>/dev/null || true)
 
-# ── Health ──
-
-HEALTH=""
-[ "$LINT_ISSUES" -le 5 ] && HEALTH+="✅ Lint  " || HEALTH+="⚠️ Lint($LINT_ISSUES)  "
-[ "${VULN_COUNT:-0}" -eq 0 ] && HEALTH+="✅ Security  " || HEALTH+="❌ Security(${VULN_COUNT})  "
-[ "${COV_PCT:-0}" -ge 80 ] && HEALTH+="✅ Coverage ${COV_PCT}%  " || HEALTH+="⚠️ Coverage ${COV_PCT}%  "
-[ "$BUILD_OK" -eq 1 ] && HEALTH+="✅ Build  " || HEALTH+="❌ Build  "
-
 # ── Generate report ──
 
 {
   echo "# Quality Report"
-  echo
-  echo "**Code Health:** $HEALTH"
   echo
   SHIELDS_BASE="https://img.shields.io/badge"
   LINT_COLOR=brightgreen; [ "$LINT_ISSUES" -gt 5 ] && LINT_COLOR=yellow; [ "$LINT_ISSUES" -gt 50 ] && LINT_COLOR=red
@@ -113,7 +103,8 @@ HEALTH=""
       echo "| $linter | $count |"
     done <<< "$ISSUES_BY_LINTER"
     echo
-    echo "### Issue Details"
+    echo "<details>"
+    echo "<summary>Issue Details ($LINT_ISSUES total)</summary>"
     echo
     echo '| Location | Linter | Message |'
     echo '|----------|--------|---------|'
@@ -121,14 +112,16 @@ HEALTH=""
 import json
 with open('$TMPDIR/lint.json') as f:
     d = json.load(f)
-for i in d.get('Issues', [])[:50]:
+for i in d.get('Issues', [])[:200]:
     pos = i.get('Pos', {})
     loc = f'{pos.get(\"Filename\", \"\")}:{pos.get(\"Line\", \"\")}'
     print(f'| {loc} | {i.get(\"FromLinter\", \"\")} | {i.get(\"Text\", \"\")} |')
 " 2>/dev/null
-    if [ "$LINT_ISSUES" -gt 50 ]; then
-      echo "... and $((LINT_ISSUES - 50)) more issues"
+    if [ "$LINT_ISSUES" -gt 200 ]; then
+      echo "... and $((LINT_ISSUES - 200)) more issues"
     fi
+    echo
+    echo "</details>"
   else
     echo 'No issues found. Clean!'
   fi
@@ -162,9 +155,14 @@ with open('$TMPDIR/vuln.json') as f:
   echo
   echo "**Total coverage:** ${COV_PCT}%"
   echo
+  echo "<details>"
+  echo "<summary>Per-function coverage</summary>"
+  echo
   echo '```'
   go tool cover -func="$TMPDIR/cover.out" 2>/dev/null || true
   echo '```'
+  echo
+  echo "</details>"
 
   # ── Lines of Code ──
   echo
@@ -190,13 +188,17 @@ with open('$TMPDIR/vuln.json') as f:
   echo '|--------|'
   go list -m 2>/dev/null || true
   echo
-  echo "### All Dependencies"
+  ALL_DEPS=$(go list -m all 2>/dev/null | wc -l | tr -d ' ')
+  echo "<details>"
+  echo "<summary>All Dependencies ($ALL_DEPS modules)</summary>"
   echo
   echo '| Module | Version |'
   echo '|--------|---------|'
   go list -m all 2>/dev/null | while IFS= read -r dep; do
     echo "| $dep | |"
   done || true
+  echo
+  echo "</details>"
 } > "$OUTPUT"
 
 echo "Report written to $OUTPUT"
