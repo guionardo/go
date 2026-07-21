@@ -4,24 +4,27 @@ import (
 	"time"
 )
 
-type config struct {
-	defaultTTL time.Duration
+// Config holds shared cache configuration for providers.
+type Config struct {
+	DefaultTTL time.Duration
 }
 
 // Option is a functional option for configuring a cache provider.
 type Option interface {
-	apply(*config)
+	// Apply applies the option to the configuration.
+	Apply(*Config)
 }
 
-type optionFunc func(*config)
+type optionFunc func(*Config)
 
-func (f optionFunc) apply(cfg *config) {
+// Apply applies the option to the configuration.
+func (f optionFunc) Apply(cfg *Config) {
 	f(cfg)
 }
 
 // WithDefaultTTL sets the provider-level default TTL for all keys.
 func WithDefaultTTL(ttl time.Duration) Option {
-	return optionFunc(func(cfg *config) {
-		cfg.defaultTTL = ttl
+	return optionFunc(func(cfg *Config) {
+		cfg.DefaultTTL = ttl
 	})
 }
