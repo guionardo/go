@@ -22,6 +22,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Build swapper binaries
+        run: make swapper
+
       - name: Run tests
         run: go test -v ./...
 
@@ -34,6 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
+
+      - name: Build swapper binaries
+        run: make swapper
 
       - name: generate test coverage
         run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...

@@ -21,6 +21,9 @@ jobs:
           go-version: "1.26"
           cache: true
 
+      - name: Build swapper binaries
+        run: make swapper
+
       - name: Build
         run: go build ./...
 
