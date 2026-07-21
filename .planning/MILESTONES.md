@@ -1,5 +1,15 @@
 # Milestones
 
+## v1.5 Self-Update (Shipped: 2026-07-21)
+
+**Phases completed:** 1 phases, 3 plans, 0 tasks
+
+**Key accomplishments:**
+
+- (none recorded)
+
+---
+
 ## v1.4 Core Packages (Shipped: 2026-07-21)
 
 **Phases completed:** 1 phase, 3 plans, 50 tasks
@@ -22,6 +32,7 @@
 **UAT:** 8/8 tests passed
 
 **Archived artifacts:**
+
 - `milestones/v1.4-ROADMAP.md`
 - `milestones/v1.4-REQUIREMENTS.md`
 - `milestones/v1.4-phases/`
@@ -31,5 +42,6 @@
 ## v1.5 (Planned)
 
 ### Planned phases:
+
 - STRNG: String utilities package (truncation, padding, join/split)
 - RETRY: Retry with backoff strategies and jitter support
