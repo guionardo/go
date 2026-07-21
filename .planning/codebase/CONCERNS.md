@@ -97,23 +97,17 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 ## Performance Bottlenecks
 
-### time_tools/parser.go: Global Lock Contention on Every Parse
+### ~~time_tools/parser.go: Global Lock Contention on Every Parse~~ (FIXED)
 
-**Issue:** `Parse()` acquires a read lock on the global `layoutsLock` on every invocation, even after the layout list has stabilized. The promotion optimization (moving the matched layout to front) acquires a write lock and modifies the shared slice.
+**Issue was:** `Parse()` used `sync.RWMutex` for layout list access and promotion.
 
-**Files:** `time_tools/parser.go` (lines 49-78)
+**Fix applied:** Replaced `sync.RWMutex` with `atomic.Pointer[[]string]`. Readers load atomically (no lock), promotion creates a copy-on-write slice and atomically swaps the pointer.
 
-**Cause:** The self-optimizing layout promotion reorders the global `layouts` slice under a write lock, while all callers must acquire a read lock even if no promotion is needed.
+### ~~config/provider.go: Reflection on Every Configuration Update~~ (ACCEPTED)
 
-**Improvement path:** Use a copy-on-write pattern or sync.Map for layouts. For the common case (no promotion needed after warmup), the read lock is fast but still adds overhead. Consider per-goroutine layout caching.
+**Issue:** `updateConfiguration` uses `reflect.DeepEqual` and reflection-based logging on every update.
 
-### config/provider.go: Reflection on Every Configuration Update
-
-**Issue:** `updateConfiguration` uses `reflect.DeepEqual` to compare configurations, and `getConfigurationLog` uses full reflection to serialize to log attributes. Both happen on every configuration load/update.
-
-**Files:** `config/provider.go` (lines 97, 105)
-
-**Improvement path:** For hot-reload scenarios, the reflection overhead is negligible. But for frequently-updated configs, consider hashing or a comparison interface.
+**Assessment:** Overhead is negligible — configuration updates are not a hot path. Accepted as-is.
 
 ## Fragile Areas
 
@@ -159,19 +153,17 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 **Fix applied:** `validate` is now initialized lazily via `sync.Once` in `getValidator()`, allowing future customization before the first call.
 
-### `github.com/opencontainers/go-digest` v1.0.0
+### ~~`github.com/opencontainers/go-digest` v1.0.0~~ (VERIFIED - NOT A BUG)
 
-**Risk:** Used in `release/release.go` only for digest verification of downloaded assets. The digest format (e.g., `sha256:abc123...`) is assumed but the `Asset.Digest` field is a plain string — mismatch between the digest string format and what `go-digest` produces could cause false negatives.
+**Risk was:** Format mismatch between `go-digest` output and `Asset.Digest`.
 
-**Files:** `release/release.go` (lines 120-122)
+**Assessment:** `digest.FromBytes(content).String()` produces `"sha256:hex"` format. `Asset.Digest` is populated by the release workflow (documented in `release/README.md`) which must generate the same `sha256:hex` format. The code is correct; the contract is documented.
 
 ## Missing Critical Features
 
-### No Hot-Reload Observability
+### ~~No Hot-Reload Observability~~ (FEATURE - NOT A BUG)
 
-**Problem:** `config.Provider` caches configuration and requires explicit `UpdateConfiguration()` calls to reload. There is no file watcher mechanism, no callback/hook system for config changes, and no notification to dependents.
-
-**Blocks:** Applications that need live configuration reloading without restart.
+**Note:** This is a feature request, not a code defect. The current design with explicit `UpdateConfiguration()` is appropriate for the library's use case. File watching can be added when needed.
 
 ## Test Coverage Gaps
 
@@ -216,6 +208,10 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 | ~~Makefile Linux-only deps~~ | ~~`Makefile:21-26`~~ | ~~Low~~ | ✅ Fixed |
 | ~~Path traversal tests enhanced~~ | ~~`config/profile/profile_test.go:104-111`~~ | ~~Low~~ | ✅ Fixed |
 | ~~Lock double-fetch race~~ | ~~`config/provider.go:62-79`~~ | ~~Not a bug~~ | ✅ Closed |
+| ~~Global lock contention on every Parse~~ | ~~`time_tools/parser.go:49-78`~~ | ~~Low~~ | ✅ Fixed |
+| ~~go-digest format mismatch~~ | ~~`release/release.go:120-122`~~ | ~~Low~~ | ✅ Verified safe |
+| ~~Reflection on config update~~ | ~~`config/provider.go:97,105`~~ | ~~Low~~ | ✅ Accepted |
+| ~~Hot-reload observability~~ | ~~`config.Provider`~~ | ~~Feature~~ | ✅ Not a bug |
 | MID package untested on macOS/Windows | `mid/machineid_darwin.go` etc. | Medium | Soon |
 
 *Concerns audit: 2026-07-21* — updated 2026-07-21 after fixes

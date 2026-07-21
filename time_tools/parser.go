@@ -2,7 +2,7 @@ package timetools
 
 import (
 	"errors"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -10,7 +10,15 @@ import (
 // priority. Successful parses promote the matched template to the
 // front of the list for faster matching on subsequent calls.
 var (
-	layouts = []string{
+	layouts atomic.Pointer[[]string]
+
+	// ErrTimeParser is returned when Parse cannot match the input
+	// string against any known time layout.
+	ErrTimeParser = errors.New("failed to parse time.Time value")
+)
+
+func init() {
+	layouts.Store(&[]string{
 		time.DateTime,
 		time.ANSIC,
 		time.UnixDate,
@@ -29,48 +37,35 @@ var (
 		time.StampNano,
 		time.DateOnly,
 		time.TimeOnly,
-	}
-	layoutsLock sync.RWMutex
-
-	// ErrTimeParser is returned when Parse cannot match the input
-	// string against any known time layout.
-	ErrTimeParser = errors.New("failed to parse time.Time value")
-)
+	})
+}
 
 // Parse attempts to parse the input string s using a prioritized list
 // of Go time layouts (RFC3339, DateTime, DateOnly, Kitchen, etc.).
 // The first successful match is returned. On success, the matched
-// layout is promoted to the front of the list (asynchronously) so
-// that frequently used formats are checked first in future calls.
+// layout is promoted to the front of the list so that frequently used
+// formats are checked first in future calls.
 // Returns ErrTimeParser if no layout matches the input.
 func Parse(s string) (time.Time, error) {
-	layoutsLock.RLock()
+	current := *layouts.Load()
 
-	for index := range layouts {
-		t, err := time.Parse(layouts[index], s)
+	for i := range current {
+		t, err := time.Parse(current[i], s)
 		if err == nil {
-			if index > 0 {
-				layout := layouts[index]
-
-				layoutsLock.RUnlock()
-
-				layoutsLock.Lock()
-				if index < len(layouts) && layouts[index] == layout {
-					for n := index; n > 0; n-- {
-						layouts[n] = layouts[n-1]
-					}
-					layouts[0] = layout
+			if i > 0 {
+				promoted := make([]string, len(current))
+				copy(promoted, current)
+				for n := i; n > 0; n-- {
+					promoted[n] = promoted[n-1]
 				}
-				layoutsLock.Unlock()
-			} else {
-				layoutsLock.RUnlock()
+				promoted[0] = current[i]
+				layouts.Store(&promoted)
 			}
 
 			return t, nil
 		}
 	}
 
-	layoutsLock.RUnlock()
 	return time.Time{}, ErrTimeParser
 }
 
@@ -78,8 +73,5 @@ func Parse(s string) (time.Time, error) {
 // format strings. This is useful for customizing which layouts Parse
 // will attempt and in what order.
 func SetLayouts(newLayouts []string) {
-	layoutsLock.Lock()
-	defer layoutsLock.Unlock()
-
-	layouts = newLayouts
+	layouts.Store(&newLayouts)
 }
