@@ -87,16 +87,30 @@ func GetThisLatestRelease() (*Release, error) {
 	return GetLatestRelease(owner, repo)
 }
 
+var githubClient = &http.Client{
+	Timeout: 30 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("too many redirects")
+		}
+		if req.URL.Host != "api.github.com" && req.URL.Host != "github.com" {
+			return fmt.Errorf("redirect to untrusted host: %s", req.URL.Host)
+		}
+		return nil
+	},
+}
+
 func GetLatestRelease(owner, repo string) (*Release, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 	req.Header.Add("X-Github-Api-Version", "2026-03-10")
-	req.Header.Add("Accept", "application/vnt.github+json")
+	req.Header.Add("Accept", "application/vnd.github+json")
 
-	response, err := http.Get(url)
+	response, err := githubClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest release: %w", err)
 	}
+	defer response.Body.Close()
 
 	var release Release
 	if err = json.NewDecoder(response.Body).Decode(&release); err != nil {
@@ -111,6 +125,7 @@ func (asset *Asset) Download(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
