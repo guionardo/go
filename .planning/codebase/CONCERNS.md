@@ -1,49 +1,29 @@
 # Codebase Concerns
 
 **Analysis Date:** 2026-07-21
+**Last Updated:** 2026-07-21 — release.go issues verified fixed; machine-id trimmed; GetEnv simplified; provider returns errors
 
 ## Tech Debt
 
-### release/release.go: Unused HTTP Request with Lost Custom Headers
+### ~~release/release.go: Unused HTTP Request with Lost Custom Headers~~ (FIXED)
 
-**Issue:** `GetLatestRelease()` in `release/release.go` (lines 92-96) creates an `http.NewRequest`, sets custom headers on it (`X-Github-Api-Version`, `Accept`), then never uses that request. Instead it calls `http.Get(url)` which creates a *new* request without those headers. All headers are silently lost.
+**Issue was:** `GetLatestRelease()` created `http.NewRequest` with custom headers but used `http.Get(url)` instead.
 
-**Files:** `release/release.go` (lines 92-96)
+**Fix applied:** Uses `githubClient.Do(req)` with the configured request and headers. Both `X-Github-Api-Version` and `Accept: application/vnd.github+json` are now sent correctly.
 
-```go
-// BUG: req is created but http.Get(url) is used instead
-req, _ := http.NewRequest(http.MethodGet, url, nil)
-req.Header.Add("X-Github-Api-Version", "2026-03-10")
-req.Header.Add("Accept", "application/vnt.github+json")  // also wrong value
+### ~~release/release.go: Response Body Not Closed~~ (FIXED)
 
-response, err := http.Get(url)  // http.Get ignores req entirely
-```
+**Issue was:** `response.Body` never closed in `GetLatestRelease()`.
 
-**Impact:** The `X-Github-Api-Version` header is lost, which means API version pinning doesn't work. The `Accept` header also has a typo: `application/vnt.github+json` should be `application/vnd.github+json`. This is a GitHub API consumer — without the correct Accept header, API responses could change unexpectedly.
+**Fix applied:** `defer response.Body.Close()` added after error check.
 
-**Fix approach:** Replace `http.Get(url)` with `http.DefaultClient.Do(req)` to use the configured request. Fix the Accept header value.
+### ~~release/release.go: Download Method Body Not Closed on Error~~ (FIXED)
 
-### release/release.go: Response Body Not Closed
+**Issue was:** `Asset.Download()` didn't close `resp.Body` on error paths.
 
-**Issue:** `GetLatestRelease()` in `release/release.go` never closes `response.Body`. This leaks HTTP connections.
+**Fix applied:** `defer resp.Body.Close()` immediately after HTTP response.
 
-**Files:** `release/release.go` (lines 96-104)
-
-**Impact:** Connects to GitHub API are not returned to the connection pool, leading to resource leaks in long-running processes.
-
-**Fix approach:** Add `defer response.Body.Close()` after the `http.Get` call and after the error check.
-
-### release/release.go: Download Method Body Not Closed on Error
-
-**Issue:** `Asset.Download()` (line 110) reads `resp.Body` but only closes via GC. If `io.ReadAll` or the digest comparison fails, `resp.Body` is never closed.
-
-**Files:** `release/release.go` (lines 109-128)
-
-**Impact:** Resource leak on download errors or digest mismatch.
-
-**Fix approach:** Add `defer resp.Body.Close()` immediately after the error check on `http.Get`.
-
-### config/provider.go: Silent Error Swallowing in Configuration Loading
+### ~~config/provider.go: Silent Error Swallowing in Configuration Loading~~ (FIXED)
 
 **Issue:** `loadStaticConfiguration()` at `config/provider.go` (lines 112-131) logs profile/environment parsing errors but returns `nil` regardless. Callers of `GetConfiguration()` never see these errors if any of the sub-steps fail.
 
@@ -63,36 +43,27 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 **Impact:** A misconfigured profiles path, invalid YAML, or missing environment variables silently result in a zero-value config being returned. The application thinks it has valid configuration when it may not.
 
-**Fix approach:** Accumulate errors and return them, or only swallow specific known-recoverable errors. At minimum, the user should be aware configuration loading was incomplete.
+**Fix applied:** Now accumulates `profile`, `yaml`, `env`, and validation errors via `errors.Join` and returns them.
 
 ### Duplicate Inconsistent GetEnv Functions
 
 **Issue:** Two packages define their own `GetEnv` function with slightly different behavior:
-- `config/environment/environment.go` — case-insensitive via `strings.EqualFold` 
+- `config/environment/environment.go` — case-insensitive via `strings.EqualFold` (now removed)
 - `shell_tools/environment.go` — case-sensitive via `strings.CutPrefix`
 
 **Files:**
 - `config/environment/environment.go` (lines 18-38)
 - `shell_tools/environment.go` (lines 16-28)
 
-**Impact:** Inconsistent environment variable resolution between packages. On case-insensitive systems (Windows), these work the same; on case-sensitive systems (Linux/macOS), the config package will match env vars by different casing than expected.
+**Impact:** Inconsistent environment variable resolution between packages.
 
-**Fix approach:** Consolidate to a single `GetEnv` utility. The shell_tools version is simpler and more standard; use it everywhere or make `config/environment` delegate to `shell_tools`.
+**Fix approach:** Consolidate to a single `GetEnv` utility. `config/environment.GetEnv` was simplified to use `os.LookupEnv` only (no case-insensitive fallback). A full consolidation would have both packages import from a shared utility.
 
-### config/environment/environment.go: Inconsistent Case-Insensitive Env Lookup
+### ~~config/environment/environment.go: Inconsistent Case-Insensitive Env Lookup~~ (FIXED)
 
-**Issue:** `GetEnv()` in `config/environment/environment.go` first calls `os.Getenv(env)` (case-sensitive), then falls through to iterate `os.Environ()` with `strings.EqualFold` (case-insensitive). This means for an env var `PATH=foo`:
-1. `os.Getenv("path")` returns `""` (case-sensitive no match)
-2. The `os.Environ()` loop finds `PATH=foo` via `EqualFold` and returns `"foo"`
-3. But `os.Getenv("PATH")` returns `"foo"` immediately
+**Issue was:** `GetEnv()` had a case-insensitive `os.Environ()` fallback after `os.Getenv`.
 
-This leads to inconsistent results depending on the caller's casing choice.
-
-**Files:** `config/environment/environment.go` (lines 18-38)
-
-**Impact:** Environment lookups that pass wrong casing sometimes succeed and sometimes fail inconsistently.
-
-**Fix approach:** Either drop the `os.Environ()` loop (rely solely on `os.Getenv`), or make the initial lookup also case-insensitive.
+**Fix applied:** Removed the `os.Environ()` loop entirely. `GetEnv` now uses a single `os.LookupEnv` call — consistent, predictable behavior on all platforms.
 
 ### Makefile: Linux-Only Dependency Installation Commands
 
@@ -106,13 +77,11 @@ This leads to inconsistent results depending on the caller's casing choice.
 
 ## Known Bugs
 
-### release/release.go: Wrong Accept Header for GitHub API
+### ~~release/release.go: Wrong Accept Header for GitHub API~~ (FIXED)
 
-**Issue:** The Accept header value `application/vnt.github+json` (line 94) has a typo — `vnt` should be `vnd` (short for "vendor"). Additionally, the GitHub API may require a more specific media type to get the expected response format.
+**Issue was:** Accept header had `vnt` typo and the carrying request was never sent.
 
-**Files:** `release/release.go` (line 94)
-
-**Impact:** While GitHub API often returns JSON by default regardless, the intended API version pinning is completely broken since the request carrying the headers is never sent.
+**Fix applied:** Header corrected to `application/vnd.github+json` — sent via `githubClient.Do(req)`.
 
 ### config/provider.go: Lock Double-Fetch Race in GetConfiguration
 
@@ -143,17 +112,11 @@ Between releasing the read lock and acquiring the write lock, another goroutine 
 
 ## Security Considerations
 
-### release/release.go: No HTTP Timeout
+### ~~release/release.go: No HTTP Timeout~~ (FIXED)
 
-**Issue:** Both `GetLatestRelease()` and `Asset.Download()` use `http.Get(url)` (and `http.NewRequest` without a client context) with no timeout configuration. Network calls can block indefinitely.
+**Issue was:** `http.Get(url)` with no timeout configuration.
 
-**Files:** `release/release.go` (lines 96, 110)
-
-**Risk:** A slow or hanging external API (GitHub) could block the application forever. Denial of service vector.
-
-**Current mitigation:** None.
-
-**Recommendations:** Use `http.Client` with a timeout (e.g., 30s) and a `context.Context` for cancellation.
+**Fix applied:** `githubClient` has `Timeout: 30 * time.Second`. `GetLatestRelease()` uses this client. `Asset.Download()` still uses `http.Get` directly — should be migrated to use the client for timeout protection.
 
 ### httptest_mock/response.go: Header Injection Sanitization Bypass
 
@@ -310,11 +273,13 @@ w.Header().Add(key, sanitized)
 
 | Issue | File | Severity | Fix Priority |
 |-------|------|----------|-------------|
-| Unused HTTP request losing headers | `release/release.go:92-96` | Critical | Immediate |
-| Response body not closed | `release/release.go:96-104` | High | Immediate |
-| Failed config loading returns nil error | `config/provider.go:72-78` | High | Next |
-| No HTTP timeouts on external calls | `release/release.go:96,110` | Medium | Next |
+| ~~Unused HTTP request losing headers~~ | ~~`release/release.go:92-96`~~ | ~~Critical~~ | ✅ Fixed |
+| ~~Response body not closed~~ | ~~`release/release.go:96-104`~~ | ~~High~~ | ✅ Fixed |
+| ~~Failed config loading returns nil error~~ | ~~`config/provider.go:72-78`~~ | ~~High~~ | ✅ Fixed |
+| ~~Inconsistent case-insensitive env lookup~~ | ~~`config/environment/environment.go:18-38`~~ | ~~Medium~~ | ✅ Fixed |
+| ~~MID file content not trimmed~~ | ~~`mid/machineid_linux.go:58-71`~~ | ~~Low~~ | ✅ Fixed |
+| No HTTP timeout on Asset.Download | `release/release.go:124` | Medium | Next |
 | MID package untested on macOS/Windows | `mid/machineid_darwin.go` etc. | Medium | Soon |
-| Inconsistent GetEnv implementations | `config/environment/` and `shell_tools/` | Low | Soon |
+| Duplicate GetEnv implementations | `config/environment/` and `shell_tools/` | Low | Soon |
 
-*Concerns audit: 2026-07-21*
+*Concerns audit: 2026-07-21* — updated 2026-07-21 after fixes

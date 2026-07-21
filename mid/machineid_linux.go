@@ -57,7 +57,7 @@ func collectHostnamectl() (out string, err error) {
 
 func collectDbusMachineId() (out string, err error) {
 	if content, err := os.ReadFile("/var/lib/dbus/machine-id"); err == nil {
-		out = string(content)
+		out = strings.TrimSpace(string(content))
 	}
 
 	return outErr(out, "dbus")
@@ -65,7 +65,7 @@ func collectDbusMachineId() (out string, err error) {
 
 func collectEtcMachineId() (out string, err error) {
 	if content, err := os.ReadFile("/etc/machine-id"); err == nil {
-		out = string(content)
+		out = strings.TrimSpace(string(content))
 	}
 
 	return outErr(out, "etc")

@@ -7,25 +7,16 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
-const kvCount = 2
-
-// GetEnv tries to read the environment, with a default value in case of not found
+// GetEnv returns the value of the environment variable, or a default if not set.
 func GetEnv(env string, defaultValue ...string) string {
 	if env == "" {
 		return ""
 	}
 
-	if value := os.Getenv(env); value != "" {
+	if value, ok := os.LookupEnv(env); ok {
 		return value
-	}
-
-	for _, entry := range os.Environ() {
-		if parts := strings.SplitN(entry, "=", kvCount); len(parts) == kvCount && strings.EqualFold(parts[0], env) {
-			return parts[1]
-		}
 	}
 
 	if len(defaultValue) > 0 {

@@ -51,9 +51,10 @@ func TestGetEnv(t *testing.T) {
 		assert.Equal(t, "", environment.GetEnv(""))
 	})
 
-	t.Run("case_insensitive_match", func(t *testing.T) {
+	t.Run("exact_case_match", func(t *testing.T) {
 		t.Setenv("TESTCASE_ENV", "value")
-		assert.Equal(t, "value", environment.GetEnv("testcase_env"))
+		assert.Equal(t, "value", environment.GetEnv("TESTCASE_ENV"))
+		assert.Empty(t, environment.GetEnv("testcase_env"))
 	})
 }
 

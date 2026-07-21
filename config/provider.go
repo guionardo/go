@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 	"sync"
@@ -110,23 +112,35 @@ func (p *Provider[T]) updateConfiguration(configuration T) error {
 // loadStaticConfiguration loads the static configuration from the scope files and the environment variables.
 // Caller MUST hold p.lock write lock.
 func (p *Provider[T]) loadStaticConfiguration() error {
-
-	var configuration T
+	var (
+		configuration T
+		errs          []error
+	)
 
 	if profilesPath := p.getProfilesPath(); profilesPath == "" {
 		slog.Info("no profiles path found, skipping profile loading")
 	} else {
 		content, err := profile.GetScopedProfileContent(p.profilesPath, p.defaultScope, p.scope)
 		if err != nil {
-			logger().Error("error reading profile", "error", err)
+			logger().Warn("error reading profile", "error", err)
 		} else if err := yaml.Unmarshal(content, &configuration); err != nil {
 			logger().Error("error unmarshalling profile", "error", err)
+			errs = append(errs, fmt.Errorf("yaml: %w", err))
 		}
 	}
 
 	if err := environment.ParseEnvironment(&configuration, nil); err != nil {
 		logger().Error("error parsing environment", "error", err)
+		errs = append(errs, fmt.Errorf("env: %w", err))
 	}
 
-	return p.updateConfiguration(configuration)
+	if err := p.updateConfiguration(configuration); err != nil {
+		return err
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
 }
