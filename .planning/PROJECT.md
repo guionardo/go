@@ -32,6 +32,7 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ GitHub latest release fetcher with asset download and digest verification — `release/` — existing
 - ✓ CI pipeline with golangci-lint, pre-commit, commitlint, coverage enforcement, vulncheck — existing
 - ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — v1.0: in-memory, Redis, Memcache, Postgres, Valkey
+- ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
 
 ### Active
 
@@ -50,11 +51,15 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 ## Current State
 
-**v1.4 — Core Packages** (shipped 2026-07-21)
+**v1.5 — Self-Update** (shipped 2026-07-21)
 
-The first planned milestone shipped the generic `Cache[K, V]` package with 5 backends. The codebase has ~13 utility packages with 6,600+ lines of code across the cache subsystem. CI enforces linting, conventional commits, and E2E test separation via build tags.
+The `release` package now provides a complete self-update mechanism: version detection from build info, GitHub release checking, platform-specific asset download with SHA256 verification, atomic binary replacement via an embedded swapper (cross-platform), and automatic relaunch. All 21 library packages have proper `doc.go` documentation files. The main README was restructured with a package index table.
 
-**Tech stack:** Go 1.26, testcontainers-go for E2E, go-redis/v9, valkey-go, gomemcache, pgx/v5
+**Previous: v1.4 — Core Packages** (shipped 2026-07-21)
+
+Shipped the generic `Cache[K, V]` package with 5 backends. ~13 utility packages with 6,600+ lines of code across the cache subsystem.
+
+**Tech stack:** Go 1.26, testcontainers-go for E2E, go-redis/v9, valkey-go, gomemcache, pgx/v5, hashicorp/go-version
 
 ## Context
 
@@ -77,6 +82,9 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | Monorepo of independent packages | Each package is usable independently via `go get` | ✓ Good |
 | Conventional commits + pre-commit | Enforce consistent commit history and code quality | ✓ Good |
 | Generic Cache interface over 5 backends | Swap providers without code changes; memory cache for zero-dep testing | ✓ Good (v1.0) |
+| Self-update via embedded swapper | Spawn → exit → swap → exec avoids file-in-use locks on Windows | ✓ Good (v1.5) |
+| hashicorp/go-version for semver | Replaces custom parser; handles prereleases, pseudo-versions, build metadata | ✓ Good (v1.5) |
+| Two-phase SHA256 verification | go-digest at download + stdlib at swap protects against corruption mid-flight | ✓ Good (v1.5) |
 
 ## Evolution
 
@@ -96,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 after v1.4 milestone*
+*Last updated: 2026-07-21 after v1.5 milestone*
