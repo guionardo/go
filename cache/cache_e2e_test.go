@@ -1,3 +1,5 @@
+//go:build e2e
+
 package cache_test
 
 import (
@@ -177,7 +179,10 @@ func TestCacheE2E_Valkey(t *testing.T) {
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "valkey/valkey:8-alpine",
 			ExposedPorts: []string{"6379/tcp"},
-			WaitingFor:   wait.ForLog("* Ready to accept connections").WithStartupTimeout(30 * time.Second),
+			WaitingFor: wait.ForAll(
+				wait.ForLog("* Ready to accept connections"),
+				wait.ForListeningPort("6379/tcp"),
+			).WithStartupTimeout(30 * time.Second),
 		},
 		Started: true,
 	})

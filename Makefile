@@ -82,7 +82,7 @@ test: ## Run tests
 test-e2e: gocheck ## Run E2E integration tests (requires Docker)
 	@echo "\n🚀 \033[30;44m  RUNNING E2E TESTS  \033[0m"
 	@DOCKER_HOST=unix:///Users/guionardo/.orbstack/run/docker.sock \
-		go test ./cache/ -run 'TestCacheE2E' -v -count=1 -timeout=300s
+		go test ./cache/ -tags=e2e -run 'TestCacheE2E' -v -count=1 -timeout=300s
 
 coverage: check-go-test-coverage ## Check test coverage
 	@go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./... -count=1
