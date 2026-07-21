@@ -6,7 +6,7 @@ Golang tools, examples, and packages
 [![Go tests and checking](https://github.com/guionardo/go/actions/workflows/go.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go.yml)
 ![coverage](https://raw.githubusercontent.com/guionardo/go/badges/.badges/main/coverage.svg)
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
-[![Quality Report](https://img.shields.io/badge/Quality-make%20quality--report-blue)](scripts/quality-report.sh)
+[![Quality Report](https://img.shields.io/badge/Quality-make%20quality--report-blue)](/quality-report.md)
 
 ## Package Index
 
