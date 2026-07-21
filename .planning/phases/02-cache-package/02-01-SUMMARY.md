@@ -213,6 +213,16 @@ None - no external service configuration required.
 - Postgres and in-memory providers will use the same sweep pattern established here
 - Future providers will follow the functional options pattern established in this plan
 
+## Self-Check: PASSED
+
+All claims in this summary verified:
+- All 10 source files exist
+- `go build ./cache/...` compiles without errors
+- `go test ./cache/... -count=1 -race` — 28 tests pass, no data races
+- 4 external dependencies present in go.mod
+- 5 commits with Conventional Commit format
+- SUMMARY.md created and committed
+
 ---
 
 *Phase: 02-cache-package*
