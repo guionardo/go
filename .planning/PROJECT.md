@@ -43,6 +43,10 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 <!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
 
+| Feature | Reason |
+|---------|--------|
+| Slices utility package | Go 1.26 stdlib `slices` package covers common operations — not needed |
+
 ## Context
 
 This is a personal Go monorepo of utility packages published as `github.com/guionardo/go`. The codebase follows Go standard library idioms with minimal external dependencies. Testing uses `testify` assertions with `httptest` for HTTP tests. CI enforces 95% total coverage, conventional commits, and comprehensive linting.

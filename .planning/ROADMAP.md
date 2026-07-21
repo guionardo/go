@@ -2,12 +2,7 @@
 
 ## Milestone: 1 — Core Packages
 
-### Phase 1: Slices Package
-
-**Requirements:** SLICE-01 through SLICE-10
-**Status:** Pending
-
-### Phase 2: Cache Package
+### Phase 1: Cache Package
 
 **Requirements:** CACHE-01 through CACHE-11
 **Goal:** A generic `Cache[K, V]` abstraction over multiple backends (in-memory, Redis, Memcache, Postgres, Valkey) with each provider in its own sub-package — pluggable without code changes.
