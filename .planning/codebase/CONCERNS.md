@@ -169,13 +169,11 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 ### mid package (50% threshold)
 
-**What's not tested:** The mid package has an explicitly lowered coverage threshold of 50%. The `machineid_darwin.go` file with `system_profiler` execution is not tested. The `machineid_windows.go` is also untested. The `machineid_linux.go` file has a test file but likely misses error paths.
+**What's tested:** Linux collectors (hostnamectl, dbus, etc) with fallback order, concurrent safety, and edge cases. Linux tests have build tag `linux`.
 
-**Files:** `mid/machineid_darwin.go`, `mid/machineid_windows.go`, `mid/machineid_linux.go`
+**What's new:** Added build-tagged test files for macOS (`darwin`) and Windows (`windows`) that exercise `MachineID()` on those platforms. Also added a non-platform concurrent access test.
 
-**Risk:** Platform-specific machine ID gathering is fragile and untested on macOS and Windows. A breaking change in `system_profiler` output format would go undetected.
-
-**Priority:** Medium
+**Remaining risk:** Platform-specific code cannot be tested without running on those platforms. CI currently runs on `ubuntu-latest`, `macos-latest`, and `windows-latest` — the macOS and Windows tests do run in CI but gracefully skip when the underlying command (`system_profiler`, `reg query`) is unavailable in containerized runners.
 
 ### ~~release/release.go: No Tests~~ (STALE — REMOVED)
 
@@ -212,6 +210,6 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 | ~~go-digest format mismatch~~ | ~~`release/release.go:120-122`~~ | ~~Low~~ | ✅ Verified safe |
 | ~~Reflection on config update~~ | ~~`config/provider.go:97,105`~~ | ~~Low~~ | ✅ Accepted |
 | ~~Hot-reload observability~~ | ~~`config.Provider`~~ | ~~Feature~~ | ✅ Not a bug |
-| MID package untested on macOS/Windows | `mid/machineid_darwin.go` etc. | Medium | Soon |
+| ~~MID package untested on macOS/Windows~~ | ~~`mid/machineid_darwin.go` etc.~~ | ~~Medium~~ | ✅ Platform tests added |
 
 *Concerns audit: 2026-07-21* — updated 2026-07-21 after fixes

@@ -33,6 +33,26 @@ func TestMachineID_AlwaysString(t *testing.T) {
 	assert.IsType(t, "", got, "MachineID must always return a string")
 }
 
+func TestConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	t.Run("parallel_calls_dont_crash", func(t *testing.T) {
+		t.Parallel()
+
+		done := make(chan struct{}, 10)
+		for range 10 {
+			go func() {
+				mid.MachineID()
+				done <- struct{}{}
+			}()
+		}
+
+		for range 10 {
+			<-done
+		}
+	})
+}
+
 func ExampleMachineID() {
 	id := mid.MachineID()
 	fmt.Printf("Machine ID: %s\n", id)
