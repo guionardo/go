@@ -57,15 +57,11 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 **Fix applied:** Removed the `os.Environ()` loop entirely. `GetEnv` now uses a single `os.LookupEnv` call — consistent, predictable behavior on all platforms.
 
-### Makefile: Linux-Only Dependency Installation Commands
+### ~~Makefile: Linux-Only Dependency Installation Commands~~ (FIXED)
 
-**Issue:** `Makefile` target `install-pre-commit` runs `sudo apt install -y pre-commit`, which is Debian/Ubuntu-specific. Fails on macOS and non-Debian Linux.
+**Issue was:** `install-pre-commit` used `sudo apt install` which is Debian/Ubuntu-specific.
 
-**Files:** `Makefile` (lines 21-26)
-
-**Impact:** Developers on macOS cannot use `make deps` — they must manually install pre-commit.
-
-**Fix approach:** Use OS-detection to branch installation or provide separate macOS targets.
+**Fix applied:** Added OS detection — uses `brew install` on macOS, `apt install` on Linux, and errors with install instructions otherwise.
 
 ## Known Bugs
 
@@ -75,32 +71,9 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 **Fix applied:** Header corrected to `application/vnd.github+json` — sent via `githubClient.Do(req)`.
 
-### config/provider.go: Lock Double-Fetch Race in GetConfiguration
+### ~~config/provider.go: Lock Double-Fetch Race in GetConfiguration~~ (NOT A BUG)
 
-**Issue:** The double-checked locking pattern in `GetConfiguration()` (lines 63-78) has a read-then-write lock promotion:
-
-```go
-p.lock.RLock()
-if p.loaded {
-    defer p.lock.RUnlock()
-    return p.configuration, nil
-}
-p.lock.RUnlock()
-// Window here: another goroutine could load between unlock and lock
-p.lock.Lock()
-defer p.lock.Unlock()
-if !p.loaded {
-    if err := p.loadStaticConfiguration(); err != nil {
-        ...
-    }
-}
-```
-
-Between releasing the read lock and acquiring the write lock, another goroutine could load the configuration. The inner `if !p.loaded` mitigates the re-initialization but not the race on the configuration data itself.
-
-**Files:** `config/provider.go` (lines 62-79)
-
-**Impact:** Under concurrent startup pressure, `loadStaticConfiguration()` could be invoked multiple times. The `updateConfiguration` method uses `reflect.DeepEqual` check, which prevents unnecessary writes but the configuration object could be concurrently accessed during the window.
+**Assessment:** This is safe double-checked locking in Go. The inner `if !p.loaded` under the write lock prevents double initialization. `sync.RWMutex` guarantees visibility — the write lock in `loadStaticConfiguration` synchronizes with the read lock in the fast path. Two goroutines cannot both invoke `loadStaticConfiguration`.
 
 ## Security Considerations
 
@@ -216,15 +189,11 @@ Between releasing the read lock and acquiring the write lock, another goroutine 
 
 **Note:** This concern was based on an early audit. The `release` package now has 56 tests across 4 test files covering version parsing, update checks, download, swapper, and self-update orchestration.
 
-### config/profile/profile.go: Path Traversal Only Partially Tested
+### ~~config/profile/profile.go: Path Traversal Only Partially Tested~~ (FIXED)
 
-**What's not tested:** The `getProfileFiles` path traversal protection (line 71) only tests `../` traversal, not encoded traversal (`..%2F`), symlink-based escape, or other variants.
+**What was tested:** Only `../etc` traversal was covered.
 
-**Files:** `config/profile/profile.go` (lines 64-89), `config/profile/profile_test.go` (lines 104-111)
-
-**Risk:** A crafted profile scope value could potentially read files outside the intended directory.
-
-**Priority:** Low
+**Fix applied:** Added tests for deep traversal (`../../../etc`), nested scope traversal (`valid` + `../../etc`), and scope-level traversal (`default` + `../../secret`).
 
 ---
 
@@ -244,6 +213,9 @@ Between releasing the read lock and acquiring the write lock, another goroutine 
 | ~~Duplicate GetEnv implementations~~ | ~~`config/environment/` and `shell_tools/`~~ | ~~Low~~ | ✅ Fixed |
 | ~~Recover-based error handling loses stack~~ | ~~`config/environment/environment.go:43-48`~~ | ~~Low~~ | ✅ Fixed |
 | ~~Global validator instance not extensible~~ | ~~`config/validation/validator.go:12`~~ | ~~Low~~ | ✅ Fixed |
+| ~~Makefile Linux-only deps~~ | ~~`Makefile:21-26`~~ | ~~Low~~ | ✅ Fixed |
+| ~~Path traversal tests enhanced~~ | ~~`config/profile/profile_test.go:104-111`~~ | ~~Low~~ | ✅ Fixed |
+| ~~Lock double-fetch race~~ | ~~`config/provider.go:62-79`~~ | ~~Not a bug~~ | ✅ Closed |
 | MID package untested on macOS/Windows | `mid/machineid_darwin.go` etc. | Medium | Soon |
 
 *Concerns audit: 2026-07-21* — updated 2026-07-21 after fixes

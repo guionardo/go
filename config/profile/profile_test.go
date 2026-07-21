@@ -105,9 +105,36 @@ func TestGetProfileFiles_PathTraversal(t *testing.T) {
 	t.Parallel()
 
 	tmp := t.TempDir()
-	_, _, err := getProfileFiles(tmp, "../etc", "default")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "escapes base path")
+
+	t.Run("simple_parent_traversal", func(t *testing.T) {
+		t.Parallel()
+		_, _, err := getProfileFiles(tmp, "../etc", "default")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "escapes base path")
+	})
+
+	t.Run("deep_traversal", func(t *testing.T) {
+		t.Parallel()
+		_, _, err := getProfileFiles(tmp, "../../../etc", "default")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "escapes base path")
+	})
+
+	t.Run("nested_scope_traversal", func(t *testing.T) {
+		t.Parallel()
+		_, _, err := getProfileFiles(tmp, "valid", "../../etc")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "escapes base path")
+	})
+
+
+
+	t.Run("scope_traversal", func(t *testing.T) {
+		t.Parallel()
+		_, _, err := getProfileFiles(tmp, "default", "../../secret")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "escapes base path")
+	})
 }
 
 func TestGetScopedProfileContent(t *testing.T) {

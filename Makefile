@@ -21,7 +21,14 @@ deps: gocheck install-pre-commit install-golangci install-commitlint install-gov
 
 install-pre-commit:
 	@echo  "\n🛠️  \033[30;42m INSTALLING PRE-COMMIT \033[0m"
-	@sudo apt install -y pre-commit
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install pre-commit; \
+	elif command -v apt >/dev/null 2>&1; then \
+		sudo apt install -y pre-commit; \
+	else \
+		echo "Unsupported package manager. Install pre-commit manually: https://pre-commit.com/#install"; \
+		exit 1; \
+	fi
 	@pre-commit autoupdate
 	@pre-commit install -t commit-msg -t pre-commit
 	@echo "✅  PRE-COMMIT INSTALLED"
