@@ -7,7 +7,7 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      Top-Level Go Packages (Utilities)                   │
+│                      Top-Level Go Packages (Utilities)                  │
 ├────────────┬──────────┬───────────┬──────────┬──────────┬───────────────┤
 │  config/   │  flow/   │ fraction/ │  set/    │  mid/    │  httptest_    │
 │ type-safe  │  generic │ immutable │ generic  │ cross-   │  mock/        │
@@ -25,9 +25,9 @@
          │                  │                    │
          ▼                  ▼                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        Go Standard Library                                │
-│  net/http, os, reflect, encoding/json, database/sql, regexp, sync,       │
-│  iter, log/slog, runtime/debug                                           │
+│                        Go Standard Library                              │
+│  net/http, os, reflect, encoding/json, database/sql, regexp, sync,      │
+│  iter, log/slog, runtime/debug                                          │
 └─────────────────────────────────────────────────────────────────────────┘
          │
          ▼
