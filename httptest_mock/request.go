@@ -176,33 +176,25 @@ func (r *Request) matchQueryParams(req *http.Request) bool {
 	return true
 }
 
-func headerKeys(h http.Header) []string {
-	keys := make([]string, 0, len(h))
-	for k := range h {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 // matchHeaders checks if all specified headers match the request.
 func (r *Request) matchHeaders(req *http.Request) bool {
 	for key, value := range r.Headers {
-		queryValue := req.Header.Get(key)
-		if queryValue == "" {
-			normalized := strings.ReplaceAll(strings.ToLower(key), "_", "-")
-			for k, v := range req.Header {
-				if strings.ReplaceAll(strings.ToLower(k), "_", "-") == normalized && len(v) > 0 {
-					queryValue = v[0]
-					break
-				}
+		// Go's HTTP transport does not always canonicalize header keys before
+		// sending (observed on Windows: Api-Key sent as Api_key). Iterate all
+		// headers with normalized comparison to handle cross-platform differences.
+		queryValue := ""
+		normalized := strings.ReplaceAll(strings.ToLower(key), "_", "-")
+		for k, v := range req.Header {
+			if strings.ReplaceAll(strings.ToLower(k), "_", "-") == normalized && len(v) > 0 {
+				queryValue = v[0]
+				break
 			}
 		}
 		if queryValue != value {
-			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s: want=%q got=%q (req keys: %v)",
-				noMatchEmoji, key, value, queryValue, headerKeys(req.Header)))
+			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
 			return false
 		} else {
-			r.readData[readDataHeaderPrefix+key] = req.Header.Get(key)
+			r.readData[readDataHeaderPrefix+key] = queryValue
 		}
 	}
 
