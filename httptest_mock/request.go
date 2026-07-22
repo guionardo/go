@@ -179,7 +179,17 @@ func (r *Request) matchQueryParams(req *http.Request) bool {
 // matchHeaders checks if all specified headers match the request.
 func (r *Request) matchHeaders(req *http.Request) bool {
 	for key, value := range r.Headers {
-		if queryValue := req.Header.Get(key); queryValue != value {
+		queryValue := req.Header.Get(key)
+		// Fallback: iterate all headers with case-insensitive key comparison
+		if queryValue == "" {
+			for k, v := range req.Header {
+				if len(v) > 0 && strings.EqualFold(k, key) {
+					queryValue = v[0]
+					break
+				}
+			}
+		}
+		if queryValue != value {
 			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
 			return false
 		} else {
