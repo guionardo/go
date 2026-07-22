@@ -36,6 +36,15 @@ make coverage-quick
 
 This enforces the thresholds in `.testcoverage-quick.yml`: packages ≥80%, files ≥70%, total ≥75%. Do not commit if it fails. Fix uncovered code or add tests first. (Note: cache providers tested via E2E with Docker — threshold overrides apply.)
 
+## Cross-Platform Testing
+
+The CI runs tests on Linux, macOS, and Windows. Known platform differences:
+
+- **Windows HTTP transport**: `http.DefaultClient` does not always canonicalize header keys before sending. A header set as `Api-Key` may arrive at the server as `Api_key`. Use normalization (lowercase + underscore→hyphen) instead of `req.Header.Get()` when matching headers.
+- **Windows env vars**: `os.LookupEnv` is case-insensitive on Windows — `GetEnv("PATH")` and `GetEnv("path")` return the same value.
+- **Windows file permissions**: `os.WriteFile` with 0755 mode produces 0666 on Windows. Skip permission checks when running on Windows.
+- **Parallel test isolation**: Tests modifying global state (e.g., `collectFuncs` in `mid/`) must not use `t.Parallel()` to avoid races between sub-tests.
+
 ## Code Style
 
 - Follow standard Go conventions and idioms

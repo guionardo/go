@@ -24,6 +24,7 @@ A Go library for creating HTTP mock servers in tests using declarative JSON/YAML
 - **Helper utilities**: Load mocks from files, retrieve handlers from servers, and more
 - **Builder API**: Fluent helpers to build mocks in code (`NewMock`, `FastServe`) and create custom handlers
 - **Captured request values**: Access matched `{path}` params, query params, and headers from inside custom handlers
+- **Cross-platform header matching**: Header keys are normalized for comparison (lowercase, underscores→hyphens), so `API_KEY` matches `api-key` on all platforms
 
 ## Installation
 
