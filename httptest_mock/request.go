@@ -180,21 +180,17 @@ func (r *Request) matchQueryParams(req *http.Request) bool {
 func (r *Request) matchHeaders(req *http.Request) bool {
 	for key, value := range r.Headers {
 		queryValue := req.Header.Get(key)
-		// Fallback: iterate all headers with normalized key comparison
-		// (Go canonicalizes Api_key → Api-Key, so API_KEY won't match via Get directly)
 		if queryValue == "" {
 			normalized := strings.ReplaceAll(strings.ToLower(key), "_", "-")
 			for k, v := range req.Header {
-				knorm := strings.ReplaceAll(strings.ToLower(k), "_", "-")
-				if knorm == normalized && len(v) > 0 {
+				if strings.ReplaceAll(strings.ToLower(k), "_", "-") == normalized && len(v) > 0 {
 					queryValue = v[0]
 					break
 				}
 			}
 		}
 		if queryValue != value {
-			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s: want=%q got=%q (req headers: %v)",
-				noMatchEmoji, key, value, queryValue, req.Header))
+			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
 			return false
 		} else {
 			r.readData[readDataHeaderPrefix+key] = req.Header.Get(key)

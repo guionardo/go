@@ -7,7 +7,7 @@ request:
   path_params:
     id: "123"
   headers:
-    API_KEY: "test_key"
+    Api-Key: "test_key"
   body: "TEST_BODY"
 response:
   status: 200
