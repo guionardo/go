@@ -180,10 +180,12 @@ func (r *Request) matchQueryParams(req *http.Request) bool {
 func (r *Request) matchHeaders(req *http.Request) bool {
 	for key, value := range r.Headers {
 		queryValue := req.Header.Get(key)
-		// Fallback: iterate all headers with case-insensitive key comparison
+		// Fallback: iterate all headers with normalized key comparison
+		// (canonicalization converts underscores to hyphens — e.g. API_KEY → Api-Key)
 		if queryValue == "" {
+			normalized := strings.ReplaceAll(strings.ToLower(key), "_", "-")
 			for k, v := range req.Header {
-				if len(v) > 0 && strings.EqualFold(k, key) {
+				if strings.ReplaceAll(strings.ToLower(k), "_", "-") == normalized && len(v) > 0 {
 					queryValue = v[0]
 					break
 				}
