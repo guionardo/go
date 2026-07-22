@@ -2,6 +2,7 @@ package environment_test
 
 import (
 	"log/slog"
+	"runtime"
 	"testing"
 
 	"github.com/guionardo/go/config/environment"
@@ -54,7 +55,14 @@ func TestGetEnv(t *testing.T) {
 	t.Run("exact_case_match", func(t *testing.T) {
 		t.Setenv("TESTCASE_ENV", "value")
 		assert.Equal(t, "value", environment.GetEnv("TESTCASE_ENV"))
-		assert.Empty(t, environment.GetEnv("testcase_env"))
+		// On Windows, env vars are case-insensitive so testcase_env also returns "value".
+		// On Unix, env vars are case-sensitive so testcase_env returns "".
+		got := environment.GetEnv("testcase_env")
+		if runtime.GOOS != "windows" {
+			assert.Empty(t, got)
+		} else {
+			assert.Equal(t, "value", got)
+		}
 	})
 }
 
