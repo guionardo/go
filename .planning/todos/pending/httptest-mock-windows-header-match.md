@@ -1,6 +1,6 @@
 ---
 title: "Fix httptest_mock header matching on Windows"
-status: resolved
+status: pending
 priority: high
 created: 2026-07-21
 ---
@@ -8,6 +8,9 @@ created: 2026-07-21
 **GitHub issue:** [#41](https://github.com/guionardo/go/issues/41)
 
 **Task:** `TestMockHandler_ServeHTTP` header matching failure on Windows.
+Not a race condition — locking is correct. Not t.Parallel() related.
+Debug logging added to `matchHeaders` to dump `req.Header` keys.
+Wait for next CI run to see actual received headers.
 
 **Symptoms:**
 - All `TestMockHandler_ServeHTTP` sub-tests fail on Windows CI with `❌ HEADER Api-Key != test_key`
