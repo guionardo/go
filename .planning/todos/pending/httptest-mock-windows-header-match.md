@@ -1,9 +1,11 @@
 ---
-title: "Debug httptest_mock header matching failure on Windows"
+title: "Fix httptest_mock header matching on Windows"
 status: pending
 priority: high
 created: 2026-07-21
 ---
+
+**GitHub issue:** [#41](https://github.com/guionardo/go/issues/41)
 
 **Task:** Investigate and fix `TestMockHandler_ServeHTTP` header matching failure on Windows.
 
