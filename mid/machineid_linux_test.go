@@ -98,10 +98,7 @@ func TestCollectHostnamectl(t *testing.T) {
 }
 
 func TestMachineIDFallbackOrder(t *testing.T) { //nolint: funlen
-	t.Parallel()
-
 	t.Run("stops_at_first_success", func(t *testing.T) {
-		t.Parallel()
 
 		var (
 			mu        sync.Mutex
@@ -149,8 +146,6 @@ func TestMachineIDFallbackOrder(t *testing.T) { //nolint: funlen
 	})
 
 	t.Run("all_fail_returns_empty", func(t *testing.T) {
-		t.Parallel()
-
 		allFail := func() (string, error) {
 			return "", assert.AnError
 		}
