@@ -15,6 +15,8 @@ created: 2026-07-21
 - The case-insensitive normalization fallback (underscore→hyphen) also fails to find it
 - Test passes on Linux and macOS
 
+**GitHub issue:** [#41](https://github.com/guionardo/go/issues/41)
+
 **Needs:** Debug on a Windows machine to inspect what `req.Header` actually contains when the httptest.Server handler receives the request.
 
 **Hypotheses:**
