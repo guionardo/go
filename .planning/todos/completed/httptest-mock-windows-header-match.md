@@ -1,13 +1,13 @@
 ---
 title: "Fix httptest_mock header matching on Windows"
-status: pending
+status: resolved
 priority: high
 created: 2026-07-21
 ---
 
 **GitHub issue:** [#41](https://github.com/guionardo/go/issues/41)
 
-**Task:** Investigate and fix `TestMockHandler_ServeHTTP` header matching failure on Windows.
+**Task:** `TestMockHandler_ServeHTTP` header matching failure on Windows.
 
 **Symptoms:**
 - All `TestMockHandler_ServeHTTP` sub-tests fail on Windows CI with `❌ HEADER Api-Key != test_key`

@@ -28,8 +28,6 @@ func doRequest(t *testing.T, req *http.Request) (resp *http.Response, body []byt
 	return resp, body, mockName, nil
 }
 func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
-	t.Parallel()
-
 	s, assertFunc := httptestmock.SetupServer(t,
 		httptestmock.WithRequestsFrom(path.Join("mocks", "examples")),
 		httptestmock.WithAddMockInfoToResponse(),
@@ -37,7 +35,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 	defer assertFunc(t)
 
 	t.Run("example_1_exactly_matching_should_return_200_OK", func(t *testing.T) {
-		t.Parallel()
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodPost, "/api/v1/users/123?user_id=123",
 			"TEST_BODY")
@@ -53,8 +50,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.JSONEq(t, `{"message":"Hello, world!"}`, string(respBody))
 	})
 	t.Run("example_1_query_unmatch_should_return_400_Bad_Request", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodPost, "/api/v1/users/123?user_id=456",
 			"TEST_BODY")
@@ -68,8 +63,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("example_1_path_unmatch_should_return_404", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodPost, "/api/v1/users/456?user_id=123",
 			"TEST_BODY")
@@ -83,8 +76,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("example_1_body_unmatch_should_return_404", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodPost, "/api/v1/users/123?user_id=123",
 			"DIFFERENT_BODY")
@@ -98,8 +89,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("ServeHTTP with non-matching request", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodGet, "/api/v1/customers", nil)
 		resp, _, mockName, err := doRequest(t, req) //nolint:bodyclose
@@ -110,8 +99,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("ServeHTTP with partial-matching request - should return 400 Bad Request", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodPost, "/api/v1/users/123?user_id=123",
 			"TEST_BODY")
@@ -124,8 +111,6 @@ func TestMockHandler_ServeHTTP(t *testing.T) { //nolint:funlen
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 	t.Run("example_3_partial_match_should_return_200_OK", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptestmock.CreateTestRequest(t, s,
 			http.MethodPost, "/api/v1/owners", nil)
 		req.Header.Add("Api_key", "unexpected key")
