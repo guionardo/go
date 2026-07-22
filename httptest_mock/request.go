@@ -176,6 +176,14 @@ func (r *Request) matchQueryParams(req *http.Request) bool {
 	return true
 }
 
+func headerKeys(h http.Header) []string {
+	keys := make([]string, 0, len(h))
+	for k := range h {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // matchHeaders checks if all specified headers match the request.
 func (r *Request) matchHeaders(req *http.Request) bool {
 	for key, value := range r.Headers {
@@ -190,7 +198,8 @@ func (r *Request) matchHeaders(req *http.Request) bool {
 			}
 		}
 		if queryValue != value {
-			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s != %s", noMatchEmoji, key, value))
+			r.matchLog = append(r.matchLog, fmt.Sprintf("%s HEADER %s: want=%q got=%q (req keys: %v)",
+				noMatchEmoji, key, value, queryValue, headerKeys(req.Header)))
 			return false
 		} else {
 			r.readData[readDataHeaderPrefix+key] = req.Header.Get(key)
