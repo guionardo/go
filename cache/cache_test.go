@@ -50,6 +50,13 @@ func TestCacheSentinelErrors(t *testing.T) {
 		assert.Error(t, cache.ErrClosed)
 		assert.Contains(t, cache.ErrClosed.Error(), "closed")
 	})
+
+	t.Run("err_canceled", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Error(t, cache.ErrCanceled)
+		assert.Contains(t, cache.ErrCanceled.Error(), "canceled")
+	})
 }
 
 func TestCacheOption(t *testing.T) {
