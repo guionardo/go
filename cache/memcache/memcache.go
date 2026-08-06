@@ -126,13 +126,13 @@ func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
 }
 
 // GetOrSet returns the existing value or computes, stores, and returns it.
-func (c *Cache[K, V]) GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error) {
+func (c *Cache[K, V]) GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error) {
 	value, err := c.Get(ctx, key)
 	if err == nil {
 		return value, nil
 	}
 
-	computed, err := setter()
+	computed, err := setter(ctx)
 	if err != nil {
 		var zero V
 		return zero, err
