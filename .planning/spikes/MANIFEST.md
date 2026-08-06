@@ -16,6 +16,10 @@ Requirements emerging:
 - The `shared` return is a global signal (leader sees true too) — never use it as a "I'm the follower" check
 - Error from a failing setter is shared with all waiters (verify in 003)
 - Placement must be shared code, not duplicated per provider (see 005)
+- Do (blocking) is context-blind; a canceled waiter can only abandon via DoChan + select — acceptable tradeoff for GetOrSet
+- Panicking setters fan out panics to all waiters — wrapper should recover and return error
+- singleflight does NOT cache completed results (group key deleted on completion) — TTL remains fully owned by provider
+- The singleflight fn must double-check Get before computing to avoid clobbering a concurrent direct Set
 
 ## Requirements (original quality-report)
 
