@@ -1,18 +1,39 @@
 # Spike Wrap-Up Summary
 
-**Date:** 2026-07-21
-**Spikes processed:** 1
-**Feature areas:** Quality Reporting
-**Skill output:** `.opencode/skills/spike-findings-go/`
+**Date:** 2026-08-06
+**Spikes processed:** 4
+**Feature areas:** Singleflight in Cache GetOrSet
+**Skill output:** `./.opencode/skills/spike-findings-go/`
 
 ## Processed Spikes
 | # | Name | Type | Verdict | Feature Area |
 |---|------|------|---------|--------------|
-| 001 | golangci-lint-report | standard | VALIDATED | Quality Reporting |
+| 002 | singleflight-dedup | standard | VALIDATED | Singleflight in Cache GetOrSet |
+| 003 | singleflight-failure | standard | VALIDATED | Singleflight in Cache GetOrSet |
+| 004 | singleflight-ttl | standard | VALIDATED | Singleflight in Cache GetOrSet |
+| 005 | singleflight-placement | standard | VALIDATED | Singleflight in Cache GetOrSet |
 
 ## Key Findings
 
-- `golangci-lint` v2 JSON output uses `{"Issues":[], "Report":{"Linters":[...]}}` structure — straightforward to parse
-- `govulncheck` outputs line-delimited JSON — must iterate line-by-line, not parse as single object
-- Combined report generates ~500 lines covering all metrics in ~15 seconds
-- Script is ~120 lines, easily extensible with additional data sources
+1. **Dedup is perfect.** 50 concurrent misses on one key → setter runs exactly
+   once; all callers receive the same value. Different keys run in parallel.
+2. **`shared` is a global flag.** `Group.Do` returns `c.dups > 0` at return time,
+   so the leader also reports `shared=true` when any follower waited. It can
+   never be used to identify "the leader".
+3. **`Do()` is context-blind.** A canceled waiter can only abandon its wait via
+   `DoChan` + select on its own ctx; the leader always runs to completion. No
+   abort mechanism exists from a follower's cancel.
+4. **Panics fan out.** A panicking setter is captured as `*panicError` and the
+   panic is replayed to every waiting caller. Wrappers must recover and return
+   an error.
+5. **TTL is safe.** `doCall` deletes the group key on completion, so singleflight
+   never caches completed results — the provider's own TTL fully controls
+   freshness. The only staleness window is a caller joining an in-flight
+   computation (bounded by setter duration).
+6. **Clobber guard required.** The singleflight fn must re-read the cache (Get)
+   before computing, or a slow in-flight computation overwrites a concurrent
+   fresh direct `Set`.
+7. **One shared helper, not 5 copies.** A `cache`-package helper taking the
+   provider's `Get`/`Set` closures serves all 5 providers race-free (verified
+   `go run -race` against the real `cache/mem` provider). `golang.org/x/sync`
+   v0.22.0 is already a dependency.
