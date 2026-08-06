@@ -43,3 +43,4 @@ Requirements emerging:
 | 006 | real-provider-integration | standard | Given the shared helper, when all 5 providers delegate GetOrSet, then error semantics (prefixes + valkey initErr guard) are preserved | ✓ VALIDATED | singleflight, cache, integration, error |
 | 007 | delete-vs-inflight | standard | Given Delete during an in-flight setter, when the leader finishes, then the key is not resurrected (and Forget is sufficient) | ⚠ PARTIAL | singleflight, cache, delete, forget |
 | 008 | dochan-context-aware | standard | Given a slow setter under cancel-heavy load, when the wrapper uses DoChan + select, then canceled waiters release promptly | ✓ VALIDATED | singleflight, context, DoChan, goroutines |
+| 009 | thundering-herd-benchmark | standard | Given N concurrent misses, when singleflight wraps the setter vs naive, then setter runs 1 vs N times with measurable win | ✓ VALIDATED | singleflight, cache, benchmark |
