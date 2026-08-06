@@ -59,31 +59,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SF-01 | — | Pending |
-| SF-02 | — | Pending |
-| SF-03 | — | Pending |
-| SF-04 | — | Pending |
-| SF-05 | — | Pending |
-| SF-06 | — | Pending |
-| SF-07 | — | Pending |
-| SF-08 | — | Pending |
-| SF-09 | — | Pending |
-| BATCH-01 | — | Pending |
-| BATCH-02 | — | Pending |
-| BATCH-03 | — | Pending |
-| BATCH-04 | — | Pending |
-| BATCH-05 | — | Pending |
-| BATCH-06 | — | Pending |
-| BATCH-07 | — | Pending |
-| BENCH-01 | — | Pending |
-| BENCH-02 | — | Pending |
-| BENCH-03 | — | Pending |
+| SF-01 | Phase 6 | Pending |
+| SF-02 | Phase 5 | Pending |
+| SF-03 | Phase 6 | Pending |
+| SF-04 | Phase 6 | Pending |
+| SF-05 | Phase 5 | Pending |
+| SF-06 | Phase 5 | Pending |
+| SF-07 | Phase 6 | Pending |
+| SF-08 | Phase 5 | Pending |
+| SF-09 | Phase 6 | Pending |
+| BATCH-01 | Phase 7 | Pending |
+| BATCH-02 | Phase 7 | Pending |
+| BATCH-03 | Phase 7 | Pending |
+| BATCH-04 | Phase 7 | Pending |
+| BATCH-05 | Phase 7 | Pending |
+| BATCH-06 | Phase 7 | Pending |
+| BATCH-07 | Phase 7 | Pending |
+| BENCH-01 | Phase 8 | Pending |
+| BENCH-02 | Phase 8 | Pending |
+| BENCH-03 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-06*
-*Last updated: 2026-08-06 after initial definition*
+*Last updated: 2026-08-06 after roadmap creation (v1.6 Cache Dedup, Phases 5-8)*
