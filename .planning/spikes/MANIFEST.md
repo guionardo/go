@@ -42,3 +42,4 @@ Requirements emerging:
 | 005 | singleflight-placement | standard | Given 5 similar GetOrSet impls, then one shared cache-package helper serves all providers race-free | ✓ VALIDATED | singleflight, cache, design |
 | 006 | real-provider-integration | standard | Given the shared helper, when all 5 providers delegate GetOrSet, then error semantics (prefixes + valkey initErr guard) are preserved | ✓ VALIDATED | singleflight, cache, integration, error |
 | 007 | delete-vs-inflight | standard | Given Delete during an in-flight setter, when the leader finishes, then the key is not resurrected (and Forget is sufficient) | ⚠ PARTIAL | singleflight, cache, delete, forget |
+| 008 | dochan-context-aware | standard | Given a slow setter under cancel-heavy load, when the wrapper uses DoChan + select, then canceled waiters release promptly | ✓ VALIDATED | singleflight, context, DoChan, goroutines |
