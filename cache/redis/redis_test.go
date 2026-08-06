@@ -1,6 +1,7 @@
 package redis_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -69,7 +70,7 @@ func TestRedisCache_SetGet(t *testing.T) {
 		got, err := c.GetOrSet(
 			t.Context(),
 			"redis_test_getorset",
-			func() (string, error) { return "computed", nil },
+			func(context.Context) (string, error) { return "computed", nil },
 		)
 		require.NoError(t, err)
 		assert.Equal(t, "computed", got)

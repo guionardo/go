@@ -1,6 +1,7 @@
 package mem_test
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -109,7 +110,7 @@ func TestMemCache_GetOrSet(t *testing.T) {
 		c := mem.New[string, string]()
 		_ = c.Set(t.Context(), "k", "v")
 
-		got, err := c.GetOrSet(t.Context(), "k", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "k", func(context.Context) (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)
@@ -121,7 +122,7 @@ func TestMemCache_GetOrSet(t *testing.T) {
 
 		c := mem.New[string, string]()
 
-		got, err := c.GetOrSet(t.Context(), "k", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "k", func(context.Context) (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)
@@ -134,7 +135,7 @@ func TestMemCache_GetOrSet_SetterError(t *testing.T) {
 
 	c := mem.New[string, string]()
 
-	_, err := c.GetOrSet(t.Context(), "k", func() (string, error) {
+	_, err := c.GetOrSet(t.Context(), "k", func(context.Context) (string, error) {
 		return "", assert.AnError
 	})
 	require.Error(t, err)

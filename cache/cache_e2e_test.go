@@ -3,6 +3,7 @@
 package cache_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -75,7 +76,7 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 
 			t.Run("get_or_set_exists", func(t *testing.T) {
 				_ = c.Set(ctx, "e2e_gos", "existing")
-				got, err := c.GetOrSet(ctx, "e2e_gos", func() (string, error) {
+				got, err := c.GetOrSet(ctx, "e2e_gos", func(_ context.Context) (string, error) {
 					return "computed", nil
 				})
 				if err != nil {
@@ -87,7 +88,7 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 			})
 
 			t.Run("get_or_set_computes", func(t *testing.T) {
-				got, err := c.GetOrSet(ctx, "e2e_gos_compute", func() (string, error) {
+				got, err := c.GetOrSet(ctx, "e2e_gos_compute", func(_ context.Context) (string, error) {
 					return "computed", nil
 				})
 				if err != nil {
@@ -99,7 +100,7 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 			})
 
 			t.Run("get_or_set_setter_error", func(t *testing.T) {
-				_, err := c.GetOrSet(ctx, "e2e_gos_err", func() (string, error) {
+				_, err := c.GetOrSet(ctx, "e2e_gos_err", func(_ context.Context) (string, error) {
 					return "", errors.New("setter failed")
 				})
 				if err == nil {

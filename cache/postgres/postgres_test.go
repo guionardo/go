@@ -1,6 +1,7 @@
 package postgres_test
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -80,7 +81,7 @@ func TestPostgresCache_SetGet(t *testing.T) {
 	})
 
 	t.Run("get_or_set_computes", func(t *testing.T) {
-		got, err := c.GetOrSet(t.Context(), "postgres_test_gos", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "postgres_test_gos", func(context.Context) (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)
