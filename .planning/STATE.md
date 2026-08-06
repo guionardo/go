@@ -2,9 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Cache Dedup
+current_phase: 5
+current_phase_name: Shared singleflight helper
 status: planning
-last_updated: "2026-08-06"
+stopped_at: Phase 5 context gathered
+last_updated: "2026-08-06T13:09:04.990Z"
 last_activity: 2026-08-06
+last_activity_desc: v1.6 roadmap created; 19/19 requirements mapped
 progress:
   total_phases: 4
   completed_phases: 0
@@ -42,9 +46,11 @@ Progress: [░░░░░░░░░░] 0%
 - SF-09 formally maps to Phase 6 (per-provider TTL parity only verifiable post-integration); Phase 5 covers the helper-level race core
 
 ### Pending Todos
+
 None yet.
 
 ### Blockers/Concerns
+
 None yet.
 
 ## Deferred Items
@@ -57,6 +63,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-06 — v1.6 milestone started; spikes 002-009 validated
-Stopped at: ROADMAP.md written (Phases 5-8), REQUIREMENTS.md traceability updated
-Resume file: None
+Last session: 2026-08-06T13:09:04.983Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-shared-singleflight-helper/05-CONTEXT.md
