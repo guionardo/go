@@ -8,12 +8,18 @@ description: Implementation blueprint from spike experiments. Requirements, prov
 
 Replace the deprecated goreportcard.com with a local `make quality-report` target that aggregates golangci-lint results, govulncheck vulnerabilities, test coverage, lines of code, and dependency information into a single markdown report.
 
-Spike sessions wrapped: 2026-07-21
+A second line of work explores wrapping the setter inside the `cache` package's
+`GetOrSet` with `golang.org/x/sync/singleflight` to avoid simultaneous rework when
+many callers miss the same key concurrently, applied across all 5 provider
+implementations (mem, redis, valkey, memcache, postgres).
+
+Spike sessions wrapped: 2026-07-21 (quality reporting), 2026-08-06 (singleflight)
 </context>
 
 <requirements>
 ## Requirements
 
+**Quality reporting:**
 - Report must be in markdown format
 - Must include lint results from golangci-lint
 - Must include security vulnerability scan from govulncheck
@@ -21,6 +27,16 @@ Spike sessions wrapped: 2026-07-21
 - Must include lines of code and file counts
 - Must include dependency list
 - Must be runnable via a single Makefile target
+
+**Singleflight in cache GetOrSet:**
+- `singleflight.Group` must wrap only the setter, not the whole Get/Set dance
+- The `shared` return is a global signal (leader sees true too) — never use it as an "I'm the follower" check
+- Error from a failing setter is shared with all waiters
+- Placement must be shared code, not duplicated per provider
+- Do (blocking) is context-blind; use DoChan + select only if per-caller cancel is required
+- Panicking setters fan out panics to all members — wrapper must recover and return error
+- singleflight does not cache completed results — TTL stays fully owned by the provider
+- The singleflight fn must double-check Get before computing to avoid clobbering a concurrent direct Set
 </requirements>
 
 <findings_index>
@@ -29,6 +45,7 @@ Spike sessions wrapped: 2026-07-21
 | Area | Reference | Key Finding |
 |------|-----------|-------------|
 | Quality Reporting | references/quality-reporting.md | Custom markdown script aggregating lint + security + coverage + metrics works in ~15s |
+| Singleflight in Cache GetOrSet | references/singleflight-cache.md | One shared cache-package helper dedups concurrent misses (setter runs once, race-free, TTL-safe) |
 
 ## Source Files
 
@@ -39,4 +56,8 @@ Original spike source files are preserved in `sources/` for complete reference.
 ## Processed Spikes
 
 - 001-golangci-lint-report
+- 002-singleflight-dedup
+- 003-singleflight-failure
+- 004-singleflight-ttl
+- 005-singleflight-placement
 </metadata>
