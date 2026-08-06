@@ -27,6 +27,11 @@ Patterns and stack choices established across spike sessions. New spikes follow 
 - singleflight fn must double-check Get before computing (clobber guard)
 - Panicking setter replays panics to all waiters — recover inside the wrapper
 - Blocking `Do()` is context-blind; use `DoChan` + select if per-caller cancel matters
+- Providers that prefix setter errors (redis/valkey) must wrap the helper result in
+  their thin GetOrSet; raw providers (mem/memcache/postgres) stay untouched
+- `group.Forget(key)` does NOT stop an in-flight leader — use a generation
+  tombstone re-checked before Set to prevent Delete resurrection
+- Measure thundering-herd wins with `go test -bench=. -benchmem -benchtime=2x`
 
 ## Tools & Libraries
 
