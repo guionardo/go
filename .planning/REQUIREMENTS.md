@@ -8,13 +8,13 @@
 ### Singleflight GetOrSet
 
 - [ ] **SF-01**: Concurrent GetOrSet misses on the same key run the setter exactly once, and all callers receive the same value
-- [ ] **SF-02**: The cache package exposes a shared `singleflightGetOrSet[K, V]` helper that wraps only the setter (not the fast-path Get)
+- [x] **SF-02**: The cache package exposes a shared `singleflightGetOrSet[K, V]` helper that wraps only the setter (not the fast-path Get)
 - [ ] **SF-03**: All 5 providers (mem, redis, valkey, memcache, postgres) delegate GetOrSet through the shared helper
 - [ ] **SF-04**: redis and valkey GetOrSet preserve their historical error prefixes; mem, memcache, and postgres return raw setter errors; the valkey initErr guard stays provider-side
-- [ ] **SF-05**: A panicking setter is recovered by the wrapper and returned as an error to every waiter
-- [ ] **SF-06**: A caller whose context is canceled abandons its wait promptly (DoChan + select variant) instead of blocking for the setter duration
+- [x] **SF-05**: A panicking setter is recovered by the wrapper and returned as an error to every waiter
+- [x] **SF-06**: A caller whose context is canceled abandons its wait promptly (DoChan + select variant) instead of blocking for the setter duration
 - [ ] **SF-07**: A Delete issued while a setter is in flight is not resurrected by the late Set (generation-tombstone re-check before Set)
-- [ ] **SF-08**: The helper double-checks Get inside the singleflight fn so a concurrent direct Set is not clobbered by a stale in-flight computation
+- [x] **SF-08**: The helper double-checks Get inside the singleflight fn so a concurrent direct Set is not clobbered by a stale in-flight computation
 - [ ] **SF-09**: Singleflight GetOrSet passes the race detector and keeps existing per-provider TTL semantics unchanged
 
 ### Batch Operations
@@ -60,13 +60,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SF-01 | Phase 6 | Pending |
-| SF-02 | Phase 5 | Pending |
+| SF-02 | Phase 5 | Complete |
 | SF-03 | Phase 6 | Pending |
 | SF-04 | Phase 6 | Pending |
-| SF-05 | Phase 5 | Pending |
-| SF-06 | Phase 5 | Pending |
+| SF-05 | Phase 5 | Complete |
+| SF-06 | Phase 5 | Complete |
 | SF-07 | Phase 6 | Pending |
-| SF-08 | Phase 5 | Pending |
+| SF-08 | Phase 5 | Complete |
 | SF-09 | Phase 6 | Pending |
 | BATCH-01 | Phase 7 | Pending |
 | BATCH-02 | Phase 7 | Pending |
@@ -80,6 +80,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BENCH-03 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 19 total
 - Mapped to phases: 19
 - Unmapped: 0 ✓
