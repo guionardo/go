@@ -3,6 +3,8 @@
 //
 // The Cache[K, V] interface exposes Get, Set, Delete, GetOrSet, and Close —
 // all accepting context.Context for cancellation and timeout propagation.
+// GetOrSet's setter receives a context.Context (the caller's ctx) and is
+// invoked only on a miss; concurrent misses on the same key may be deduplicated.
 //
 // Usage:
 //
@@ -30,8 +32,13 @@
 //
 // Sentinel errors (wrapped with provider prefix):
 //
-//	var ErrMiss   = errors.New("cache: key not found")
-//	var ErrClosed = errors.New("cache: cache is closed")
+//	var ErrMiss    = errors.New("cache: key not found")
+//	var ErrClosed  = errors.New("cache: cache is closed")
+//	var ErrCanceled = errors.New("cache: canceled") // wraps the waiter's ctx.Err()
+//
+// SingleflightGetOrSet[K, V] is an exported helper that dedups concurrent
+// GetOrSet misses on the same key. Providers embed it to share one
+// implementation of the miss-path setter wrap (see Phase 6).
 //
 // Consumer code imports providers at construction time only —
 // the cache.Cache interface is the only type in business logic.
