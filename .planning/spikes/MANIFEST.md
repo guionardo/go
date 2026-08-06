@@ -35,4 +35,4 @@ Requirements emerging:
 | 002 | singleflight-dedup | standard | Given N concurrent misses on the same key, when setter wrapped in singleflight, then it runs exactly once and all callers share the value | ✓ VALIDATED | singleflight, concurrency, cache, GetOrSet |
 | 003 | singleflight-failure | standard | Given a failing setter or canceled context, when wrapped in singleflight, then the error is shared to all waiters and nothing is cached | ✓ VALIDATED | singleflight, concurrency, cache, error |
 | 004 | singleflight-ttl | standard | Given per-key TTL + expiring values, when singleflight group reused across calls, then TTL is respected and stale values are not served | ✓ VALIDATED | singleflight, concurrency, cache, ttl |
-| 005 | singleflight-placement | design | Given 5 similar GetOrSet impls, when singleflight is introduced, then it lives in one shared place with no duplication | PENDING | singleflight, cache, design |
+| 005 | singleflight-placement | standard | Given 5 similar GetOrSet impls, then one shared cache-package helper serves all providers race-free | ✓ VALIDATED | singleflight, cache, design |
