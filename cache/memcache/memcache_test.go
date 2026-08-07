@@ -91,6 +91,80 @@ func TestMemcacheCache_Close(t *testing.T) {
 	})
 }
 
+func TestMemcacheCache_Batch(t *testing.T) {
+	skipIfNoMemcache(t)
+
+	t.Run("mget_returns_found", func(t *testing.T) {
+		c := memcache.New[string, string]()
+		defer c.Close()
+
+		require.NoError(t, c.Set(t.Context(), "mc_mget_a", "v1"))
+		require.NoError(t, c.Set(t.Context(), "mc_mget_b", "v2"))
+
+		result := c.MGet(t.Context(), "mc_mget_a", "mc_mget_b", "mc_mget_missing")
+		assert.Equal(t, "v1", result["mc_mget_a"])
+		assert.Equal(t, "v2", result["mc_mget_b"])
+		assert.NotContains(t, result, "mc_mget_missing")
+	})
+
+	t.Run("mget_empty_keys", func(t *testing.T) {
+		c := memcache.New[string, string]()
+		defer c.Close()
+
+		result := c.MGet(t.Context())
+		assert.Empty(t, result)
+	})
+
+	t.Run("mset_stores_all", func(t *testing.T) {
+		c := memcache.New[string, string]()
+		defer c.Close()
+
+		err := c.MSet(t.Context(), map[string]string{"mc_mset_a": "va", "mc_mset_b": "vb"})
+		require.NoError(t, err)
+
+		got, err := c.Get(t.Context(), "mc_mset_a")
+		require.NoError(t, err)
+		assert.Equal(t, "va", got)
+
+		got, err = c.Get(t.Context(), "mc_mset_b")
+		require.NoError(t, err)
+		assert.Equal(t, "vb", got)
+	})
+
+	t.Run("mdel_deletes", func(t *testing.T) {
+		c := memcache.New[string, string]()
+		defer c.Close()
+
+		require.NoError(t, c.Set(t.Context(), "mc_mdel_a", "va"))
+		require.NoError(t, c.Set(t.Context(), "mc_mdel_b", "vb"))
+
+		err := c.MDel(t.Context(), "mc_mdel_a", "mc_mdel_b")
+		require.NoError(t, err)
+
+		_, err = c.Get(t.Context(), "mc_mdel_a")
+		require.Error(t, err)
+
+		_, err = c.Get(t.Context(), "mc_mdel_b")
+		require.Error(t, err)
+	})
+
+	t.Run("mdel_idempotent", func(t *testing.T) {
+		c := memcache.New[string, string]()
+		defer c.Close()
+
+		err := c.MDel(t.Context(), "mc_mdel_nonexistent")
+		require.NoError(t, err)
+	})
+
+	t.Run("mdel_empty_keys", func(t *testing.T) {
+		c := memcache.New[string, string]()
+		defer c.Close()
+
+		err := c.MDel(t.Context())
+		require.NoError(t, err)
+	})
+}
+
 func TestMemcacheCache_WithOptions(t *testing.T) {
 	t.Parallel()
 

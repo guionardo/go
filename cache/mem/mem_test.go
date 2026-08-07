@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guionardo/go/cache"
 	"github.com/guionardo/go/cache/mem"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,7 +169,7 @@ func TestMemCache_Batch(t *testing.T) {
 	t.Run("mget_returns_only_found_keys", func(t *testing.T) {
 		t.Parallel()
 
-		c := mem.New[string, string](t.Context()).(cache.BatchCache[string, string])
+		c := mem.New[string, string](t.Context())
 		require.NoError(t, c.Set(t.Context(), "a", "1"))
 		require.NoError(t, c.Set(t.Context(), "b", "2"))
 
@@ -183,7 +182,7 @@ func TestMemCache_Batch(t *testing.T) {
 	t.Run("mget_empty_keys_returns_empty_map", func(t *testing.T) {
 		t.Parallel()
 
-		c := mem.New[string, string](t.Context()).(cache.BatchCache[string, string])
+		c := mem.New[string, string](t.Context())
 		result := c.MGet(t.Context())
 		assert.Empty(t, result)
 	})
@@ -191,7 +190,7 @@ func TestMemCache_Batch(t *testing.T) {
 	t.Run("mset_stores_all_keys", func(t *testing.T) {
 		t.Parallel()
 
-		c := mem.New[string, string](t.Context()).(cache.BatchCache[string, string])
+		c := mem.New[string, string](t.Context())
 		err := c.MSet(t.Context(), map[string]string{"a": "1", "b": "2"})
 		require.NoError(t, err)
 
@@ -207,7 +206,7 @@ func TestMemCache_Batch(t *testing.T) {
 	t.Run("mset_empty_map_does_not_error", func(t *testing.T) {
 		t.Parallel()
 
-		c := mem.New[string, string](t.Context()).(cache.BatchCache[string, string])
+		c := mem.New[string, string](t.Context())
 		err := c.MSet(t.Context(), map[string]string{})
 		require.NoError(t, err)
 	})
@@ -215,7 +214,7 @@ func TestMemCache_Batch(t *testing.T) {
 	t.Run("mdel_deletes_all_keys", func(t *testing.T) {
 		t.Parallel()
 
-		c := mem.New[string, string](t.Context()).(cache.BatchCache[string, string])
+		c := mem.New[string, string](t.Context())
 		_ = c.Set(t.Context(), "a", "1")
 		_ = c.Set(t.Context(), "b", "2")
 
@@ -231,7 +230,7 @@ func TestMemCache_Batch(t *testing.T) {
 	t.Run("mset_with_ttl_stores_keys", func(t *testing.T) {
 		t.Parallel()
 
-		c := mem.New[string, string](t.Context()).(cache.BatchCache[string, string])
+		c := mem.New[string, string](t.Context())
 		err := c.MSet(t.Context(), map[string]string{"a": "1"}, time.Minute)
 		require.NoError(t, err)
 
