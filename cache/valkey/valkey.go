@@ -23,9 +23,9 @@ type valkeyCache[K comparable, V any] struct {
 }
 
 // New creates a new Valkey cache provider with optional functional options.
-// Returns a cache.Cache sharing the in-memory singleflight GetOrSet.
+// Returns a cache.BatchCache sharing the in-memory singleflight GetOrSet.
 // Operations will error if the connection failed at construction time.
-func New[K comparable, V any](opts ...Option) cache.Cache[K, V] {
+func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -114,41 +114,88 @@ func (c *valkeyCache[K, V]) CloseFunc() error {
 	return nil
 }
 
-// MGetFunc retrieves values for multiple keys via per-key fallback.
-// TODO(07-03): Replace with valkey-go DoMulti for single round-trip.
+// MGetFunc retrieves values for multiple keys via valkey-go DoMulti.
+// Each key is a separate GET command; missing keys are silently excluded
+// from the result (D-06 best-effort). Checks initErr first.
 func (c *valkeyCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	if c.initErr != nil {
+		return nil
+	}
+
+	cmds := make([]valkey.Completed, len(keys))
+	for i, key := range keys {
+		cmds[i] = c.client.B().Get().Key(fmt.Sprint(key)).Build()
+	}
+	responses := c.client.DoMulti(ctx, cmds...)
+
 	result := make(map[K]V, len(keys))
-	for _, key := range keys {
-		v, err := c.GetFunc(ctx, key)
-		if err == nil {
-			result[key] = v
+	for i, key := range keys {
+		data, err := responses[i].ToString()
+		if errors.Is(err, valkey.Nil) {
+			continue // missing key — skip silently
 		}
+		if err != nil {
+			continue // per-key error — skip (D-06 best-effort)
+		}
+		var value V
+		if err := json.Unmarshal([]byte(data), &value); err != nil {
+			continue // deserialization error — skip
+		}
+		result[key] = value
 	}
 	return result
 }
 
-// MSetFunc stores multiple key-value pairs via per-key fallback.
-// TODO(07-03): Replace with valkey-go DoMulti for single round-trip.
+// MSetFunc stores multiple key-value pairs via valkey-go DoMulti.
+// A single TTL applies to all keys in the batch. Checks initErr first.
 func (c *valkeyCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
-	var errs []error
+	if c.initErr != nil {
+		return fmt.Errorf("cache/valkey: %w", c.initErr)
+	}
+
+	expiration := c.resolveTTL(ttl...)
+	cmds := make([]valkey.Completed, 0, len(items))
+
 	for key, value := range items {
-		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
-			errs = append(errs, err)
+		data, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("cache/valkey: %w", err) // hard failure on marshal
+		}
+		cmd := c.client.B().Set().Key(fmt.Sprint(key)).Value(string(data)).Build()
+		if expiration > 0 {
+			cmd = c.client.B().Set().Key(fmt.Sprint(key)).Value(string(data)).Px(expiration).Build()
+		}
+		cmds = append(cmds, cmd)
+	}
+
+	responses := c.client.DoMulti(ctx, cmds...)
+	for _, resp := range responses {
+		if err := resp.Error(); err != nil {
+			return fmt.Errorf("cache/valkey: %w", err)
 		}
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
-// MDelFunc removes multiple keys via per-key fallback.
-// TODO(07-03): Replace with valkey-go DoMulti for single round-trip.
+// MDelFunc removes multiple keys via valkey-go DoMulti.
+// Checks initErr first.
 func (c *valkeyCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
-	var errs []error
-	for _, key := range keys {
-		if err := c.DeleteFunc(ctx, key); err != nil {
-			errs = append(errs, err)
+	if c.initErr != nil {
+		return fmt.Errorf("cache/valkey: %w", c.initErr)
+	}
+
+	cmds := make([]valkey.Completed, len(keys))
+	for i, key := range keys {
+		cmds[i] = c.client.B().Del().Key(fmt.Sprint(key)).Build()
+	}
+
+	responses := c.client.DoMulti(ctx, cmds...)
+	for _, resp := range responses {
+		if err := resp.Error(); err != nil {
+			return fmt.Errorf("cache/valkey: %w", err)
 		}
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
 // resolveTTL resolves the effective TTL for a Set operation.
