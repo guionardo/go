@@ -1,0 +1,26 @@
+{
+  "doc_path": "docs/ARCHITECTURE.md",
+  "claims_checked": 22,
+  "claims_passed": 19,
+  "claims_failed": 3,
+  "failures": [
+    {
+      "line": 26,
+      "claim": "Component diagram: Provider[T] interface",
+      "expected": "Provider[T] is an interface type in config/provider.go",
+      "actual": "Provider[T] is a generic struct (type Provider[T any] struct), not an interface; config/provider.go declares the Logger interface separately"
+    },
+    {
+      "line": 81,
+      "claim": "Cache[K, V] interface: Get, Set, Delete, GetOrSet, Close, all context-aware",
+      "expected": "all five listed methods take a context.Context",
+      "actual": "Close() error takes no context parameter (cache/cache.go line 28); only Get, Set, Delete, GetOrSet are context-aware"
+    },
+    {
+      "line": 125,
+      "claim": "Leaf packages (fraction, set, time_tools, ...) have no internal dependencies on sibling packages",
+      "expected": "no non-test leaf package source imports github.com/guionardo/go/<sibling>",
+      "actual": "httptest_mock/request.go imports github.com/guionardo/go/flow and httptest_mock/string_parts.go imports github.com/guionardo/go/reflect_tools — httptest_mock (a documented leaf) has sibling dependencies"
+    }
+  ]
+}

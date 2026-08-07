@@ -63,7 +63,9 @@ Generic key-value cache abstraction with pluggable backend providers.
 import "github.com/guionardo/go/cache"
 ```
 
-The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Close` — all accepting `context.Context`.
+The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Close`. `Get`, `Set`, `Delete`, and `GetOrSet` accept `context.Context`; `Close` does not.
+
+All providers share a common `cache.NewConcreteCache` adapter. `GetOrSet` is deduplicated via `SingleflightGetOrSet` (concurrent misses on the same key run the setter exactly once).
 
 #### Providers
 
@@ -84,24 +86,31 @@ type Cache[K comparable, V any] interface {
     Get(ctx context.Context, key K) (V, error)
     Set(ctx context.Context, key K, value V, ttl ...time.Duration) error
     Delete(ctx context.Context, key K) error
-    GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error)
+    GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error)
     Close() error
 }
 ```
 
 #### Basic Usage
 
-Consumer code never imports a provider directly — swap backends by changing the constructor:
+Each provider is independently importable. All return `cache.Cache[K, V]`, so the calling code never depends on the concrete provider type — swap backends by changing the constructor:
 
 ```go
+import (
+    "context"
+    "github.com/guionardo/go/cache/mem"
+    // "github.com/guionardo/go/cache/redis"
+)
+
+ctx := context.Background()
+
 // In tests — zero-dependency in-memory cache
-c := mem.New[string, string]()
-c.Set(ctx, "mykey", "myvalue")
+c := mem.New[string, string](ctx)
+_ = c.Set(ctx, "mykey", "myvalue")
 
-// In production — Redis
-c := redis.New[string, string](redis.WithAddr("localhost:6379"))
+// In production — Redis (same interface, different constructor)
+// c := redis.New[string, string](redis.WithAddr("localhost:6379"))
 
-// Same interface, different backend
 v, err := c.Get(ctx, "mykey")
 ```
 
@@ -112,7 +121,7 @@ var ErrMiss   = errors.New("cache: key not found")
 var ErrClosed = errors.New("cache: cache is closed")
 ```
 
-Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
+A panicking setter yields a `*cache.Panic` (wraps the recovered value and stack trace). Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
 
 ### Package config
 
@@ -162,14 +171,23 @@ func main() {
 
 Import `github.com/guionardo/go/flow`
 
-Simplify logic flows
+Simplify logic flows with generic control flow and ordered collections.
 
 ```go
-// Default returns the second argument (valueIfZero) when the value has the default (zero)
+// Default returns the second argument (valueIfZero) when the value is zero
 func Default[T comparable](value T, valueIfZero T) T
 
 // If is a generic ternary operator
 func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T
+
+// OrderedMap — key-value map with insertion-order iteration and range slicing
+type OrderedMap[T comparable, S any] struct{}
+func NewOrderedMap[T comparable, S any]() *OrderedMap[T, S]
+
+// Slice utilities
+func SliceFirstOrDefault[T any](s []T, defaultValue T) T
+func SliceLastOrDefault[T any](s []T, defaultValue T) T
+func RemoveItem[T any](s []T, index int) []T
 ```
 
 ### Package fraction
@@ -339,3 +357,65 @@ t, err = timetools.Parse("2024-12-25")
 ## 🤝 Contributing
 
 Bugs or contributions on new features can be made in the [issues page](https://github.com/guionardo/go/issues).
+
+## Installation
+
+The module requires **Go 1.26.4 or newer**. Add a package to your `go.mod` with `go get`:
+
+```bash
+go get github.com/guionardo/go
+```
+
+All packages are independently importable from the single module, for example:
+
+```go
+import "github.com/guionardo/go/flow"
+import "github.com/guionardo/go/cache"
+import "github.com/guionardo/go/cache/mem"
+import "github.com/guionardo/go/config"
+```
+
+Because this is a library module (not a CLI), there is nothing to build or run at the top level — `go build` and `go vet` apply to the consuming project.
+
+## Quick Start
+
+1. Add the module as a dependency:
+
+   ```bash
+   go get github.com/guionardo/go
+   ```
+
+2. Import and use a package from your own code:
+
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+
+       "github.com/guionardo/go/cache/mem"
+       "github.com/guionardo/go/flow"
+   )
+
+   func main() {
+       ctx := context.Background()
+       c := mem.New[string, string](ctx) // in-memory cache with default TTL, sweep + expired-entry cleanup
+       _ = c.Set(ctx, "greeting", "hello")
+       v, _ := c.Get(ctx, "greeting")
+       fmt.Println(flow.If(len(v) > 0, v, "default"))
+   }
+   ```
+
+3. Run it:
+
+   ```bash
+   go run .
+   ```
+
+Each package is designed to be used independently — see the [Package Index](#package-index) for the
+full inventory and the per-package sections below for usage examples.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2025 Guionardo Furlan.

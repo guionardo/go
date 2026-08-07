@@ -1,10 +1,12 @@
 package postgres_test
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/guionardo/go/cache"
 	"github.com/guionardo/go/cache/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +29,7 @@ func skipIfNoPostgres(t *testing.T) string {
 	return connString
 }
 
-func newTestCache(t *testing.T, connString string) *postgres.Cache[string, string] {
+func newTestCache(t *testing.T, connString string) cache.Cache[string, string] {
 	t.Helper()
 
 	c, err := postgres.New[string, string](
@@ -80,7 +82,7 @@ func TestPostgresCache_SetGet(t *testing.T) {
 	})
 
 	t.Run("get_or_set_computes", func(t *testing.T) {
-		got, err := c.GetOrSet(t.Context(), "postgres_test_gos", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "postgres_test_gos", func(context.Context) (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)

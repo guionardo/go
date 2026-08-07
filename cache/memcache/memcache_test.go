@@ -1,6 +1,7 @@
 package memcache_test
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -61,7 +62,7 @@ func TestMemcacheCache_SetGet(t *testing.T) {
 		c := memcache.New[string, string]()
 		defer c.Close()
 
-		got, err := c.GetOrSet(t.Context(), "memcache_test_gos", func() (string, error) {
+		got, err := c.GetOrSet(t.Context(), "memcache_test_gos", func(context.Context) (string, error) {
 			return "computed", nil
 		})
 		require.NoError(t, err)

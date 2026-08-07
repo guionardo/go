@@ -41,6 +41,15 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - [ ] String utilities package (truncation, padding, join/split)
 - [ ] Retry package with backoff strategies and jitter support
 
+## Current Milestone: v1.6 Cache Dedup
+
+**Goal:** Eliminate duplicate setter work in cache misses and reduce round trips — via singleflight GetOrSet across all 5 providers, batch operations, and a benchmark suite.
+
+**Target features:**
+- Singleflight GetOrSet — shared helper wraps setter; dedups concurrent misses; DoChan variant for cancel; per-provider error glue; generation-tombstone Delete guard
+- Batch operations — MGet/MSet/MDel across all 5 providers with sensible fallbacks
+- Benchmark suite — thundering-herd + batch benchmarks
+
 ### Out of Scope
 
 <!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
@@ -51,7 +60,11 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 ## Current State
 
-**v1.5 — Self-Update** (shipped 2026-07-21)
+**v1.6 — Cache Dedup** (in progress)
+
+Improving the `cache` package performance: singleflight-wrapped `GetOrSet` to dedup concurrent misses across all 5 backends, batch operations (MGet/MSet/MDel), and a benchmark suite. Built on 9 validated spikes from 2026-08-06.
+
+**Previous: v1.5 — Self-Update** (shipped 2026-07-21)
 
 The `release` package now provides a complete self-update mechanism: version detection from build info, GitHub release checking, platform-specific asset download with SHA256 verification, atomic binary replacement via an embedded swapper (cross-platform), and automatic relaunch. All 21 library packages have proper `doc.go` documentation files. The main README was restructured with a package index table.
 
@@ -85,6 +98,8 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | Self-update via embedded swapper | Spawn → exit → swap → exec avoids file-in-use locks on Windows | ✓ Good (v1.5) |
 | hashicorp/go-version for semver | Replaces custom parser; handles prereleases, pseudo-versions, build metadata | ✓ Good (v1.5) |
 | Two-phase SHA256 verification | go-digest at download + stdlib at swap protects against corruption mid-flight | ✓ Good (v1.5) |
+| singleflight wraps only the setter | Dedups concurrent misses without locking the fast-path Get | ✓ Validated (v1.6 spikes) |
+| Shared GetOrSet helper over per-provider bodies | Eliminates 5× duplicated miss→setter→Set code | ✓ Validated (v1.6 spikes) |
 
 ## Evolution
 
@@ -104,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-21 after v1.5 milestone*
+*Last updated: 2026-08-06 after v1.6 Cache Dedup milestone started*

@@ -14,12 +14,11 @@ import (
 	"github.com/guionardo/go/cache"
 )
 
-var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
-	return slog.With(slog.String("module", "cache/postgres"))
-})
-
-// Cache implements cache.Cache[K, V] using a PostgreSQL backend.
-type Cache[K comparable, V any] struct {
+// postgresCache is the PostgreSQL-backed provider. It implements the
+// cache.cacher primitive interface (GetFunc/SetFunc/DeleteFunc/CloseFunc);
+// New wraps it in a cache.NewConcreteCache, which supplies the shared Cache
+// surface (singleflight GetOrSet dedup, Cache interface).
+type postgresCache[K comparable, V any] struct {
 	pool          *pgxpool.Pool
 	tableName     string
 	defaultTTL    time.Duration
@@ -27,10 +26,14 @@ type Cache[K comparable, V any] struct {
 	stop          chan struct{}
 }
 
+var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
+	return slog.With(slog.String("module", "cache/postgres"))
+})
+
 // New creates a new Postgres cache provider with optional functional options.
 // The constructor creates the cache table (if not exists) and starts the
 // background sweep goroutine.
-func New[K comparable, V any](opts ...Option) (*Cache[K, V], error) {
+func New[K comparable, V any](opts ...Option) (cache.Cache[K, V], error) {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -49,7 +52,7 @@ func New[K comparable, V any](opts ...Option) (*Cache[K, V], error) {
 		logger().Warn("pg_prewarm not available, skipping prewarm", "error", err)
 	}
 
-	c := &Cache[K, V]{
+	c := &postgresCache[K, V]{
 		pool:          pool,
 		tableName:     cfg.TableName,
 		defaultTTL:    cfg.DefaultTTL,
@@ -59,11 +62,11 @@ func New[K comparable, V any](opts ...Option) (*Cache[K, V], error) {
 
 	go c.sweepLoop()
 
-	return c, nil
+	return cache.NewConcreteCache(c), nil
 }
 
-// Get retrieves a value by key. Returns cache.ErrMiss if not found or expired.
-func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) {
+// GetFunc retrieves a value by key. Returns cache.ErrMiss if not found or expired.
+func (c *postgresCache[K, V]) GetFunc(ctx context.Context, key K) (V, error) {
 	query := fmt.Sprintf(
 		"SELECT value FROM %s WHERE cache_key = $1 AND (expires_at IS NULL OR expires_at > NOW())",
 		pgx.Identifier{c.tableName}.Sanitize(),
@@ -89,8 +92,8 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) {
 	return value, nil
 }
 
-// Set stores a value with optional per-key TTL.
-func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Duration) error {
+// SetFunc stores a value with optional per-key TTL.
+func (c *postgresCache[K, V]) SetFunc(ctx context.Context, key K, value V, ttl ...time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("cache/postgres: %w", err)
@@ -110,8 +113,8 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Durat
 	return nil
 }
 
-// Delete removes a key from the cache. Idempotent — deleting a missing key succeeds.
-func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
+// DeleteFunc removes a key from the cache. Idempotent — deleting a missing key succeeds.
+func (c *postgresCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 	query := fmt.Sprintf(
 		"DELETE FROM %s WHERE cache_key = $1",
 		pgx.Identifier{c.tableName}.Sanitize(),
@@ -124,30 +127,9 @@ func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
 	return nil
 }
 
-// GetOrSet returns the existing value or computes, stores, and returns it.
-func (c *Cache[K, V]) GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error) {
-	value, err := c.Get(ctx, key)
-	if err == nil {
-		return value, nil
-	}
-
-	computed, err := setter()
-	if err != nil {
-		var zero V
-		return zero, err
-	}
-
-	if err := c.Set(ctx, key, computed, ttl...); err != nil {
-		var zero V
-		return zero, err
-	}
-
-	return computed, nil
-}
-
-// Close shuts down the background sweep goroutine and closes the connection pool.
+// CloseFunc shuts down the background sweep goroutine and closes the connection pool.
 // Safe to call multiple times (idempotent).
-func (c *Cache[K, V]) Close() error {
+func (c *postgresCache[K, V]) CloseFunc() error {
 	select {
 	case <-c.stop:
 		// already closed
@@ -161,7 +143,7 @@ func (c *Cache[K, V]) Close() error {
 
 // resolveTTL converts the optional TTL to an expiration timestamp.
 // Returns nil for no expiry.
-func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) *time.Time {
+func (c *postgresCache[K, V]) resolveTTL(ttl ...time.Duration) *time.Time {
 	if len(ttl) > 0 && ttl[0] > 0 {
 		t := time.Now().Add(ttl[0])
 		return &t
@@ -172,6 +154,3 @@ func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) *time.Time {
 	}
 	return nil
 }
-
-// compile-time interface assertion
-var _ cache.Cache[string, any] = (*Cache[string, any])(nil)

@@ -1,0 +1,32 @@
+{
+  "doc_path": "docs/GETTING-STARTED.md",
+  "claims_checked": 34,
+  "claims_passed": 30,
+  "claims_failed": 4,
+  "failures": [
+    {
+      "line": 15,
+      "claim": "toolchain directive is golang.org/x/tools v0.48.0-compatible",
+      "expected": "a `toolchain` directive exists in go.mod",
+      "actual": "go.mod has no `toolchain` directive; golang.org/x/tools v0.48.0 is an independent indirect dependency. Only `tool` entries are gosec and govulncheck."
+    },
+    {
+      "line": 42,
+      "claim": "Targets such as test, lint, and coverage verify that the Go binary folder is on your PATH",
+      "expected": "test/lint/coverage targets depend on gocheck",
+      "actual": "Only `deps` and `test-e2e` depend on `gocheck`. `test`, `lint`, and `coverage` do not invoke gocheck (coverage depends on check-go-test-coverage/check-gocovmerge; lint on check_golangci)."
+    },
+    {
+      "line": 126,
+      "claim": "flow.If(v, \"default\", \"fallback\")",
+      "expected": "first arg is a bool (signature func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T)",
+      "actual": "v is a string from c.Get; passing it as the condition bool is a compile error."
+    },
+    {
+      "line": 37,
+      "claim": "golangci-lint, govulncheck, go-test-coverage, and commitlint are resolved against the module's tool/go install directives",
+      "expected": "these tools appear in go.mod tool directive",
+      "actual": "go.mod `tool (` block only contains gosec and govulncheck. golangci-lint, go-test-coverage, and commitlint are not tool directives; they are installed via Makefile go install @latest/curl."
+    }
+  ]
+}

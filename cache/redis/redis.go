@@ -11,14 +11,18 @@ import (
 	"github.com/guionardo/go/cache"
 )
 
-// Cache is a Redis-backed generic cache implementation.
-type Cache[K comparable, V any] struct {
+// redisCache is the Redis-backed provider. It implements the cache.cacher
+// primitive interface (GetFunc/SetFunc/DeleteFunc/CloseFunc); New wraps it in
+// a cache.NewConcreteCache, which supplies the shared Cache surface
+// (singleflight GetOrSet dedup, Cache interface).
+type redisCache[K comparable, V any] struct {
 	client     *redis.Client
 	defaultTTL time.Duration
 }
 
-// New creates a new Redis cache provider.
-func New[K comparable, V any](opts ...Option) *Cache[K, V] {
+// New creates a new Redis cache provider with optional functional options.
+// Returns a cache.Cache sharing the in-memory singleflight GetOrSet.
+func New[K comparable, V any](opts ...Option) cache.Cache[K, V] {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -31,14 +35,14 @@ func New[K comparable, V any](opts ...Option) *Cache[K, V] {
 		PoolSize: cfg.PoolSize,
 	})
 
-	return &Cache[K, V]{
+	return cache.NewConcreteCache(&redisCache[K, V]{
 		client:     client,
 		defaultTTL: cfg.DefaultTTL,
-	}
+	})
 }
 
-// Get retrieves a value by key. Returns cache.ErrMiss if not found.
-func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) {
+// GetFunc retrieves a value by key. Returns cache.ErrMiss if not found.
+func (c *redisCache[K, V]) GetFunc(ctx context.Context, key K) (V, error) {
 	var zero V
 
 	data, err := c.client.Get(ctx, fmt.Sprint(key)).Bytes()
@@ -57,9 +61,9 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) {
 	return value, nil
 }
 
-// Set stores a value with optional per-key TTL.
+// SetFunc stores a value with optional per-key TTL.
 // If ttl is empty, the provider-level default TTL is used.
-func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Duration) error {
+func (c *redisCache[K, V]) SetFunc(ctx context.Context, key K, value V, ttl ...time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("cache/redis: %w", err)
@@ -73,8 +77,8 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Durat
 	return nil
 }
 
-// Delete removes a key from the cache.
-func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
+// DeleteFunc removes a key from the cache.
+func (c *redisCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 	if err := c.client.Del(ctx, fmt.Sprint(key)).Err(); err != nil {
 		return fmt.Errorf("cache/redis: %w", err)
 	}
@@ -82,35 +86,14 @@ func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
 	return nil
 }
 
-// GetOrSet returns the existing value or computes, stores, and returns it.
-func (c *Cache[K, V]) GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error) {
-	var zero V
-
-	value, err := c.Get(ctx, key)
-	if err == nil {
-		return value, nil
-	}
-
-	value, err = setter()
-	if err != nil {
-		return zero, fmt.Errorf("cache/redis: %w", err)
-	}
-
-	if err := c.Set(ctx, key, value, ttl...); err != nil {
-		return zero, err
-	}
-
-	return value, nil
-}
-
-// Close cleans up the Redis connection.
-func (c *Cache[K, V]) Close() error {
+// CloseFunc cleans up the Redis connection.
+func (c *redisCache[K, V]) CloseFunc() error {
 	return c.client.Close()
 }
 
 // resolveTTL resolves the effective TTL for a Set operation.
 // Precedence: per-call TTL > provider-level default > 0 (no expiry).
-func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) time.Duration {
+func (c *redisCache[K, V]) resolveTTL(ttl ...time.Duration) time.Duration {
 	if len(ttl) > 0 && ttl[0] > 0 {
 		return ttl[0]
 	}

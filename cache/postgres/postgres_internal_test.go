@@ -13,7 +13,7 @@ func TestResolveTTL(t *testing.T) {
 	t.Run("per_key_ttl_overrides_default", func(t *testing.T) {
 		t.Parallel()
 
-		c := &Cache[string, string]{defaultTTL: 10 * time.Second}
+		c := &postgresCache[string, string]{defaultTTL: 10 * time.Second}
 		got := c.resolveTTL(30 * time.Second)
 
 		assert.NotNil(t, got)
@@ -23,7 +23,7 @@ func TestResolveTTL(t *testing.T) {
 	t.Run("zero_ttl_uses_default", func(t *testing.T) {
 		t.Parallel()
 
-		c := &Cache[string, string]{defaultTTL: 10 * time.Second}
+		c := &postgresCache[string, string]{defaultTTL: 10 * time.Second}
 		got := c.resolveTTL(0)
 
 		assert.NotNil(t, got)
@@ -33,7 +33,7 @@ func TestResolveTTL(t *testing.T) {
 	t.Run("no_ttl_uses_default", func(t *testing.T) {
 		t.Parallel()
 
-		c := &Cache[string, string]{defaultTTL: 30 * time.Second}
+		c := &postgresCache[string, string]{defaultTTL: 30 * time.Second}
 		got := c.resolveTTL()
 
 		assert.NotNil(t, got)
@@ -43,7 +43,7 @@ func TestResolveTTL(t *testing.T) {
 	t.Run("no_ttl_no_default_returns_nil", func(t *testing.T) {
 		t.Parallel()
 
-		c := &Cache[string, string]{}
+		c := &postgresCache[string, string]{}
 		got := c.resolveTTL()
 
 		assert.Nil(t, got)

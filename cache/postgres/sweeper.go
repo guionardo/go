@@ -10,7 +10,7 @@ import (
 )
 
 // sweepLoop runs periodically to delete expired cache entries.
-func (c *Cache[K, V]) sweepLoop() {
+func (c *postgresCache[K, V]) sweepLoop() {
 	ticker := time.NewTicker(c.sweepInterval)
 	defer ticker.Stop()
 
@@ -26,7 +26,7 @@ func (c *Cache[K, V]) sweepLoop() {
 
 // sweep deletes all expired entries from the cache table.
 // Sweep is best-effort maintenance — errors are logged but not returned.
-func (c *Cache[K, V]) sweep() {
+func (c *postgresCache[K, V]) sweep() {
 	query := fmt.Sprintf(
 		"DELETE FROM %s WHERE expires_at IS NOT NULL AND expires_at < NOW()",
 		pgx.Identifier{c.tableName}.Sanitize(),

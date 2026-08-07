@@ -47,7 +47,8 @@
     "security_enforcement": true,
     "security_asvs_level": 1,
     "security_block_on": "high",
-    "tdd_mode": true
+    "tdd_mode": true,
+    "_auto_chain_active": true
   },
   "ship": {
     "pr_body_sections": [

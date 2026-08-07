@@ -20,7 +20,9 @@ type Cache[K comparable, V any] interface {
 	Delete(ctx context.Context, key K) error
 
 	// GetOrSet returns the existing value or computes, stores, and returns it.
-	GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error)
+	// The setter receives a context.Context (the caller's ctx) and is invoked
+	// only on a miss. Concurrent misses on the same key may be deduplicated.
+	GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error)
 
 	// Close cleans up provider resources (connection pools, goroutines).
 	Close() error
