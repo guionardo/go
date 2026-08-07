@@ -84,7 +84,7 @@ type Cache[K comparable, V any] interface {
     Get(ctx context.Context, key K) (V, error)
     Set(ctx context.Context, key K, value V, ttl ...time.Duration) error
     Delete(ctx context.Context, key K) error
-    GetOrSet(ctx context.Context, key K, setter func() (V, error), ttl ...time.Duration) (V, error)
+    GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error)
     Close() error
 }
 ```
@@ -95,7 +95,7 @@ Consumer code never imports a provider directly — swap backends by changing th
 
 ```go
 // In tests — zero-dependency in-memory cache
-c := mem.New[string, string]()
+c := mem.New[string, string](ctx)
 c.Set(ctx, "mykey", "myvalue")
 
 // In production — Redis
@@ -339,3 +339,65 @@ t, err = timetools.Parse("2024-12-25")
 ## 🤝 Contributing
 
 Bugs or contributions on new features can be made in the [issues page](https://github.com/guionardo/go/issues).
+
+## Installation
+
+The module requires **Go 1.26.4 or newer**. Add a package to your `go.mod` with `go get`:
+
+```bash
+go get github.com/guionardo/go
+```
+
+All packages are independently importable from the single module, for example:
+
+```go
+import "github.com/guionardo/go/flow"
+import "github.com/guionardo/go/cache"
+import "github.com/guionardo/go/cache/mem"
+import "github.com/guionardo/go/config"
+```
+
+Because this is a library module (not a CLI), there is nothing to build or run at the top level — `go build` and `go vet` apply to the consuming project.
+
+## Quick Start
+
+1. Add the module as a dependency:
+
+   ```bash
+   go get github.com/guionardo/go
+   ```
+
+2. Import and use a package from your own code:
+
+   ```go
+   package main
+
+   import (
+       "context"
+       "fmt"
+
+       "github.com/guionardo/go/cache/mem"
+       "github.com/guionardo/go/flow"
+   )
+
+   func main() {
+       ctx := context.Background()
+       c := mem.New[string, string](ctx) // in-memory cache with default TTL, sweep + expired-entry cleanup
+       _ = c.Set(ctx, "greeting", "hello")
+       v, _ := c.Get(ctx, "greeting")
+       fmt.Println(flow.If(len(v) > 0, v, "default"))
+   }
+   ```
+
+3. Run it:
+
+   ```bash
+   go run .
+   ```
+
+Each package is designed to be used independently — see the [Package Index](#package-index) for the
+full inventory and the per-package sections below for usage examples.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2025 Guionardo Furlan.
