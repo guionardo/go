@@ -3,6 +3,7 @@ package memcache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -133,6 +134,43 @@ func (c *memcacheCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 // CloseFunc is a no-op for memcache — the client does not support Close.
 func (c *memcacheCache[K, V]) CloseFunc() error {
 	return nil
+}
+
+// MGetFunc retrieves values for multiple keys via per-key goroutines.
+// TODO(07-02): Replace with native GetMulti for single round-trip.
+func (c *memcacheCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	result := make(map[K]V, len(keys))
+	for _, key := range keys {
+		v, err := c.GetFunc(ctx, key)
+		if err == nil {
+			result[key] = v
+		}
+	}
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs via per-key goroutines.
+// TODO(07-02): Replace with native GetMulti for single round-trip.
+func (c *memcacheCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	var errs []error
+	for key, value := range items {
+		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// MDelFunc removes multiple keys via per-key goroutines.
+// TODO(07-02): Replace with native GetMulti for single round-trip.
+func (c *memcacheCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	var errs []error
+	for _, key := range keys {
+		if err := c.DeleteFunc(ctx, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // resolveTTL converts the optional TTL to a memcache expiration value.

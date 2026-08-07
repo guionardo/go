@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -89,6 +90,43 @@ func (c *redisCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 // CloseFunc cleans up the Redis connection.
 func (c *redisCache[K, V]) CloseFunc() error {
 	return c.client.Close()
+}
+
+// MGetFunc retrieves values for multiple keys via per-key fallback.
+// TODO(07-03): Replace with go-redis Pipeline for single round-trip.
+func (c *redisCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	result := make(map[K]V, len(keys))
+	for _, key := range keys {
+		v, err := c.GetFunc(ctx, key)
+		if err == nil {
+			result[key] = v
+		}
+	}
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs via per-key fallback.
+// TODO(07-03): Replace with go-redis Pipeline for single round-trip.
+func (c *redisCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	var errs []error
+	for key, value := range items {
+		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// MDelFunc removes multiple keys via per-key fallback.
+// TODO(07-03): Replace with go-redis Pipeline for single round-trip.
+func (c *redisCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	var errs []error
+	for _, key := range keys {
+		if err := c.DeleteFunc(ctx, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // resolveTTL resolves the effective TTL for a Set operation.

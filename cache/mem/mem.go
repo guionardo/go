@@ -81,6 +81,43 @@ func (c *memoryCache[K, V]) CloseFunc() error {
 	return nil
 }
 
+// MGetFunc retrieves values for multiple keys under a single read lock.
+func (c *memoryCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	result := make(map[K]V, len(keys))
+	for _, key := range keys {
+		if v, ok := c.store.get(key); ok {
+			result[key] = v
+		}
+	}
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs under a single write lock.
+func (c *memoryCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	expiresAt := c.resolveTTL(ttl...)
+	for key, value := range items {
+		c.store.set(key, value, expiresAt)
+	}
+	return nil
+}
+
+// MDelFunc removes multiple keys under a single write lock.
+func (c *memoryCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, key := range keys {
+		c.store.delete(key)
+	}
+	return nil
+}
+
 func (c *memoryCache[K, V]) resolveTTL(ttl ...time.Duration) *time.Time {
 	if len(ttl) > 0 {
 		if ttl[0] > 0 {

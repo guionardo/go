@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -139,6 +140,43 @@ func (c *postgresCache[K, V]) CloseFunc() error {
 
 	c.pool.Close()
 	return nil
+}
+
+// MGetFunc retrieves values for multiple keys via per-key fallback.
+// TODO(07-04): Replace with pgx SendBatch for single round-trip.
+func (c *postgresCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	result := make(map[K]V, len(keys))
+	for _, key := range keys {
+		v, err := c.GetFunc(ctx, key)
+		if err == nil {
+			result[key] = v
+		}
+	}
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs via per-key fallback.
+// TODO(07-04): Replace with pgx SendBatch for single round-trip.
+func (c *postgresCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	var errs []error
+	for key, value := range items {
+		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// MDelFunc removes multiple keys via per-key fallback.
+// TODO(07-04): Replace with pgx SendBatch for single round-trip.
+func (c *postgresCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	var errs []error
+	for _, key := range keys {
+		if err := c.DeleteFunc(ctx, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // resolveTTL converts the optional TTL to an expiration timestamp.
