@@ -23,6 +23,23 @@
 //	cache/memcache  — Memcache (gomemcache, lazy connect)
 //	cache/postgres  — PostgreSQL (pgx/v5, pgxpool, eager connect)
 //
+// The BatchCache[K, V] interface extends Cache with batch operations (all
+// providers implement it via their New constructor — cast to BatchCache to
+// access MGet/MSet/MDel):
+//
+//	bc := c.(cache.BatchCache[string, string])
+//	results := bc.MGet(ctx, "a", "b", "c")
+//
+// Batch operations (supported by all providers):
+//
+//	MGet(ctx, keys ...K) map[K]V        — retrieve multiple keys (missing keys absent from result)
+//	MSet(ctx, items map[K]V, ttl ...time.Duration) — store multiple values with optional single TTL
+//	MDel(ctx, keys ...K)                 — delete multiple keys (idempotent)
+//
+// Each provider uses an optimal strategy: mem uses a single lock acquisition,
+// redis/valkey use pipelines, memcache uses GetMulti, postgres uses SendBatch.
+// BatchCache[K,V] embeds Cache[K,V] for full backward compatibility.
+//
 // Configuration via functional options:
 //
 //	c := redis.New[string, string](
