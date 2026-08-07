@@ -89,6 +89,87 @@ func TestRedisCache_SetGet(t *testing.T) {
 	})
 }
 
+func TestRedisCache_Batch(t *testing.T) {
+	t.Parallel()
+	skipIfNoRedis(t)
+
+	t.Run("mget_returns_found", func(t *testing.T) {
+		t.Parallel()
+
+		c := redis.New[string, string]()
+		require.NoError(t, c.Set(t.Context(), "redis_mget_a", "v1"))
+		require.NoError(t, c.Set(t.Context(), "redis_mget_b", "v2"))
+
+		result := c.MGet(t.Context(), "redis_mget_a", "redis_mget_b", "redis_mget_missing")
+		assert.Equal(t, "v1", result["redis_mget_a"])
+		assert.Equal(t, "v2", result["redis_mget_b"])
+		assert.NotContains(t, result, "redis_mget_missing")
+	})
+
+	t.Run("mget_empty_keys", func(t *testing.T) {
+		t.Parallel()
+
+		c := redis.New[string, string]()
+		result := c.MGet(t.Context())
+		assert.Empty(t, result)
+	})
+
+	t.Run("mset_stores_all", func(t *testing.T) {
+		t.Parallel()
+
+		c := redis.New[string, string]()
+		err := c.MSet(t.Context(), map[string]string{
+			"redis_mset_a": "va",
+			"redis_mset_b": "vb",
+		})
+		require.NoError(t, err)
+
+		got, err := c.Get(t.Context(), "redis_mset_a")
+		require.NoError(t, err)
+		assert.Equal(t, "va", got)
+
+		got, err = c.Get(t.Context(), "redis_mset_b")
+		require.NoError(t, err)
+		assert.Equal(t, "vb", got)
+	})
+
+	t.Run("mset_with_ttl", func(t *testing.T) {
+		t.Parallel()
+
+		c := redis.New[string, string]()
+		err := c.MSet(t.Context(), map[string]string{"k": "v"}, 0)
+		require.NoError(t, err)
+
+		got, err := c.Get(t.Context(), "k")
+		require.NoError(t, err)
+		assert.Equal(t, "v", got)
+	})
+
+	t.Run("mdel_deletes", func(t *testing.T) {
+		t.Parallel()
+
+		c := redis.New[string, string]()
+		_ = c.Set(t.Context(), "redis_mdel_a", "a")
+		_ = c.Set(t.Context(), "redis_mdel_b", "b")
+
+		err := c.MDel(t.Context(), "redis_mdel_a", "redis_mdel_b")
+		require.NoError(t, err)
+
+		_, err = c.Get(t.Context(), "redis_mdel_a")
+		require.Error(t, err)
+		_, err = c.Get(t.Context(), "redis_mdel_b")
+		require.Error(t, err)
+	})
+
+	t.Run("mdel_empty_keys", func(t *testing.T) {
+		t.Parallel()
+
+		c := redis.New[string, string]()
+		err := c.MDel(t.Context())
+		require.NoError(t, err)
+	})
+}
+
 func TestRedisCache_Close(t *testing.T) {
 	t.Parallel()
 
