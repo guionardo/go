@@ -82,7 +82,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. memcache MGet uses native GetMulti; redis and valkey use pipelines for MGet/MSet/MDel; postgres batches operations in a single transaction/query batch
   4. Empty and partial key sets complete without errors, and all batch operations pass the race detector
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Core infrastructure: Cache interface, cacher interface, concreteCache delegation, fakeCacher, unit tests, doc.go
+- [ ] 07-02-PLAN.md — mem + memcache providers: single-lock batch ops, GetMulti, per-key goroutines, tests
+- [ ] 07-03-PLAN.md — redis + valkey providers: pipeline/DoMulti batch ops, integration tests
+- [ ] 07-04-PLAN.md — postgres provider + E2E tests + race detector verification
 
 ### Phase 8: Benchmark suite
 
@@ -108,5 +114,5 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 4. Self-Update | v1.5 | 3/3 | Complete | 2026-07-21 |
 | 5. Shared singleflight helper | v1.6 | 3/3 | Complete    | 2026-08-06 |
 | 6. Provider integration | v1.6 | TBD | Not started | - |
-| 7. Batch operations | v1.6 | TBD | Not started | - |
+| 7. Batch operations | v1.6 | 0/4 | Planning complete | - |
 | 8. Benchmark suite | v1.6 | TBD | Not started | - |
