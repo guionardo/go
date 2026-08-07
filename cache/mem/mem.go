@@ -16,7 +16,8 @@ type memoryCache[K comparable, V any] struct {
 }
 
 // New creates a new in-memory cache provider with optional functional options.
-func New[K comparable, V any](ctx context.Context, opts ...ConfigFunc) cache.Cache[K, V] {
+// Returns a cache.BatchCache[K,V] (embeds Cache[K,V] for backward compatibility).
+func New[K comparable, V any](ctx context.Context, opts ...ConfigFunc) cache.BatchCache[K, V] {
 	config := Config{
 		DefaultTTL:    5 * time.Minute, //nolint:mnd
 		MaxEntries:    1000,            //nolint:mnd

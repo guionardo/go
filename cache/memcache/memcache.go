@@ -29,8 +29,8 @@ type memcacheResult struct {
 }
 
 // New creates a new Memcache cache provider with optional functional options.
-// Returns a cache.Cache sharing the in-memory singleflight GetOrSet.
-func New[K comparable, V any](opts ...Option) cache.Cache[K, V] {
+// Returns a cache.BatchCache[K,V] (embeds Cache[K,V] for backward compatibility).
+func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -136,40 +136,126 @@ func (c *memcacheCache[K, V]) CloseFunc() error {
 	return nil
 }
 
-// MGetFunc retrieves values for multiple keys via per-key goroutines.
-// TODO(07-02): Replace with native GetMulti for single round-trip.
+// MGetFunc retrieves values for multiple keys using native GetMulti (D-08).
+// Missing keys are silently absent from the result map.
+// Uses original key ordering to avoid K-type ambiguity (Pitfall 1).
 func (c *memcacheCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
-	result := make(map[K]V, len(keys))
-	for _, key := range keys {
-		v, err := c.GetFunc(ctx, key)
-		if err == nil {
-			result[key] = v
-		}
+	keysStr := make([]string, len(keys))
+	for i, k := range keys {
+		keysStr[i] = fmt.Sprint(k)
 	}
-	return result
+
+	ch := make(chan struct {
+		items map[string]*memcache.Item
+		err   error
+	}, 1)
+
+	go func() {
+		items, err := c.client.GetMulti(keysStr)
+		ch <- struct {
+			items map[string]*memcache.Item
+			err   error
+		}{items, err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil
+	case r := <-ch:
+		result := make(map[K]V, len(keys))
+		for i, key := range keys {
+			item, ok := r.items[keysStr[i]]
+			if !ok {
+				continue // missing key — skip
+			}
+			var value V
+			if err := json.Unmarshal(item.Value, &value); err != nil {
+				continue // deserialization error — skip (D-06 best-effort)
+			}
+			result[key] = value
+		}
+		return result
+	}
 }
 
-// MSetFunc stores multiple key-value pairs via per-key goroutines.
-// TODO(07-02): Replace with native GetMulti for single round-trip.
+// MSetFunc stores multiple key-value pairs using per-key goroutines
+// with error accumulation via errors.Join (D-06).
 func (c *memcacheCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
-	var errs []error
+	type result struct {
+		err error
+	}
+
+	ch := make(chan result, len(items))
+	expiration := c.resolveTTL(ttl...)
+
 	for key, value := range items {
-		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
-			errs = append(errs, err)
+		go func(k K, v V) {
+			data, err := json.Marshal(v)
+			if err != nil {
+				ch <- result{fmt.Errorf("cache/memcache: %w", err)}
+				return
+			}
+			item := &memcache.Item{
+				Key:        fmt.Sprint(k),
+				Value:      data,
+				Expiration: expiration,
+			}
+			if err := c.client.Set(item); err != nil {
+				ch <- result{fmt.Errorf("cache/memcache: %w", err)}
+				return
+			}
+			ch <- result{}
+		}(key, value)
+	}
+
+	var errs []error
+	for range items {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("cache/memcache: %w", ctx.Err())
+		case r := <-ch:
+			if r.err != nil {
+				errs = append(errs, r.err)
+			}
 		}
 	}
+
 	return errors.Join(errs...)
 }
 
-// MDelFunc removes multiple keys via per-key goroutines.
-// TODO(07-02): Replace with native GetMulti for single round-trip.
+// MDelFunc removes multiple keys using per-key goroutines
+// with error accumulation via errors.Join (D-06).
+// Treats ErrCacheMiss as success (idempotent).
 func (c *memcacheCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
-	var errs []error
+	ch := make(chan error, len(keys))
+
 	for _, key := range keys {
-		if err := c.DeleteFunc(ctx, key); err != nil {
-			errs = append(errs, err)
+		go func(k K) {
+			err := c.client.Delete(fmt.Sprint(k))
+			if err == memcache.ErrCacheMiss {
+				ch <- nil // idempotent — missing key is not an error
+				return
+			}
+			if err != nil {
+				ch <- fmt.Errorf("cache/memcache: %w", err)
+				return
+			}
+			ch <- nil
+		}(key)
+	}
+
+	var errs []error
+	for range keys {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("cache/memcache: %w", ctx.Err())
+		case err := <-ch:
+			if err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
+
 	return errors.Join(errs...)
 }
 
