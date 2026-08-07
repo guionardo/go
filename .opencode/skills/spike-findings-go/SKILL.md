@@ -29,18 +29,16 @@ Spike sessions wrapped: 2026-07-21 (quality reporting), 2026-08-06 (singleflight
 - Must be runnable via a single Makefile target
 
 **Singleflight in cache GetOrSet:**
-- `singleflight.Group` must wrap only the setter, not the whole Get/Set dance
+- `singleflight.Group` wraps only the setter via `SingleflightGetOrSet.Do`; fast-path Get stays outside the group
 - The `shared` return is a global signal (leader sees true too) — never use it as an "I'm the follower" check
 - Error from a failing setter is shared with all waiters
-- Placement must be shared code, not duplicated per provider
-- Do (blocking) is context-blind; use DoChan + select only if per-caller cancel is required
-- Panicking setters fan out panics to all members — wrapper must recover and return error
+- Shared `concreteCache` adapter serves all 5 providers via the unexported `cacher` interface
+- Panicking setters produce a `*PanicError` (recovered + stack), never panic-escapes
 - singleflight does not cache completed results — TTL stays fully owned by the provider
-- The singleflight fn must double-check Get before computing to avoid clobbering a concurrent direct Set
-- Prefer DoChan + select for HTTP-facing GetOrSet so canceled waiters release immediately (validated in spike 008, ~15 ms vs ~300 ms blocking)
-- redis/valkey keep their historical error prefixes by wrapping the shared helper's error in their thin GetOrSet; mem/memcache/postgres return it raw; valkey's initErr guard stays provider-side
+- The singleflight fn double-checks Get before computing to avoid clobbering a concurrent direct Set
+- valkey's initErr guard stays provider-side (checked inside GetFunc/SetFunc/DeleteFunc)
 - group.Forget does NOT stop an in-flight leader — guard Delete-during-flight with a deletion-generation tombstone re-checked inside the Do fn before Set
-- Benchmark dedup impact with `go test -bench=. -benchmem -benchtime=2x` (validated in spike 009)
+- Benchmark dedup impact: `go test -bench=. -benchmem -benchtime=2x`
 </requirements>
 
 <findings_index>
