@@ -13,13 +13,6 @@ var (
 
 	// ErrClosed is returned when operations are attempted on a closed cache.
 	ErrClosed = errors.New("cache: cache is closed")
-
-	// ErrCanceled wraps the context error of a waiter that abandoned its wait
-	// via DoChan. It is wrapped with two %w verbs around the waiter's ctx.Err(),
-	// so both errors.Is(err, ErrCanceled) AND errors.Is(err, context.Canceled)
-	// hold (D-09/D-10). The leader path never returns ErrCanceled — a leader's
-	// own cancellation surfaces as the setter's raw context error (D-11).
-	ErrCanceled = errors.New("cache: canceled")
 )
 
 // Panic is the error returned by SingleflightGetOrSet.Do when a setter
@@ -46,6 +39,7 @@ func (p *Panic) Unwrap() error {
 	if !ok {
 		return nil
 	}
+
 	return err
 }
 
@@ -55,8 +49,9 @@ func (p *Panic) Unwrap() error {
 // changed).
 func newPanic(v any) *Panic {
 	stack := debug.Stack()
-	if line := bytes.IndexByte(stack[:], '\n'); line >= 0 {
+	if line := bytes.IndexByte(stack, '\n'); line >= 0 {
 		stack = stack[line+1:]
 	}
+
 	return &Panic{Value: v, Stack: stack}
 }

@@ -117,9 +117,8 @@ v, err := c.Get(ctx, "mykey")
 #### Sentinel Errors
 
 ```go
-var ErrMiss     = errors.New("cache: key not found")
-var ErrClosed   = errors.New("cache: cache is closed")
-var ErrCanceled = errors.New("cache: canceled") // waiter abandoned GetOrSet via DoChan
+var ErrMiss   = errors.New("cache: key not found")
+var ErrClosed = errors.New("cache: cache is closed")
 ```
 
 A panicking setter yields a `*cache.Panic` (wraps the recovered value and stack trace). Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
