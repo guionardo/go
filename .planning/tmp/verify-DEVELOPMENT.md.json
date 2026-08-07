@@ -1,0 +1,14 @@
+{
+  "doc_path": "docs/DEVELOPMENT.md",
+  "claims_checked": 35,
+  "claims_passed": 34,
+  "claims_failed": 1,
+  "failures": [
+    {
+      "line": 88,
+      "claim": "There is no `.github/` workflow or PR template in the repo",
+      "expected": "no .github/workflows/ directory",
+      "actual": ".github/workflows/ exists containing go.yml, opencode.yml, and release.yml — GitHub Actions workflows are present in the repo"
+    }
+  ]
+}

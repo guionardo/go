@@ -71,7 +71,7 @@ func (s *SingleflightGetOrSet[K, V]) Do(
 }
 
 // callSetter runs the setter with panic recovery. A recovered panic becomes a
-// *cache.Panic wrapping the value and stack (mirrors x/sync's panicError), so
+// *cache.PanicError wrapping the value and stack (mirrors x/sync's panicError), so
 // a panicking setter yields the typed error to every waiter and no panic ever
 // escapes to a caller goroutine (SF-05 / D-16 / D-17). It never re-panics.
 func (s *SingleflightGetOrSet[K, V]) callSetter(

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const computed = "computed"
+
 func TestCacheInterface(t *testing.T) {
 	t.Parallel()
 

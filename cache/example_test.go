@@ -41,7 +41,7 @@ func ExampleSingleflightGetOrSet_Do() {
 		return nil
 	}
 	setter := func(context.Context) (string, error) {
-		return "computed", nil
+		return computed, nil
 	}
 
 	sf := &cache.SingleflightGetOrSet[string, string]{}

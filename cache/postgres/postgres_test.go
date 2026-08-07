@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guionardo/go/cache"
 	"github.com/guionardo/go/cache/postgres"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,7 @@ func skipIfNoPostgres(t *testing.T) string {
 	return connString
 }
 
-func newTestCache(t *testing.T, connString string) *postgres.Cache[string, string] {
+func newTestCache(t *testing.T, connString string) cache.Cache[string, string] {
 	t.Helper()
 
 	c, err := postgres.New[string, string](

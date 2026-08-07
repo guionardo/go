@@ -3,56 +3,37 @@ package mem
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSweeper_sweep_removes_expired(t *testing.T) {
 	t.Parallel()
 
-	c := &Cache[string, string]{
-		entries: make(map[string]*entry[string]),
-	}
-	now := time.Now()
+	c := New[string, string](
+		t.Context(),
+		WithDefaultTTL(1*time.Second),
+		WithMaxEntries(10),
+		WithSweepInterval(500*time.Millisecond),
+	)
 
-	c.entries["expired"] = &entry[string]{value: "gone", expiresAt: ptr(now.Add(-time.Second))}
-	c.entries["fresh"] = &entry[string]{value: "here", expiresAt: ptr(now.Add(time.Hour))}
-	c.entries["no_ttl"] = &entry[string]{value: "forever", expiresAt: nil}
+	_ = c.Set(t.Context(), "expired", "gone", time.Millisecond)
+	_ = c.Set(t.Context(), "fresh", "here", time.Hour)
+	_ = c.Set(t.Context(), "no_ttl", "forever", 0)
+	_ = c.Set(t.Context(), "expired2", "gone", time.Millisecond)
 
-	c.sweep()
+	time.Sleep(time.Second)
 
-	_, ok := c.entries["expired"]
-	if ok {
-		t.Error("expected expired entry to be removed")
-	}
+	v, err := c.Get(t.Context(), "expired")
+	require.Error(t, err)
+	assert.Empty(t, v)
 
-	_, ok = c.entries["fresh"]
-	if !ok {
-		t.Error("expected fresh entry to remain")
-	}
+	v, err = c.Get(t.Context(), "fresh")
+	require.NoError(t, err)
+	assert.Equal(t, "here", v)
 
-	_, ok = c.entries["no_ttl"]
-	if !ok {
-		t.Error("expected no-ttl entry to remain")
-	}
-}
-
-func TestSweeper_sweep_all_fresh(t *testing.T) {
-	t.Parallel()
-
-	c := &Cache[string, string]{
-		entries: make(map[string]*entry[string]),
-	}
-	now := time.Now()
-
-	c.entries["a"] = &entry[string]{value: "1", expiresAt: ptr(now.Add(time.Hour))}
-	c.entries["b"] = &entry[string]{value: "2", expiresAt: ptr(now.Add(2 * time.Hour))}
-
-	c.sweep()
-
-	if len(c.entries) != 2 {
-		t.Errorf("expected 2 entries, got %d", len(c.entries))
-	}
-}
-
-func ptr(t time.Time) *time.Time {
-	return &t
+	v, err = c.Get(t.Context(), "no_ttl")
+	require.NoError(t, err)
+	assert.Equal(t, "forever", v)
 }

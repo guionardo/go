@@ -151,7 +151,7 @@ func TestCacheE2E_Mem(t *testing.T) {
 		{
 			name: "in_memory",
 			fn: func(t *testing.T) cache.Cache[string, string] {
-				return mem.New[string, string]()
+				return mem.New[string, string](t.Context())
 			},
 		},
 	})

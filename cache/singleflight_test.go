@@ -16,7 +16,7 @@ import (
 // TestSingleflightGetOrSet_SetterRunsOnce verifies that N concurrent misses on
 // the same key run the setter exactly once and every caller receives the same
 // value (ROADMAP success criterion 1).
-func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) {
+func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) { //nolint:funlen,unparam
 	t.Parallel()
 
 	var mu sync.Mutex
@@ -27,7 +27,7 @@ func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) {
 
 	sf := &cache.SingleflightGetOrSet[string, string]{}
 
-	get := func(ctx context.Context, k string) (string, error) {
+	get := func(_ context.Context, k string) (string, error) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -37,7 +37,7 @@ func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) {
 
 		return "", cache.ErrMiss
 	}
-	set := func(ctx context.Context, k, v string, _ ...time.Duration) error {
+	set := func(_ context.Context, k, v string, _ ...time.Duration) error {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -45,11 +45,11 @@ func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) {
 
 		return nil
 	}
-	setter := func(context.Context) (string, error) {
+	setter := func(context.Context) (string, error) { //nolint:unparam //nolint:unparam
 		setterRuns.Add(1)
 		time.Sleep(3 * time.Millisecond)
 
-		return "computed", nil
+		return computed, nil
 	}
 
 	const callers = 50
@@ -77,7 +77,7 @@ func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) {
 	assert.Equal(t, int64(1), setterRuns.Load(), "setter must run exactly once")
 
 	for i, r := range results {
-		assert.Equal(t, "computed", r, "caller %d must receive the computed value", i)
+		assert.Equal(t, computed, r, "caller %d must receive the computed value", i)
 	}
 
 	// Second phase: the value is now cached; Do must return it WITHOUT
@@ -87,12 +87,12 @@ func TestSingleflightGetOrSet_SetterRunsOnce(t *testing.T) {
 		panic("setter must not run for a cached key")
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "computed", v)
+	assert.Equal(t, computed, v)
 	assert.Equal(t, int64(1), setterRuns.Load(), "cached read must not re-run the setter")
 }
 
 // TestSingleflightGetOrSet_PanicRecovery verifies that a panicking setter
-// yields a *cache.Panic to every waiter and no panic escapes the Do call
+// yields a *cache.PanicError to every waiter and no panic escapes the Do call
 // (SF-05 / D-16 / D-17).
 func TestSingleflightGetOrSet_PanicRecovery(t *testing.T) {
 	t.Parallel()
@@ -103,7 +103,7 @@ func TestSingleflightGetOrSet_PanicRecovery(t *testing.T) {
 		sf := &cache.SingleflightGetOrSet[string, string]{}
 		get := func(context.Context, string) (string, error) { return "", cache.ErrMiss }
 		set := func(context.Context, string, string, ...time.Duration) error { return nil }
-		setter := func(context.Context) (string, error) {
+		setter := func(context.Context) (string, error) { //nolint:unparam
 			panic("boom")
 		}
 
@@ -125,8 +125,8 @@ func TestSingleflightGetOrSet_PanicRecovery(t *testing.T) {
 		wg.Wait()
 
 		for i, err := range errs {
-			var p *cache.Panic
-			require.ErrorAs(t, err, &p, "waiter %d must receive a *cache.Panic", i)
+			var p *cache.PanicError
+			require.ErrorAs(t, err, &p, "waiter %d must receive a *cache.PanicError", i)
 			assert.Contains(t, p.Error(), "boom", "waiter %d: Error() must contain the panic value", i)
 			assert.NotEmpty(t, p.Stack, "waiter %d: Stack must be captured", i)
 		}
@@ -139,13 +139,13 @@ func TestSingleflightGetOrSet_PanicRecovery(t *testing.T) {
 		sf := &cache.SingleflightGetOrSet[string, string]{}
 		get := func(context.Context, string) (string, error) { return "", cache.ErrMiss }
 		set := func(context.Context, string, string, ...time.Duration) error { return nil }
-		setter := func(context.Context) (string, error) {
+		setter := func(context.Context) (string, error) { //nolint:unparam
 			panic(sentinel)
 		}
 
 		_, err := sf.Do(t.Context(), "k", get, set, setter)
 
-		var p *cache.Panic
+		var p *cache.PanicError
 		require.ErrorAs(t, err, &p)
 		assert.ErrorIs(t, err, sentinel, "errors.Is must traverse Panic.Unwrap()")
 	})
@@ -154,7 +154,7 @@ func TestSingleflightGetOrSet_PanicRecovery(t *testing.T) {
 // TestSingleflightGetOrSet_ZeroValueSetter verifies that a setter returning
 // the zero value with nil error stores and returns it; deduplicated waiters
 // receive the identical value.
-func TestSingleflightGetOrSet_ZeroValueSetter(t *testing.T) {
+func TestSingleflightGetOrSet_ZeroValueSetter(t *testing.T) { //nolint:funlen,unparam
 	t.Parallel()
 
 	var mu sync.Mutex
@@ -165,7 +165,7 @@ func TestSingleflightGetOrSet_ZeroValueSetter(t *testing.T) {
 
 	sf := &cache.SingleflightGetOrSet[string, string]{}
 
-	get := func(ctx context.Context, k string) (string, error) {
+	get := func(_ context.Context, k string) (string, error) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -175,7 +175,7 @@ func TestSingleflightGetOrSet_ZeroValueSetter(t *testing.T) {
 
 		return "", cache.ErrMiss
 	}
-	set := func(ctx context.Context, k, v string, _ ...time.Duration) error {
+	set := func(_ context.Context, k, v string, _ ...time.Duration) error {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -183,7 +183,7 @@ func TestSingleflightGetOrSet_ZeroValueSetter(t *testing.T) {
 
 		return nil
 	}
-	setter := func(context.Context) (string, error) {
+	setter := func(context.Context) (string, error) { //nolint:unparam
 		setterRuns.Add(1)
 		return "", nil
 	}
@@ -226,7 +226,7 @@ func TestSingleflightGetOrSet_ZeroValueSetter(t *testing.T) {
 // is never clobbered by a stale in-flight computation: the double-check Get
 // inside the singleflight fn picks up the fresh value and the setter never
 // runs (SF-08 / T-05-02).
-func TestSingleflightGetOrSet_ClobberGuard(t *testing.T) {
+func TestSingleflightGetOrSet_ClobberGuard(t *testing.T) { //nolint:funlen,unparam
 	t.Parallel()
 
 	var mu sync.Mutex
@@ -242,7 +242,7 @@ func TestSingleflightGetOrSet_ClobberGuard(t *testing.T) {
 
 	sf := &cache.SingleflightGetOrSet[string, string]{}
 
-	get := func(ctx context.Context, k string) (string, error) {
+	get := func(_ context.Context, k string) (string, error) {
 		// The first (fast-path) invocation blocks until the direct Set lands,
 		// then artificially misses so Do enters the singleflight group; the
 		// double-check Get inside the fn is what must find "fresh".
@@ -260,7 +260,7 @@ func TestSingleflightGetOrSet_ClobberGuard(t *testing.T) {
 
 		return "", cache.ErrMiss
 	}
-	set := func(ctx context.Context, k, v string, _ ...time.Duration) error {
+	set := func(_ context.Context, k, v string, _ ...time.Duration) error {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -268,7 +268,7 @@ func TestSingleflightGetOrSet_ClobberGuard(t *testing.T) {
 
 		return nil
 	}
-	setter := func(context.Context) (string, error) {
+	setter := func(context.Context) (string, error) { //nolint:unparam
 		setterRuns.Add(1)
 		return "stale", nil
 	}
@@ -302,7 +302,7 @@ func TestSingleflightGetOrSet_ClobberGuard(t *testing.T) {
 // TestSingleflightGetOrSet_TTLPassthrough verifies that the leader's ttl is
 // passed verbatim to the set closure (D-18) and that the leader's ttl wins
 // when concurrent callers pass different TTLs (D-19).
-func TestSingleflightGetOrSet_TTLPassthrough(t *testing.T) {
+func TestSingleflightGetOrSet_TTLPassthrough(t *testing.T) { //nolint:funlen,unparam
 	t.Parallel()
 
 	t.Run("single_leader_ttl", func(t *testing.T) {
@@ -323,7 +323,7 @@ func TestSingleflightGetOrSet_TTLPassthrough(t *testing.T) {
 
 			return nil
 		}
-		setter := func(context.Context) (string, error) { return "computed", nil }
+		setter := func(context.Context) (string, error) { return computed, nil }
 
 		_, err := sf.Do(t.Context(), "k", get, set, setter, 5*time.Second)
 		require.NoError(t, err)
@@ -346,7 +346,7 @@ func TestSingleflightGetOrSet_TTLPassthrough(t *testing.T) {
 		releaseSetter := make(chan struct{})
 		sf := &cache.SingleflightGetOrSet[string, string]{}
 
-		get := func(ctx context.Context, k string) (string, error) {
+		get := func(_ context.Context, k string) (string, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -366,11 +366,11 @@ func TestSingleflightGetOrSet_TTLPassthrough(t *testing.T) {
 
 			return nil
 		}
-		setter := func(context.Context) (string, error) {
+		setter := func(context.Context) (string, error) { //nolint:unparam
 			close(setterStarted)
 			<-releaseSetter
 
-			return "computed", nil
+			return computed, nil
 		}
 
 		leaderResult := make(chan error, 1)
@@ -434,6 +434,6 @@ func TestSingleflightGetOrSet_LeaderCancel(t *testing.T) {
 
 	err := <-result
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.Canceled)
-	assert.Equal(t, ctx.Err(), err, "Do must return the raw context error")
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, ctx.Err(), err, "Do must return the raw context error")
 }

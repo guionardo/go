@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
+
 	"github.com/guionardo/go/cache"
 )
 
-// Cache implements cache.Cache[K, V] using a Memcache backend.
-type Cache[K comparable, V any] struct {
+// memcacheCache is the Memcache-backed provider. It implements the
+// cache.cacher primitive interface (GetFunc/SetFunc/DeleteFunc/CloseFunc);
+// New wraps it in a cache.NewConcreteCache, which supplies the shared Cache
+// surface (singleflight GetOrSet dedup, Cache interface).
+type memcacheCache[K comparable, V any] struct {
 	client     *memcache.Client
 	defaultTTL time.Duration
 }
@@ -24,7 +28,8 @@ type memcacheResult struct {
 }
 
 // New creates a new Memcache cache provider with optional functional options.
-func New[K comparable, V any](opts ...Option) *Cache[K, V] {
+// Returns a cache.Cache sharing the in-memory singleflight GetOrSet.
+func New[K comparable, V any](opts ...Option) cache.Cache[K, V] {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -34,14 +39,14 @@ func New[K comparable, V any](opts ...Option) *Cache[K, V] {
 	mc.Timeout = cfg.Timeout
 	mc.MaxIdleConns = cfg.MaxIdleConns
 
-	return &Cache[K, V]{
+	return cache.NewConcreteCache(&memcacheCache[K, V]{
 		client:     mc,
 		defaultTTL: cfg.DefaultTTL,
-	}
+	})
 }
 
-// Get retrieves a value by key. Returns cache.ErrMiss if not found.
-func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) {
+// GetFunc retrieves a value by key. Returns cache.ErrMiss if not found.
+func (c *memcacheCache[K, V]) GetFunc(ctx context.Context, key K) (V, error) {
 	keyStr := fmt.Sprint(key)
 	ch := make(chan memcacheResult, 1)
 
@@ -74,8 +79,8 @@ func (c *Cache[K, V]) Get(ctx context.Context, key K) (V, error) {
 	}
 }
 
-// Set stores a value with optional per-key TTL.
-func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Duration) error {
+// SetFunc stores a value with optional per-key TTL.
+func (c *memcacheCache[K, V]) SetFunc(ctx context.Context, key K, value V, ttl ...time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("cache/memcache: %w", err)
@@ -104,8 +109,8 @@ func (c *Cache[K, V]) Set(ctx context.Context, key K, value V, ttl ...time.Durat
 	}
 }
 
-// Delete removes a key from the cache. Idempotent — deleting a missing key is not an error.
-func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
+// DeleteFunc removes a key from the cache. Idempotent — deleting a missing key is not an error.
+func (c *memcacheCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 	ch := make(chan error, 1)
 	go func() {
 		ch <- c.client.Delete(fmt.Sprint(key))
@@ -125,35 +130,14 @@ func (c *Cache[K, V]) Delete(ctx context.Context, key K) error {
 	}
 }
 
-// GetOrSet returns the existing value or computes, stores, and returns it.
-func (c *Cache[K, V]) GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error) {
-	value, err := c.Get(ctx, key)
-	if err == nil {
-		return value, nil
-	}
-
-	computed, err := setter(ctx)
-	if err != nil {
-		var zero V
-		return zero, err
-	}
-
-	if err := c.Set(ctx, key, computed, ttl...); err != nil {
-		var zero V
-		return zero, err
-	}
-
-	return computed, nil
-}
-
-// Close is a no-op for memcache — the client does not support Close.
-func (c *Cache[K, V]) Close() error {
+// CloseFunc is a no-op for memcache — the client does not support Close.
+func (c *memcacheCache[K, V]) CloseFunc() error {
 	return nil
 }
 
 // resolveTTL converts the optional TTL to a memcache expiration value.
 // Returns 0 for no expiry (memcache protocol: 0 means no expiry).
-func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) int32 {
+func (c *memcacheCache[K, V]) resolveTTL(ttl ...time.Duration) int32 {
 	var d time.Duration
 	switch {
 	case len(ttl) > 0 && ttl[0] > 0:
@@ -173,6 +157,3 @@ func (c *Cache[K, V]) resolveTTL(ttl ...time.Duration) int32 {
 	}
 	return int32(seconds)
 }
-
-// compile-time interface assertion
-var _ cache.Cache[string, any] = (*Cache[string, any])(nil)
