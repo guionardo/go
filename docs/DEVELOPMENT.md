@@ -85,7 +85,7 @@ The default branch is `main`. Work on a dedicated branch for each change set, an
 
 ## PR process
 
-CI runs on GitHub Actions via the workflows in `.github/workflows/`: `go.yml` runs cross-platform tests (ubuntu/macos/windows) plus the coverage check, `opencode.yml` runs agent checks, and `release.yml` publishes releases. Linting is not part of the CI workflows — it is enforced locally via `make lint` and the pre-commit hooks. This runs alongside `CONTRIBUTING.md` and project conventions:
+CI runs on GitHub Actions via the workflows in `.github/workflows/`: `go.yml` runs cross-platform tests (ubuntu/macos/windows) plus the coverage check, `opencode.yml` triggers an opencode agent on issue/PR comments containing `/oc` or `/opencode`, and `release.yml` publishes releases from version tags. Linting is not part of the CI workflows — it is enforced locally via `make lint` and the pre-commit hooks. This runs alongside `CONTRIBUTING.md` and project conventions:
 
 1. Run `make test` and `make lint` and confirm both pass before submitting.
 2. Run `make coverage-quick` and confirm it passes; it enforces the thresholds above. Fix uncovered code or add tests if it fails (cache providers are exempt — they need Docker E2E coverage, enforced separately by `make coverage`).

@@ -81,7 +81,7 @@ Because this is a library rather than a running service, "data flow" is describe
 | `Cache[K, V]` interface | `cache/cache.go` | Generic key-value cache contract: `Get`, `Set`, `Delete`, `GetOrSet` are context-aware; `Close` takes no context. |
 | `SingleflightGetOrSet[K, V]` | `cache/singleflight.go` | Deduplicates concurrent `GetOrSet` misses on the same key; provides cancel-aware `DoChan`. |
 | `NewConcreteCache` / `cacher` | `cache/concrete_cache.go` | Bridges the public `Cache` interface to provider-specific `GetFunc/SetFunc/DeleteFunc/CloseFunc`. |
-| `Panic` error type | `cache/errors.go` | Wrapay recovered setter panics (mirrors `x/sync` singleflight's `panicError`); `Unwrap` traverses the recovered error. |
+| `Panic` error type | `cache/errors.go` | Wraps recovered setter panics (mirrors `x/sync` singleflight's `panicError`); `Unwrap` traverses the recovered error. |
 | `Provider[T]` | `config/provider.go` | Generic typed configuration provider; thread-safe `GetConfiguration`/`UpdateConfiguration` backed by YAML profiles + env + validation. |
 | `Logger` interface | `config/provider.go` | Logging seam (implemented by `log/slog`, `testing.T`, or custom) used for configuration events. |
 | `UpdateResult`, `UpdateState` | `release/self_update.go` | Result struct + state enum describing the entry of a self-update attempt. |
