@@ -29,7 +29,7 @@ func skipIfNoPostgres(t *testing.T) string {
 	return connString
 }
 
-func newTestCache(t *testing.T, connString string) cache.Cache[string, string] {
+func newTestCache(t *testing.T, connString string) cache.BatchCache[string, string] {
 	t.Helper()
 
 	c, err := postgres.New[string, string](
@@ -123,6 +123,64 @@ func TestPostgresCache_Close(t *testing.T) {
 
 		_ = c.Close()
 		err = c.Close()
+		require.NoError(t, err)
+	})
+}
+
+func TestPostgresCache_Batch(t *testing.T) {
+	connString := skipIfNoPostgres(t)
+	c := newTestCache(t, connString)
+
+	t.Run("mget_returns_found", func(t *testing.T) {
+		// Ensure keys exist
+		require.NoError(t, c.Set(t.Context(), "pg_mget_a", "v1"))
+		require.NoError(t, c.Set(t.Context(), "pg_mget_b", "v2"))
+
+		result := c.MGet(t.Context(), "pg_mget_a", "pg_mget_b", "missing")
+		assert.Equal(t, "v1", result["pg_mget_a"])
+		assert.Equal(t, "v2", result["pg_mget_b"])
+		assert.NotContains(t, result, "missing")
+	})
+
+	t.Run("mget_empty_keys", func(t *testing.T) {
+		result := c.MGet(t.Context())
+		assert.Empty(t, result)
+	})
+
+	t.Run("mset_stores_all", func(t *testing.T) {
+		err := c.MSet(t.Context(), map[string]string{"pg_mset_a": "va", "pg_mset_b": "vb"})
+		require.NoError(t, err)
+
+		got, err := c.Get(t.Context(), "pg_mset_a")
+		require.NoError(t, err)
+		assert.Equal(t, "va", got)
+
+		got, err = c.Get(t.Context(), "pg_mset_b")
+		require.NoError(t, err)
+		assert.Equal(t, "vb", got)
+	})
+
+	t.Run("mset_empty_map", func(t *testing.T) {
+		err := c.MSet(t.Context(), map[string]string{})
+		require.NoError(t, err)
+	})
+
+	t.Run("mdel_deletes", func(t *testing.T) {
+		_ = c.Set(t.Context(), "pg_mdel_a", "val_a")
+		_ = c.Set(t.Context(), "pg_mdel_b", "val_b")
+
+		err := c.MDel(t.Context(), "pg_mdel_a", "pg_mdel_b")
+		require.NoError(t, err)
+
+		_, err = c.Get(t.Context(), "pg_mdel_a")
+		require.ErrorIs(t, err, cache.ErrMiss)
+
+		_, err = c.Get(t.Context(), "pg_mdel_b")
+		require.ErrorIs(t, err, cache.ErrMiss)
+	})
+
+	t.Run("mdel_empty_keys", func(t *testing.T) {
+		err := c.MDel(t.Context())
 		require.NoError(t, err)
 	})
 }
