@@ -372,4 +372,72 @@ func BenchmarkBatch(b *testing.B) {
 			})
 		}
 	})
+
+	b.Run("MSet", func(b *testing.B) {
+		for _, n := range batchSizes {
+			n := n
+			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					items := make(map[string]string, n)
+					for j := 0; j < n; j++ {
+						items[fmt.Sprintf("mset_native_%d_%d_%d", n, i, j)] = "v"
+					}
+					if err := c.MSet(b.Context(), items); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					items := make(map[string]string, n)
+					for j := 0; j < n; j++ {
+						items[fmt.Sprintf("mset_pk_%d_%d_%d", n, i, j)] = "v"
+					}
+					for k, v := range items {
+						if err := c.Set(b.Context(), k, v); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
+	})
+
+	b.Run("MDel", func(b *testing.B) {
+		for _, n := range batchSizes {
+			n := n
+			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					keys := make([]string, n)
+					for j := 0; j < n; j++ {
+						key := fmt.Sprintf("mdel_native_%d_%d_%d", n, i, j)
+						if err := c.Set(b.Context(), key, "v"); err != nil {
+							b.Fatal(err)
+						}
+						keys[j] = key
+					}
+					if err := c.MDel(b.Context(), keys...); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					keys := make([]string, n)
+					for j := 0; j < n; j++ {
+						key := fmt.Sprintf("mdel_pk_%d_%d_%d", n, i, j)
+						if err := c.Set(b.Context(), key, "v"); err != nil {
+							b.Fatal(err)
+						}
+						keys[j] = key
+					}
+					for _, key := range keys {
+						if err := c.Delete(b.Context(), key); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
+	})
 }
