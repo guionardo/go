@@ -24,8 +24,8 @@
 - [ ] **BATCH-03**: mem provider implements batch ops by iterating the underlying store with a single lock acquisition
 - [ ] **BATCH-04**: memcache provider uses native `GetMulti` for MGet
 - [ ] **BATCH-05**: redis and valkey providers use pipelines for MGet/MSet/MDel
-- [ ] **BATCH-06**: postgres provider batches operations in a single transaction/query batch
-- [ ] **BATCH-07**: All batch operations handle empty and partial key sets without errors, and pass the race detector
+- [x] **BATCH-06**: postgres provider batches operations in a single transaction/query batch
+- [x] **BATCH-07**: All batch operations handle empty and partial key sets without errors, and pass the race detector
 
 ### Benchmark Suite
 
@@ -73,8 +73,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BATCH-03 | Phase 7 | Pending |
 | BATCH-04 | Phase 7 | Pending |
 | BATCH-05 | Phase 7 | Pending |
-| BATCH-06 | Phase 7 | Pending |
-| BATCH-07 | Phase 7 | Pending |
+| BATCH-06 | Phase 7 | Complete |
+| BATCH-07 | Phase 7 | Complete |
 | BENCH-01 | Phase 8 | Pending |
 | BENCH-02 | Phase 8 | Pending |
 | BENCH-03 | Phase 8 | Pending |
