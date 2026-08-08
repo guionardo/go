@@ -3,15 +3,17 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Cache Dedup
 current_phase: 9
-status: active
-stopped_at: Phase 9 Plan 01 complete
-last_updated: "2026-08-08T11:17:41.342Z"
+status: Awaiting next milestone
+stopped_at: Phase 9 Plan 01 complete — all cleanup items resolved
+last_updated: "2026-08-08T11:19:42.326Z"
+last_activity: 2026-08-08
+last_activity_desc: Milestone v1.6 completed and archived
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_phases: 5
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 11
+  percent: 80
 current_phase_name: Post-v1.6 cleanup
 ---
 
@@ -92,3 +94,14 @@ current_phase_name: Post-v1.6 cleanup
 - [Phase 9 P01 D-04]: Config HTTP endpoint uses net/http stdlib — no new dependencies
 - [Phase 9 P01 D-05]: ServeMux routing groups mocks by method+path for efficiency, rebuilds on AddMocks for dynamic registration
 - [Phase 9 P01 D-06]: Header keys normalized to lowercase with underscore→hyphen before comparison for cross-platform compatibility
+
+## Current Position
+
+Phase: Milestone v1.6 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-08 — Milestone v1.6 completed and archived
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
