@@ -352,6 +352,94 @@ func benchmarkMGetPerKey(b *testing.B, c cache.BatchCache[string, string], n int
 	}
 }
 
+// runBatchBenchmarks runs the full MGet/MSet/MDel benchmark suite on a given
+// provider. Extracted as a shared helper so both the mem subtests and the
+// Docker-backed provider subtests reuse the same measurement structure.
+func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name string) {
+	batchSizes := []int{1, 10, 100, 1000}
+
+	b.Run("MGet", func(b *testing.B) {
+		for _, n := range batchSizes {
+			n := n
+			keys := prePopulateKeys(b, c, n, fmt.Sprintf("%s_mget_%d", name, n))
+			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				benchmarkMGetNative(b, c, n, keys)
+			})
+			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				benchmarkMGetPerKey(b, c, n, keys)
+			})
+		}
+	})
+
+	b.Run("MSet", func(b *testing.B) {
+		for _, n := range batchSizes {
+			n := n
+			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					items := make(map[string]string, n)
+					for j := 0; j < n; j++ {
+						items[fmt.Sprintf("%s_mset_native_%d_%d_%d", name, n, i, j)] = "v"
+					}
+					if err := c.MSet(b.Context(), items); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					items := make(map[string]string, n)
+					for j := 0; j < n; j++ {
+						items[fmt.Sprintf("%s_mset_pk_%d_%d_%d", name, n, i, j)] = "v"
+					}
+					for k, v := range items {
+						if err := c.Set(b.Context(), k, v); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
+	})
+
+	b.Run("MDel", func(b *testing.B) {
+		for _, n := range batchSizes {
+			n := n
+			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					keys := make([]string, n)
+					for j := 0; j < n; j++ {
+						key := fmt.Sprintf("%s_mdel_native_%d_%d_%d", name, n, i, j)
+						if err := c.Set(b.Context(), key, "v"); err != nil {
+							b.Fatal(err)
+						}
+						keys[j] = key
+					}
+					if err := c.MDel(b.Context(), keys...); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					keys := make([]string, n)
+					for j := 0; j < n; j++ {
+						key := fmt.Sprintf("%s_mdel_pk_%d_%d_%d", name, n, i, j)
+						if err := c.Set(b.Context(), key, "v"); err != nil {
+							b.Fatal(err)
+						}
+						keys[j] = key
+					}
+					for _, key := range keys {
+						if err := c.Delete(b.Context(), key); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
+	})
+}
+
 // BenchmarkBatch quantifies the performance win of native batch operations
 // (MGet/MSet/MDel) against per-key sequential fallback across multiple batch
 // sizes. Uses the mem provider (zero-dependency).
@@ -440,4 +528,155 @@ func BenchmarkBatch(b *testing.B) {
 			})
 		}
 	})
+
+	// ---- Docker-backed provider batch subtests (gated by skipIfNoDocker) ----
+
+	type dockerProvider struct {
+		name  string
+		setup func(b *testing.B) cache.BatchCache[string, string]
+	}
+
+	providers := []dockerProvider{
+		{
+			"redis", func(b *testing.B) cache.BatchCache[string, string] {
+				skipIfNoDocker(b, "redis batch benchmark requires Docker")
+				ctx := b.Context()
+
+				redisC, err := tcredis.RunContainer(ctx,
+					testcontainers.WithImage("redis:7-alpine"),
+					tcredis.WithSnapshotting(0, 0),
+				)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				port, err := redisC.MappedPort(ctx, "6379/tcp")
+				if err != nil {
+					b.Fatal(err)
+				}
+				host, err := redisC.Host(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				addr := host + ":" + port.Port()
+				return redis.New[string, string](redis.WithAddr(addr))
+			},
+		},
+		{
+			"valkey", func(b *testing.B) cache.BatchCache[string, string] {
+				skipIfNoDocker(b, "valkey batch benchmark requires Docker")
+				ctx := b.Context()
+
+				valkeyC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+					ContainerRequest: testcontainers.ContainerRequest{
+						Image:        "valkey/valkey:8-alpine",
+						ExposedPorts: []string{"6379/tcp"},
+						WaitingFor: wait.ForAll(
+							wait.ForLog("* Ready to accept connections"),
+							wait.ForListeningPort("6379/tcp"),
+						).WithStartupTimeout(30 * time.Second),
+					},
+					Started: true,
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				port, err := valkeyC.MappedPort(ctx, "6379")
+				if err != nil {
+					b.Fatal(err)
+				}
+				host, err := valkeyC.Host(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				addr := host + ":" + port.Port()
+				return valkey.New[string, string](valkey.WithAddr(addr))
+			},
+		},
+		{
+			"memcache", func(b *testing.B) cache.BatchCache[string, string] {
+				skipIfNoDocker(b, "memcache batch benchmark requires Docker")
+				ctx := b.Context()
+
+				memcacheC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+					ContainerRequest: testcontainers.ContainerRequest{
+						Image:        "memcached:1-alpine",
+						ExposedPorts: []string{"11211/tcp"},
+						WaitingFor:   wait.ForListeningPort("11211/tcp").WithStartupTimeout(30 * time.Second),
+					},
+					Started: true,
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				port, err := memcacheC.MappedPort(ctx, "11211")
+				if err != nil {
+					b.Fatal(err)
+				}
+				host, err := memcacheC.Host(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				addr := host + ":" + port.Port()
+				return memcache.New[string, string](memcache.WithServers(addr))
+			},
+		},
+		{
+			"postgres", func(b *testing.B) cache.BatchCache[string, string] {
+				skipIfNoDocker(b, "postgres batch benchmark requires Docker")
+				ctx := b.Context()
+
+				pgC, err := tcpostgres.RunContainer(ctx,
+					testcontainers.WithImage("postgres:16-alpine"),
+					tcpostgres.WithDatabase("cache_bench"),
+					tcpostgres.WithUsername("test"),
+					tcpostgres.WithPassword("test"),
+				)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				port, err := pgC.MappedPort(ctx, "5432/tcp")
+				if err != nil {
+					b.Fatal(err)
+				}
+				host, err := pgC.Host(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				connStr := "postgres://test:test@" + host + ":" + port.Port() + "/cache_bench?sslmode=disable"
+
+				// Retry connecting — Postgres may not accept connections immediately.
+				var pgProvider cache.BatchCache[string, string]
+				var lastErr error
+				for retry := 0; retry < 10; retry++ {
+					pgProvider, lastErr = postgres.New[string, string](postgres.WithConnString(connStr))
+					if lastErr == nil {
+						break
+					}
+					time.Sleep(2 * time.Second)
+				}
+				if lastErr != nil {
+					b.Fatal(lastErr)
+				}
+
+				return pgProvider
+			},
+		},
+	}
+
+	for _, p := range providers {
+		p := p // capture range variable
+		b.Run(p.name, func(b *testing.B) {
+			c := p.setup(b)
+			defer c.Close()
+			runBatchBenchmarks(b, c, p.name)
+		})
+	}
 }

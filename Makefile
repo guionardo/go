@@ -94,11 +94,13 @@ test-e2e: gocheck ## Run E2E integration tests (requires Docker)
 
 benchmark: gocheck ## Run benchmark suite (mem always, Docker-backed when available)
 	@echo "\n🚀 \033[30;44m  RUNNING BENCHMARK SUITE  \033[0m"
-	@go test -bench=. -benchtime=1s -count=5 -benchmem ./cache/...
+	@DOCKER_HOST=$(DOCKER_HOST) \
+		go test -bench=. -benchtime=1s -count=5 -benchmem ./cache/...
 
 benchmark-quick: gocheck ## Quick benchmark run for development
 	@echo "\n🚀 \033[30;44m  RUNNING QUICK BENCHMARK  \033[0m"
-	@go test -bench=. -benchtime=100ms -count=1 -benchmem ./cache/...
+	@DOCKER_HOST=$(DOCKER_HOST) \
+		go test -bench=. -benchtime=100ms -count=1 -benchmem ./cache/...
 
 coverage: check-go-test-coverage check-gocovmerge ## Check test coverage
 	@echo "\n🚀 \033[30;44m  RUNNING E2E COVERAGE  \033[0m"
