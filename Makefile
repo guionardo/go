@@ -92,6 +92,14 @@ test-e2e: gocheck ## Run E2E integration tests (requires Docker)
 	@DOCKER_HOST=$(DOCKER_HOST) \
 		go test ./cache/ -tags=e2e -run 'TestCacheE2E' -v -count=1 -timeout=300s
 
+benchmark: gocheck ## Run benchmark suite (mem always, Docker-backed when available)
+	@echo "\n🚀 \033[30;44m  RUNNING BENCHMARK SUITE  \033[0m"
+	@go test -bench=. -benchtime=1s -count=5 -benchmem ./cache/...
+
+benchmark-quick: gocheck ## Quick benchmark run for development
+	@echo "\n🚀 \033[30;44m  RUNNING QUICK BENCHMARK  \033[0m"
+	@go test -bench=. -benchtime=100ms -count=1 -benchmem ./cache/...
+
 coverage: check-go-test-coverage check-gocovmerge ## Check test coverage
 	@echo "\n🚀 \033[30;44m  RUNNING E2E COVERAGE  \033[0m"
 	@DOCKER_HOST=$(DOCKER_HOST) \
@@ -135,7 +143,7 @@ lint-fix: check_golangci ## Run linters and fix issues
 
 ##@ Quality Report
 
-.PHONY: quality-report
+.PHONY: benchmark benchmark-quick quality-report
 quality-report: ## Generate quality report (lint, security, coverage, metrics)
 	@bash scripts/quality-report.sh quality-report.md .
 
