@@ -312,3 +312,64 @@ func BenchmarkSingleflightGetOrSet(b *testing.B) {
 		benchmarkHerdSingleflightConcurrencyLoop(b, pgProvider)
 	})
 }
+
+// ---------- Batch benchmarks (Plan 08-02) ----------
+
+// prePopulateKeys creates n keys under the given prefix and sets them in the cache.
+// Returns the list of keys for use in benchmark iterations.
+func prePopulateKeys(b *testing.B, c cache.BatchCache[string, string], n int, prefix string) []string {
+	keys := make([]string, n)
+	for i := range n {
+		key := fmt.Sprintf("%s_%d", prefix, i)
+		if err := c.Set(b.Context(), key, "v"); err != nil {
+			b.Fatal(err)
+		}
+		keys[i] = key
+	}
+	return keys
+}
+
+// benchmarkMGetNative benchmarks the native MGet batch operation.
+// Keys are pre-populated before the b.N loop starts so the measured
+// operation is pure read under a single RLock.
+func benchmarkMGetNative(b *testing.B, c cache.BatchCache[string, string], _ int, keys []string) {
+	for i := 0; i < b.N; i++ {
+		_ = c.MGet(b.Context(), keys...)
+	}
+}
+
+// benchmarkMGetPerKey benchmarks the per-key Get fallback by iterating over
+// all keys and accumulating results in a map (to prevent DCE).
+func benchmarkMGetPerKey(b *testing.B, c cache.BatchCache[string, string], n int, keys []string) {
+	for i := 0; i < b.N; i++ {
+		result := make(map[string]string, n)
+		for _, key := range keys {
+			if v, err := c.Get(b.Context(), key); err == nil {
+				result[key] = v
+			}
+		}
+		_ = result
+	}
+}
+
+// BenchmarkBatch quantifies the performance win of native batch operations
+// (MGet/MSet/MDel) against per-key sequential fallback across multiple batch
+// sizes. Uses the mem provider (zero-dependency).
+func BenchmarkBatch(b *testing.B) {
+	c := mem.New[string, string](b.Context())
+	defer c.Close()
+	batchSizes := []int{1, 10, 100, 1000}
+
+	b.Run("MGet", func(b *testing.B) {
+		for _, n := range batchSizes {
+			n := n
+			keys := prePopulateKeys(b, c, n, fmt.Sprintf("batch_mget_%d", n))
+			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				benchmarkMGetNative(b, c, n, keys)
+			})
+			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				benchmarkMGetPerKey(b, c, n, keys)
+			})
+		}
+	})
+}
