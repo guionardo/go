@@ -116,6 +116,111 @@ func Test_compareBody(t *testing.T) {
 	})
 }
 
+func TestRequest_matchHeaders(t *testing.T) {
+	t.Parallel()
+
+	t.Run("exact_match", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"Api-Key": "test_value"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		req.Header.Set("Api-Key", "test_value")
+		assert.True(t, r.matchHeaders(req))
+		assert.Equal(t, "test_value", r.readData[readDataHeaderPrefix+"api-key"])
+	})
+
+	t.Run("case_insensitive_match", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"Api-Key": "test_value"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		req.Header["api_key"] = []string{"test_value"} // bypass canonicalization
+		assert.True(t, r.matchHeaders(req))
+		assert.Equal(t, "test_value", r.readData[readDataHeaderPrefix+"api-key"])
+	})
+
+	t.Run("underscore_to_hyphen_match", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"Api_Key": "test_value"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		req.Header.Set("Api-Key", "test_value")
+		assert.True(t, r.matchHeaders(req))
+		assert.Equal(t, "test_value", r.readData[readDataHeaderPrefix+"api-key"])
+	})
+
+	t.Run("windows_non_canonical_match", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"Api-Key": "test_value"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		// Simulate Windows HTTP transport: header key with underscores
+		// and non-canonical casing
+		req.Header["Api_key"] = []string{"test_value"}
+		assert.True(t, r.matchHeaders(req))
+		assert.Equal(t, "test_value", r.readData[readDataHeaderPrefix+"api-key"])
+	})
+
+	t.Run("missing_header_returns_false", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"X-Missing": "value"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		assert.False(t, r.matchHeaders(req))
+	})
+
+	t.Run("multiple_headers_same_normalized_key", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"X-Custom": "first"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		req.Header["X-Custom"] = []string{"first", "second"}
+		assert.True(t, r.matchHeaders(req))
+	})
+
+	t.Run("empty_header_value_matches_empty_expected", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"X-Empty": ""},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		req.Header["X-Empty"] = []string{""}
+		assert.True(t, r.matchHeaders(req))
+	})
+
+	t.Run("empty_expected_non_empty_header_no_match", func(t *testing.T) {
+		t.Parallel()
+
+		r := Request{
+			Headers:  map[string]string{"X-Value": "expected"},
+			readData: make(map[string]string),
+		}
+		req := httptest.NewRequest("GET", "http://localhost/test", nil)
+		req.Header["X-Value"] = []string{""}
+		assert.False(t, r.matchHeaders(req))
+	})
+}
+
 func Test_marshalSorted(t *testing.T) {
 	t.Parallel()
 
