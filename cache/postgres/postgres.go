@@ -34,7 +34,7 @@ var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
 // New creates a new Postgres cache provider with optional functional options.
 // The constructor creates the cache table (if not exists) and starts the
 // background sweep goroutine.
-func New[K comparable, V any](opts ...Option) (cache.Cache[K, V], error) {
+func New[K comparable, V any](opts ...Option) (cache.BatchCache[K, V], error) {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -142,40 +142,102 @@ func (c *postgresCache[K, V]) CloseFunc() error {
 	return nil
 }
 
-// MGetFunc retrieves values for multiple keys via per-key fallback.
-// TODO(07-04): Replace with pgx SendBatch for single round-trip.
+// MGetFunc retrieves values for multiple keys via pgx SendBatch.
+// Each key is a parameterized SELECT query in the batch; missing keys
+// are silently excluded from the result (D-06 best-effort).
 func (c *postgresCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	query := fmt.Sprintf(
+		"SELECT value FROM %s WHERE cache_key = $1 AND (expires_at IS NULL OR expires_at > NOW())",
+		pgx.Identifier{c.tableName}.Sanitize(),
+	)
+
+	batch := &pgx.Batch{}
+	for _, key := range keys {
+		batch.Queue(query, fmt.Sprint(key))
+	}
+
+	br := c.pool.SendBatch(ctx, batch)
+	defer br.Close()
+
 	result := make(map[K]V, len(keys))
 	for _, key := range keys {
-		v, err := c.GetFunc(ctx, key)
-		if err == nil {
-			result[key] = v
+		var valueJSON string
+		err := br.QueryRow().Scan(&valueJSON)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue // missing key — skip
 		}
+		if err != nil {
+			continue // query error — skip (D-06 best-effort)
+		}
+		var value V
+		if err := json.Unmarshal([]byte(valueJSON), &value); err != nil {
+			continue // deserialization error — skip
+		}
+		result[key] = value
 	}
 	return result
 }
 
-// MSetFunc stores multiple key-value pairs via per-key fallback.
-// TODO(07-04): Replace with pgx SendBatch for single round-trip.
+// MSetFunc stores multiple key-value pairs via pgx SendBatch.
+// Uses INSERT ON CONFLICT (upsert) for each key. Errors are accumulated
+// via errors.Join (D-06 best-effort).
 func (c *postgresCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
-	var errs []error
+	query := fmt.Sprintf(
+		"INSERT INTO %s (cache_key, value, expires_at) VALUES ($1, $2, $3) ON CONFLICT (cache_key) DO UPDATE SET value = $2, expires_at = $3",
+		pgx.Identifier{c.tableName}.Sanitize(),
+	)
+
+	batch := &pgx.Batch{}
+	expiresAt := c.resolveTTL(ttl...)
+
 	for key, value := range items {
-		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
-			errs = append(errs, err)
+		data, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("cache/postgres: %w", err) // hard failure on marshal
+		}
+		batch.Queue(query, fmt.Sprint(key), string(data), expiresAt)
+	}
+
+	br := c.pool.SendBatch(ctx, batch)
+	defer br.Close()
+
+	// Consume results (pgx requires reading all results from SendBatch)
+	var errs []error
+	for range items {
+		if _, err := br.Exec(); err != nil {
+			errs = append(errs, fmt.Errorf("cache/postgres: %w", err))
 		}
 	}
+
 	return errors.Join(errs...)
 }
 
-// MDelFunc removes multiple keys via per-key fallback.
-// TODO(07-04): Replace with pgx SendBatch for single round-trip.
+// MDelFunc removes multiple keys via pgx SendBatch.
+// Uses a parameterized DELETE query for each key. Errors are accumulated
+// via errors.Join (D-06 best-effort). Deleting already-missing keys is
+// idempotent (DELETE on non-existent rows affects 0 rows — no error).
 func (c *postgresCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
-	var errs []error
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE cache_key = $1",
+		pgx.Identifier{c.tableName}.Sanitize(),
+	)
+
+	batch := &pgx.Batch{}
 	for _, key := range keys {
-		if err := c.DeleteFunc(ctx, key); err != nil {
-			errs = append(errs, err)
+		batch.Queue(query, fmt.Sprint(key))
+	}
+
+	br := c.pool.SendBatch(ctx, batch)
+	defer br.Close()
+
+	// Consume results (pgx requires reading all results)
+	var errs []error
+	for range keys {
+		if _, err := br.Exec(); err != nil {
+			errs = append(errs, fmt.Errorf("cache/postgres: %w", err))
 		}
 	}
+
 	return errors.Join(errs...)
 }
 
