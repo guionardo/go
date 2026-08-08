@@ -1,9 +1,11 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"reflect"
 	"sync"
 
@@ -87,6 +89,36 @@ func (p *Provider[T]) UpdateConfiguration(configuration T) error {
 	defer p.lock.Unlock()
 
 	return p.updateConfiguration(configuration)
+}
+
+// HTTPHandler returns an http.Handler that accepts PATCH/POST requests
+// with a JSON body to update the configuration. Thread-safe via Provider's
+// internal write lock. Responds with 200 OK and the updated configuration
+// on success, 400 on invalid JSON, 405 on wrong method, 422 on validation failure.
+func (p *Provider[T]) HTTPHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch && r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var cfg T
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if err := p.UpdateConfiguration(cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(cfg); err != nil {
+			slog.Error("failed to encode configuration response", "error", err)
+		}
+	})
 }
 
 func (p *Provider[T]) updateConfiguration(configuration T) error {
