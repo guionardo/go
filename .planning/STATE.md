@@ -5,13 +5,13 @@ milestone_name: Cache Dedup
 current_phase: 8
 current_phase_name: Benchmark suite
 status: active
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-08-08T01:05:38.767Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-08-08T01:12:28.100Z"
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 50
 ---
 
@@ -22,7 +22,7 @@ progress:
 - **Milestone:** v1.6 Cache Dedup
 - **Phase:** 8 — Benchmark suite
 - **Plan:** 3 plans created (08-01 through 08-03), 08-01 complete
-- **Progress:** [████████░░] 80% (3/5 phases complete, Phase 6 retroactively closed)
+- **Progress:** [█████████░] 90% (3/5 phases complete, Phase 6 retroactively closed)
 
 ## Status
 
@@ -55,9 +55,9 @@ progress:
 
 ## Session
 
-**Last session:** 2026-08-08T01:05:38.761Z
-**Stopped at:** Completed 08-01-PLAN.md
-**Resume file:** .planning/phases/08-benchmark-suite/08-02-PLAN.md
+**Last session:** 2026-08-08T01:12:27.110Z
+**Stopped at:** Completed 08-02-PLAN.md
+**Resume file:** .planning/phases/08-benchmark-suite/08-03-PLAN.md
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ progress:
 |------|----------|-------|-------|
 | Phase 07-batch-operations P04 | 7min | 3 tasks | 3 files |
 | Phase 08-benchmark-suite P08-01 | 15min | 2 tasks | 1 file |
+| Phase 08-benchmark-suite P08-02 | 12 | 2 tasks | 1 files |
 
 ## Decisions
 
@@ -75,3 +76,4 @@ progress:
 - [Phase 8]: skipIfNoDocker checks DOCKER_HOST + docker info for robust detection of testcontainers-ready Docker daemon
 - [Phase ?]: Phase 8: Naive herd benchmark uses TOCTOU pattern (check-outside/compute-outside-store) to demonstrate thundering-herd behavior
 - [Phase ?]: Phase 8: skipIfNoDocker checks DOCKER_HOST + docker info for robust detection of testcontainers-ready Docker daemon
+- [Phase ?]: MSet native benchmarks show higher ns/op but lower allocs/op than per-key for mem provider — map iteration inside write lock adds overhead. Batching win more pronounced for network-backed providers where round-trip time dominates.
