@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 5: Shared singleflight helper** - Shared `singleflightGetOrSet` helper in the cache package: setter-only wrap, DoChan cancel variant, panic recovery, Get double-check (completed 2026-08-06)
 - [ ] **Phase 6: Provider integration** - All 5 providers delegate GetOrSet through the helper; error-prefix parity, delete-during-flight tombstone guard, race/TTL parity
-- [ ] **Phase 7: Batch operations** - MGet/MSet/MDel on all 5 providers with provider-appropriate batching (single-lock, GetMulti, pipelines, query batch)
+- [x] **Phase 7: Batch operations** - MGet/MSet/MDel on all 5 providers with provider-appropriate batching (single-lock, GetMulti, pipelines, query batch) — completed 2026-08-08
 - [ ] **Phase 8: Benchmark suite** - Thundering-herd dedup and batch batching benchmarks, runnable via `make benchmark`
 
 ## Phase Details
@@ -98,10 +98,15 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. The thundering-herd benchmark shows the setter running N times with the naive path vs exactly 1 time with singleflight under concurrent load
-  2. The batch benchmark shows pipeline/GetMulti batching outperforming naive per-key loops
-  3. `make benchmark` runs the full suite with `-benchmem` and exits successfully
+   2. The batch benchmark shows pipeline/GetMulti batching outperforming naive per-key loops
+   3. `make benchmark` runs the full suite with `-benchmem` and exits successfully
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Thundering-herd singleflight benchmark (mem + Docker-gated all providers)
+- [ ] 08-02-PLAN.md — Batch operations benchmark (mem, per-key comparison)
+- [ ] 08-03-PLAN.md — `make benchmark` + `make benchmark-quick` + Docker-backed batch provider benchmarks
 
 ## Progress
 
@@ -114,5 +119,5 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 4. Self-Update | v1.5 | 3/3 | Complete | 2026-07-21 |
 | 5. Shared singleflight helper | v1.6 | 3/3 | Complete    | 2026-08-06 |
 | 6. Provider integration | v1.6 | TBD | Not started | - |
-| 7. Batch operations | v1.6 | 0/4 | Planning complete | - |
-| 8. Benchmark suite | v1.6 | TBD | Not started | - |
+| 7. Batch operations | v1.6 | 4/4 | Complete | 2026-08-08 |
+| 8. Benchmark suite | v1.6 | 0/3 | Not started | - |
