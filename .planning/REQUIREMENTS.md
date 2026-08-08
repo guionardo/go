@@ -29,7 +29,7 @@
 
 ### Benchmark Suite
 
-- [ ] **BENCH-01**: Thundering-herd GetOrSet benchmark demonstrates the setter runs N times (naive) vs 1 time (singleflight) under concurrent load
+- [x] **BENCH-01**: Thundering-herd GetOrSet benchmark demonstrates the setter runs N times (naive) vs 1 time (singleflight) under concurrent load
 - [ ] **BENCH-02**: Batch operations benchmark demonstrates pipeline/GetMulti batching against naive per-key loops
 - [ ] **BENCH-03**: A `make benchmark` target runs the suite with `-benchmem`
 
@@ -75,7 +75,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BATCH-05 | Phase 7 | Pending |
 | BATCH-06 | Phase 7 | Complete |
 | BATCH-07 | Phase 7 | Complete |
-| BENCH-01 | Phase 8 | Pending |
+| BENCH-01 | Phase 8 | Complete |
 | BENCH-02 | Phase 8 | Pending |
 | BENCH-03 | Phase 8 | Pending |
 

@@ -85,6 +85,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
+
 - [ ] 07-01-PLAN.md — Core infrastructure: Cache interface, cacher interface, concreteCache delegation, fakeCacher, unit tests, doc.go
 - [ ] 07-02-PLAN.md — mem + memcache providers: single-lock batch ops, GetMulti, per-key goroutines, tests
 - [ ] 07-03-PLAN.md — redis + valkey providers: pipeline/DoMulti batch ops, integration tests
@@ -101,10 +102,11 @@ Plans:
    2. The batch benchmark shows pipeline/GetMulti batching outperforming naive per-key loops
    3. `make benchmark` runs the full suite with `-benchmem` and exits successfully
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
 Plans:
-- [ ] 08-01-PLAN.md — Thundering-herd singleflight benchmark (mem + Docker-gated all providers)
+
+- [x] 08-01-PLAN.md — Thundering-herd singleflight benchmark (mem + Docker-gated all providers)
 - [ ] 08-02-PLAN.md — Batch operations benchmark (mem, per-key comparison)
 - [ ] 08-03-PLAN.md — `make benchmark` + `make benchmark-quick` + Docker-backed batch provider benchmarks
 
@@ -120,4 +122,4 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | 5. Shared singleflight helper | v1.6 | 3/3 | Complete    | 2026-08-06 |
 | 6. Provider integration | v1.6 | TBD | Not started | - |
 | 7. Batch operations | v1.6 | 4/4 | Complete | 2026-08-08 |
-| 8. Benchmark suite | v1.6 | 0/3 | Not started | - |
+| 8. Benchmark suite | v1.6 | 1/3 | In Progress|  |

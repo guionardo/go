@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Cache Dedup
-current_phase: 7
-current_phase_name: Batch operations
-status: complete
-stopped_at: Phase 8 context gathered
-last_updated: "2026-08-08T00:38:24.225Z"
+current_phase: 8
+current_phase_name: Benchmark suite
+status: active
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-08-08T01:05:38.767Z"
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 10
+  completed_plans: 8
   percent: 50
 ---
 
@@ -20,16 +20,24 @@ progress:
 ## Current
 
 - **Milestone:** v1.6 Cache Dedup
-- **Phase:** 7 — Batch operations
-- **Plan:** 4 plans created (07-01 through 07-04)
-- **Progress:** [██████████] 100% (3/5 phases complete, Phase 6 retroactively closed)
+- **Phase:** 8 — Benchmark suite
+- **Plan:** 3 plans created (08-01 through 08-03), 08-01 complete
+- **Progress:** [████████░░] 80% (3/5 phases complete, Phase 6 retroactively closed)
 
 ## Status
 
 - Phase 5 (Shared singleflight helper) — complete
 - Phase 6 (Provider integration) — retroactively closed (work already shipped)
 - Phase 7 (Batch operations) — 07-01 complete, 07-02 complete, 07-03 complete, 07-04 complete
-- Phase 8 (Benchmark suite) — pending
+- Phase 8 (Benchmark suite) — 08-01 complete (thundering-herd benchmarks)
+
+## Phase 8 Plans
+
+| Plan | Wave | Description |
+|------|------|-------------|
+| 08-01 | 1 (current) | ✅ Thundering-herd singleflight benchmark with mem + 4 Docker providers |
+| 08-02 | 1 (pending) | ⏳ Batch benchmarks (MGet/MSet/MDel) |
+| 08-03 | 2 (pending) | ⏳ Make benchmark targets |
 
 ## Phase 7 Plans
 
@@ -43,24 +51,27 @@ progress:
 ## Last Activity
 
 - **Date:** 2026-08-08
-- **Desc:** Phase 7 Wave 3 complete. postgres MGetFunc/MSetFunc/MDelFunc using pgx SendBatch
-  (D-11), postgres.New returns BatchCache, provider integration tests (6 subtests),
-  E2E infrastructure updated to BatchCache, 7 batch E2E subtests, race detector passes (BATCH-07).
+- **Desc:** Phase 8 Plan 01 complete: thundering-herd benchmark in cache/bench_test.go with mem provider (always runs) and Docker-gated subtests for redis, valkey, memcache, postgres. All concurrency levels (10, 50, 100, 500) verified: naive ≈ N setter_runs/op, singleflight ≈ 1 setter_runs/op.
 
 ## Session
 
-**Last session:** 2026-08-08T00:38:24.219Z
-**Stopped at:** Phase 8 context gathered
-**Resume file:** .planning/phases/08-benchmark-suite/08-CONTEXT.md
+**Last session:** 2026-08-08T01:05:38.761Z
+**Stopped at:** Completed 08-01-PLAN.md
+**Resume file:** .planning/phases/08-benchmark-suite/08-02-PLAN.md
 
 ## Performance Metrics
 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 07-batch-operations P04 | 7min | 3 tasks | 3 files |
+| Phase 08-benchmark-suite P08-01 | 15min | 2 tasks | 1 file |
 
 ## Decisions
 
 - [Phase ?]: pgx SendBatch used for all postgres batch ops (MGet/MSet/MDel) per D-11
 - [Phase ?]: providerCase.fn type changed to cache.BatchCache[string,string] for batch E2E access
 - [Phase ?]: Error accumulation via errors.Join for MSetFunc/MDelFunc per D-06
+- [Phase 8]: Naive herd benchmark uses TOCTOU pattern (check-outside/compute-outside-store) to demonstrate thundering-herd behavior
+- [Phase 8]: skipIfNoDocker checks DOCKER_HOST + docker info for robust detection of testcontainers-ready Docker daemon
+- [Phase ?]: Phase 8: Naive herd benchmark uses TOCTOU pattern (check-outside/compute-outside-store) to demonstrate thundering-herd behavior
+- [Phase ?]: Phase 8: skipIfNoDocker checks DOCKER_HOST + docker info for robust detection of testcontainers-ready Docker daemon
