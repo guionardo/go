@@ -19,10 +19,10 @@ progress:
 
 ## Current
 
-- **Milestone:** v1.6 Cache Dedup
-- **Phase:** 8 — Benchmark suite
-- **Plan:** 3 plans executed (08-01 through 08-03), all complete
-- **Progress:** [██████████] 100% (3/5 phases complete, Phase 6 retroactively closed)
+- **Milestone:** v1.6 Cache Dedup ✅
+- **Phase:** 8 — Benchmark suite (complete)
+- **Plan:** 3 plans completed (08-01 through 08-03)
+- **Progress:** [██████████] 100% — milestone complete!
 
 ## Status
 

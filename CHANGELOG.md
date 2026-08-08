@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6] — 2026-08-08
+
+### Added
+- `SingleflightGetOrSet[K, V]` shared helper — dedups concurrent GetOrSet misses on the same key across all 5 providers
+  - `Do` (blocking) and `DoChan` (cancel-aware) entry points
+  - Setter panic recovery → `*cache.Panic` typed error
+  - Double-check Get inside the group (clobber guard)
+  - `ErrCanceled` sentinel wrapping `context.Canceled`
+- Provider integration — all 5 providers delegate GetOrSet through the shared helper
+  - redis/valkey preserve historical error prefixes
+  - valkey initErr guard stays provider-side
+  - Generation-tombstone re-check prevents delete-during-flight resurrection
+- `BatchCache[K, V]` embedding interface — backward compatible with `Cache[K, V]`
+  - `MGet(ctx, keys ...K) map[K]V` — returns only found keys
+  - `MSet(ctx, items map[K]V, ttl ...time.Duration)` — single optional TTL, `errors.Join` accumulation
+  - `MDel(ctx, keys ...K)` — idempotent multi-key delete
+- Provider-optimal batch strategies:
+  - mem: single lock acquisition (RLock/Lock once per batch)
+  - memcache: native `GetMulti` for MGet, goroutine-per-key for MSet/MDel
+  - redis/valkey: pipelines (go-redis Pipeline / valkey-go DoMulti)
+  - postgres: `SendBatch` with INSERT ON CONFLICT upsert pattern
+- 7 batch E2E subtests across all 5 providers (testcontainers-go)
+- Benchmark suite quantifying the dedup and batching wins:
+  - `BenchmarkSingleflightGetOrSet` — thundering-herd at concurrency 10/50/100/500
+  - `BenchmarkBatch` — MGet/MSet/MDel at batch sizes 1/10/100/1000
+  - Naive vs singleflight comparison for herd; native batch vs per-key fallback for batch ops
+  - All 5 providers benchmarked (mem always, redis/valkey/memcache/postgres Docker-gated)
+
+### Changed
+- `Cache` interface `GetOrSet` setter signature: `func() (V, error)` → `func(context.Context) (V, error)` (v1.6 breaking change)
+- All 5 providers refactored from hand-rolled GetOrSet → shared `concreteCache` / `cacher` architecture
+- Providers return `BatchCache[K, V]` from `New()` (backward compatible via embedding)
+- Makefile: added `benchmark` (-benchtime=1s -count=5 -benchmem) and `benchmark-quick` targets
+
 ## [v1.5] — 2026-07-21
 
 ### Added

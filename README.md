@@ -67,6 +67,8 @@ The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Clo
 
 All providers share a common `cache.NewConcreteCache` adapter. `GetOrSet` is deduplicated via `SingleflightGetOrSet` (concurrent misses on the same key run the setter exactly once).
 
+All providers also implement `BatchCache[K, V]` (embedded in `Cache`), exposing `MGet`, `MSet`, and `MDel` with provider-optimal strategies: single-lock for in-memory, GetMulti for memcache, pipelines for redis/valkey, and SendBatch for postgres.
+
 #### Providers
 
 Each provider lives in its own sub-package and is independently importable:
@@ -79,7 +81,7 @@ Each provider lives in its own sub-package and is independently importable:
 | `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
 | `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
 
-#### Interface
+#### Interfaces
 
 ```go
 type Cache[K comparable, V any] interface {
@@ -88,6 +90,14 @@ type Cache[K comparable, V any] interface {
     Delete(ctx context.Context, key K) error
     GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error)
     Close() error
+}
+
+// BatchCache[K, V] embeds Cache[K, V] for full backward compatibility.
+type BatchCache[K comparable, V any] interface {
+    Cache[K, V] // Get, Set, Delete, GetOrSet, Close
+    MGet(ctx context.Context, keys ...K) map[K]V
+    MSet(ctx context.Context, items map[K]V, ttl ...time.Duration) error
+    MDel(ctx context.Context, keys ...K) error
 }
 ```
 
@@ -114,14 +124,54 @@ _ = c.Set(ctx, "mykey", "myvalue")
 v, err := c.Get(ctx, "mykey")
 ```
 
+#### Batch Operations
+
+Use `BatchCache[K, V]` for multi-key operations. The constructor returns it — cast or assign directly:
+
+```go
+import "github.com/guionardo/go/cache/mem"
+
+bc := mem.New[string, string](ctx)
+
+// Store multiple values at once
+_ = bc.MSet(ctx, map[string]string{
+    "a": "alpha",
+    "b": "beta",
+    "c": "charlie",
+})
+
+// Fetch multiple keys — missing keys are absent from the result
+results := bc.MGet(ctx, "a", "b", "c", "missing")
+fmt.Println(results["a"]) // "alpha"
+
+// Delete multiple keys (idempotent)
+_ = bc.MDel(ctx, "a", "b")
+```
+
+Each provider uses an optimal batching strategy: single lock (in-memory), GetMulti (memcache), pipelines (redis/valkey), or SendBatch (postgres).
+
+#### Benchmark Results
+
+Benchmarks quantify the win from singleflight dedup and batch batching (mem provider):
+
+| Benchmark | Comparison | Result |
+|-----------|-----------|--------|
+| Thundering-herd (50 concurrent) | Naive vs singleflight | Singleflight runs setter 1× vs 50× |
+| MGet (100 keys) | Native vs per-key loop | 10-17% faster |
+| MDel (100 keys) | Native vs per-key loop | up to 49% faster |
+| MSet (100 keys) | Native vs per-key loop | ~1000 fewer allocs/op |
+
+Run `make benchmark` for the full suite or `make benchmark-quick` for fast iteration.
+
 #### Sentinel Errors
 
 ```go
-var ErrMiss   = errors.New("cache: key not found")
-var ErrClosed = errors.New("cache: cache is closed")
+var ErrMiss    = errors.New("cache: key not found")
+var ErrClosed  = errors.New("cache: cache is closed")
+var ErrCanceled = errors.New("cache: canceled") // wraps ctx.Err() for canceled waiters
 ```
 
-A panicking setter yields a `*cache.Panic` (wraps the recovered value and stack trace). Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
+A panicking setter yields a `*cache.Panic` (wraps the recovered value and stack trace). A canceled `DoChan` waiter receives `ErrCanceled` (wraps `context.Canceled`). Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
 
 ### Package config
 

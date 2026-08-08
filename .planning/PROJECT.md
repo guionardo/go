@@ -32,6 +32,10 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ GitHub latest release fetcher with asset download and digest verification — `release/` — existing
 - ✓ CI pipeline with golangci-lint, pre-commit, commitlint, coverage enforcement, vulncheck — existing
 - ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — v1.0: in-memory, Redis, Memcache, Postgres, Valkey
+- ✓ `SingleflightGetOrSet[K, V]` shared helper deduplicating concurrent GetOrSet misses — `cache/` — v1.6
+- ✓ Provider integration — all 5 providers delegate GetOrSet through the shared helper — `cache/` — v1.6
+- ✓ `BatchCache[K, V]` with MGet/MSet/MDel across all 5 providers — `cache/` — v1.6
+- ✓ Benchmark suite quantifying dedup and batching wins — `cache/` — v1.6
 - ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
 
 ### Active
@@ -41,14 +45,16 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - [ ] String utilities package (truncation, padding, join/split)
 - [ ] Retry package with backoff strategies and jitter support
 
-## Current Milestone: v1.6 Cache Dedup
+## Completed Milestones
 
-**Goal:** Eliminate duplicate setter work in cache misses and reduce round trips — via singleflight GetOrSet across all 5 providers, batch operations, and a benchmark suite.
+### v1.6 Cache Dedup — completed 2026-08-08
 
-**Target features:**
-- Singleflight GetOrSet — shared helper wraps setter; dedups concurrent misses; DoChan variant for cancel; per-provider error glue; generation-tombstone Delete guard
-- Batch operations — MGet/MSet/MDel across all 5 providers with sensible fallbacks
-- Benchmark suite — thundering-herd + batch benchmarks
+Eliminated duplicate setter work in cache misses and reduced round trips via singleflight GetOrSet across all 5 providers, batch operations (MGet/MSet/MDel), and a benchmarking suite.
+
+**Key results:**
+- Singleflight dedup: setter runs exactly once for N concurrent misses (vs N× without)
+- Batch MGet: 10-17% faster than per-key loop; MDel: up to 49% faster
+- All 5 providers use optimal strategies (pipeline, GetMulti, SendBatch, single-lock)
 
 ### Out of Scope
 
@@ -60,9 +66,11 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 ## Current State
 
-**v1.6 — Cache Dedup** (in progress)
+**v1.6 — Cache Dedup** (shipped 2026-08-08)
 
-Improving the `cache` package performance: singleflight-wrapped `GetOrSet` to dedup concurrent misses across all 5 backends, batch operations (MGet/MSet/MDel), and a benchmark suite. Built on 9 validated spikes from 2026-08-06.
+All five cache providers now share a common `cacher` / `concreteCache` architecture with singleflight-wrapped `GetOrSet`, `BatchCache[K,V]` interface with MGet/MSet/MDel using provider-optimal strategies, and a benchmark suite proving the dedup and batching wins. Built on 9 validated spikes from 2026-08-06.
+
+**Next:** String utilities or retry package — see Active requirements.
 
 **Previous: v1.5 — Self-Update** (shipped 2026-07-21)
 
