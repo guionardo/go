@@ -89,6 +89,87 @@ func TestValkeyCache_SetGet(t *testing.T) {
 	})
 }
 
+func TestValkeyCache_Batch(t *testing.T) {
+	t.Parallel()
+	skipIfNoValkey(t)
+
+	t.Run("mget_returns_found", func(t *testing.T) {
+		t.Parallel()
+
+		c := valkey.New[string, string]()
+		require.NoError(t, c.Set(t.Context(), "valkey_mget_a", "v1"))
+		require.NoError(t, c.Set(t.Context(), "valkey_mget_b", "v2"))
+
+		result := c.MGet(t.Context(), "valkey_mget_a", "valkey_mget_b", "valkey_mget_missing")
+		assert.Equal(t, "v1", result["valkey_mget_a"])
+		assert.Equal(t, "v2", result["valkey_mget_b"])
+		assert.NotContains(t, result, "valkey_mget_missing")
+	})
+
+	t.Run("mget_empty_keys", func(t *testing.T) {
+		t.Parallel()
+
+		c := valkey.New[string, string]()
+		result := c.MGet(t.Context())
+		assert.Empty(t, result)
+	})
+
+	t.Run("mset_stores_all", func(t *testing.T) {
+		t.Parallel()
+
+		c := valkey.New[string, string]()
+		err := c.MSet(t.Context(), map[string]string{
+			"valkey_mset_a": "va",
+			"valkey_mset_b": "vb",
+		})
+		require.NoError(t, err)
+
+		got, err := c.Get(t.Context(), "valkey_mset_a")
+		require.NoError(t, err)
+		assert.Equal(t, "va", got)
+
+		got, err = c.Get(t.Context(), "valkey_mset_b")
+		require.NoError(t, err)
+		assert.Equal(t, "vb", got)
+	})
+
+	t.Run("mset_with_ttl", func(t *testing.T) {
+		t.Parallel()
+
+		c := valkey.New[string, string]()
+		err := c.MSet(t.Context(), map[string]string{"k": "v"}, 0)
+		require.NoError(t, err)
+
+		got, err := c.Get(t.Context(), "k")
+		require.NoError(t, err)
+		assert.Equal(t, "v", got)
+	})
+
+	t.Run("mdel_deletes", func(t *testing.T) {
+		t.Parallel()
+
+		c := valkey.New[string, string]()
+		_ = c.Set(t.Context(), "valkey_mdel_a", "a")
+		_ = c.Set(t.Context(), "valkey_mdel_b", "b")
+
+		err := c.MDel(t.Context(), "valkey_mdel_a", "valkey_mdel_b")
+		require.NoError(t, err)
+
+		_, err = c.Get(t.Context(), "valkey_mdel_a")
+		require.Error(t, err)
+		_, err = c.Get(t.Context(), "valkey_mdel_b")
+		require.Error(t, err)
+	})
+
+	t.Run("mdel_empty_keys", func(t *testing.T) {
+		t.Parallel()
+
+		c := valkey.New[string, string]()
+		err := c.MDel(t.Context())
+		require.NoError(t, err)
+	})
+}
+
 func TestValkeyCache_Close(t *testing.T) {
 	t.Parallel()
 

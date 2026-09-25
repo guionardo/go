@@ -1,10 +1,14 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -427,4 +431,84 @@ func TestPostInit(t *testing.T) {
 		assert.Equal(t, "custom-scope", p.scope)
 		assert.Equal(t, "/custom/path", p.profilesPath)
 	})
+}
+
+func TestProvider_HTTPHandler_method_not_allowed(t *testing.T) {
+	provider := NewProvider[testConfig]()
+	handler := provider.HTTPHandler()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Contains(t, rec.Body.String(), "method not allowed")
+}
+
+func TestProvider_HTTPHandler_invalid_json(t *testing.T) {
+	provider := NewProvider[testConfig]()
+	handler := provider.HTTPHandler()
+
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader("{invalid}"))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "invalid JSON")
+}
+
+func TestProvider_HTTPHandler_successful_patch(t *testing.T) {
+	provider := NewProvider[testConfig]()
+	handler := provider.HTTPHandler()
+
+	body := `{"name":"updated-name","version":42}`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	var cfg testConfig
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &cfg))
+	assert.Equal(t, "updated-name", cfg.Name)
+	assert.Equal(t, 42, cfg.Version)
+
+	// Verify config persists
+	loaded, err := provider.GetConfiguration()
+	require.NoError(t, err)
+	assert.Equal(t, "updated-name", loaded.Name)
+	assert.Equal(t, 42, loaded.Version)
+}
+
+func TestProvider_HTTPHandler_post_also_accepted(t *testing.T) {
+	provider := NewProvider[testConfig]()
+	handler := provider.HTTPHandler()
+
+	body := `{"name":"post-name","version":99}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+	var cfg testConfig
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &cfg))
+	assert.Equal(t, "post-name", cfg.Name)
+	assert.Equal(t, 99, cfg.Version)
+}
+
+func TestProvider_HTTPHandler_validation_error(t *testing.T) {
+	provider := NewProvider[testConfig]()
+	handler := provider.HTTPHandler()
+
+	// testConfig has a required Name field - empty name should trigger validation error
+	body := `{"name":"","version":1}`
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+	assert.Contains(t, rec.Body.String(), "validation")
 }

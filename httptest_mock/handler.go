@@ -35,8 +35,12 @@ type (
 		// It should be checked after calling SetupServer.
 		setupError error
 
-		// mu protects concurrent access to the handler's requests.
+		// mu protects concurrent access to the handler's requests and mux.
 		mu sync.RWMutex
+
+		// mux is a ServeMux that routes requests to mock groups by method+path pattern.
+		// Rebuilt by rebuildMux whenever mocks change. Thread-safe via mu.
+		mux *http.ServeMux
 
 		// extraLogger is an optional additional logger for more detailed logs.
 		extraLogger *slog.Logger
@@ -50,9 +54,9 @@ type (
 )
 
 // ServeHTTP implements the http.Handler interface.
-// It iterates through registered mocks and returns the response for the first match.
+// It uses a ServeMux to route requests by method+path pattern, then
+// iterates through the matching mock group to find a full or partial match.
 // If no mock matches, the handler returns 404 Not Found.
-// If there are partial matches, the handler returns 400 Bad Request.
 func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -61,12 +65,72 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	partialMatchRequests := make([]Mocker, 0)
+	s.ensureMux()
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	s.mux.ServeHTTP(w, r)
+}
+
+// ensureMux lazily initialises the ServeMux under a write lock if nil.
+// Thread-safe; call before reading s.mux under read lock.
+func (s *MockHandler) ensureMux() {
+	s.mu.RLock()
+	if s.mux != nil {
+		s.mu.RUnlock()
+		return
+	}
+	s.mu.RUnlock()
+
+	s.mu.Lock()
+	if s.mux == nil {
+		s.rebuildMux()
+	}
+	s.mu.Unlock()
+}
+
+// rebuildMux groups mocks by "METHOD /path" pattern and creates a new ServeMux.
+// Each group is registered as a ServeMux handler that iterates only mocks
+// with matching method and path. Non-*Mock Mocker implementations are
+// grouped into a fallback handler that matches all paths.
+// Caller MUST hold a write lock on s.mu.
+func (s *MockHandler) rebuildMux() {
+	groups := make(map[string][]Mocker)
+	var fallback []Mocker
 
 	for _, mock := range s.mocks {
+		if m, ok := mock.(*Mock); ok {
+			pattern := m.Request.Method + " " + m.Request.Path
+			groups[pattern] = append(groups[pattern], mock)
+		} else {
+			fallback = append(fallback, mock)
+		}
+	}
+
+	newMux := http.NewServeMux()
+	for pattern, mocks := range groups {
+		mocks := mocks
+		newMux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+			s.handleMockGroup(mocks, w, r)
+		})
+	}
+
+	if len(fallback) > 0 {
+		newMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			s.handleMockGroup(fallback, w, r)
+		})
+	}
+
+	s.mux = newMux
+}
+
+// handleMockGroup iterates a slice of mocks (all sharing the same method+path)
+// and returns the first full match, first accepting partial match, or 404.
+// Collects partial match candidates for diagnostic logging when no match is found.
+func (s *MockHandler) handleMockGroup(mocks []Mocker, w http.ResponseWriter, r *http.Request) {
+	partialMatchRequests := make([]Mocker, 0)
+
+	for _, mock := range mocks {
 		switch mock.Matches(r, s.allowPartialMatch) {
 		case MatchLevelFull:
 			s.log("%s request matched %s", s.logHeader, mock.String())
@@ -89,7 +153,6 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			partialMatchRequests = append(partialMatchRequests, mock)
-			// the request did not match, let's continue to the next one
 			s.log("%s request did not match %s:\n%s", s.logHeader,
 				mock.String(), strings.Join(mock.Logs(), "\n"))
 			s.extraLogger.Warn(s.logHeader+" request did not match",
@@ -100,7 +163,6 @@ func (s *MockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if len(partialMatchRequests) > 0 {
 		s.log("Mocks candidates for request %s %s", r.Method, r.URL.String())
-
 		for _, req := range partialMatchRequests {
 			s.log("%s partial match details: %s", s.logHeader, req.String())
 		}
@@ -152,12 +214,14 @@ func (s *MockHandler) Assert(t *testing.T) {
 	}
 }
 
-// AddMocks appends new mock requests to the existing ones in the handler.
+// AddMocks appends new mock requests to the existing ones in the handler
+// and rebuilds the ServeMux to include the new mocks.
 func (s *MockHandler) AddMocks(mocks ...Mocker) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.mocks = append(s.mocks, mocks...)
+	s.rebuildMux()
 
 	for _, req := range mocks {
 		s.log("%s registered %s", s.logHeader, req.String())

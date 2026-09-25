@@ -15,10 +15,15 @@ type (
 		SetFunc(ctx context.Context, key K, value V, ttl ...time.Duration) error
 		DeleteFunc(ctx context.Context, key K) error
 		CloseFunc() error
+
+		// Batch operations — Phase 7 additions.
+		MGetFunc(ctx context.Context, keys ...K) map[K]V
+		MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error
+		MDelFunc(ctx context.Context, keys ...K) error
 	}
 )
 
-func NewConcreteCache[K comparable, V any](c cacher[K, V]) Cache[K, V] {
+func NewConcreteCache[K comparable, V any](c cacher[K, V]) BatchCache[K, V] {
 	return &concreteCache[K, V]{
 		cache: c,
 	}
@@ -59,4 +64,20 @@ func (c *concreteCache[K, V]) GetOrSet(
 // Close cleans up provider resources (connection pools, goroutines).
 func (c *concreteCache[K, V]) Close() error {
 	return c.cache.CloseFunc()
+}
+
+// MGet retrieves values for multiple keys via the underlying cacher.
+// Only found keys are included in the result map.
+func (c *concreteCache[K, V]) MGet(ctx context.Context, keys ...K) map[K]V {
+	return c.cache.MGetFunc(ctx, keys...)
+}
+
+// MSet stores multiple key-value pairs via the underlying cacher.
+func (c *concreteCache[K, V]) MSet(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	return c.cache.MSetFunc(ctx, items, ttl...)
+}
+
+// MDel removes multiple keys via the underlying cacher.
+func (c *concreteCache[K, V]) MDel(ctx context.Context, keys ...K) error {
+	return c.cache.MDelFunc(ctx, keys...)
 }

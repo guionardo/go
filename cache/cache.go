@@ -27,3 +27,22 @@ type Cache[K comparable, V any] interface {
 	// Close cleans up provider resources (connection pools, goroutines).
 	Close() error
 }
+
+// BatchCache extends Cache with batch operations for multiple keys.
+// Implementations: concreteCache (returned by NewConcreteCache).
+// Existing Cache[K,V] implementors are unaffected per D-02.
+type BatchCache[K comparable, V any] interface {
+	Cache[K, V]
+
+	// MGet retrieves values for multiple keys. Only found keys are included
+	// in the result map; missing keys are silently absent (D-03).
+	MGet(ctx context.Context, keys ...K) map[K]V
+
+	// MSet stores multiple key-value pairs with an optional single TTL (D-04).
+	// If ttl is empty, each key uses the provider-level default TTL.
+	MSet(ctx context.Context, items map[K]V, ttl ...time.Duration) error
+
+	// MDel removes multiple keys. Idempotent — deleting already-missing
+	// keys is not an error (D-05).
+	MDel(ctx context.Context, keys ...K) error
+}

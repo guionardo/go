@@ -16,7 +16,8 @@ type memoryCache[K comparable, V any] struct {
 }
 
 // New creates a new in-memory cache provider with optional functional options.
-func New[K comparable, V any](ctx context.Context, opts ...ConfigFunc) cache.Cache[K, V] {
+// Returns a cache.BatchCache[K,V] (embeds Cache[K,V] for backward compatibility).
+func New[K comparable, V any](ctx context.Context, opts ...ConfigFunc) cache.BatchCache[K, V] {
 	config := Config{
 		DefaultTTL:    5 * time.Minute, //nolint:mnd
 		MaxEntries:    1000,            //nolint:mnd
@@ -77,6 +78,43 @@ func (c *memoryCache[K, V]) CloseFunc() error {
 		// already closed
 	default:
 		close(c.stop)
+	}
+	return nil
+}
+
+// MGetFunc retrieves values for multiple keys under a single read lock.
+func (c *memoryCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	result := make(map[K]V, len(keys))
+	for _, key := range keys {
+		if v, ok := c.store.get(key); ok {
+			result[key] = v
+		}
+	}
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs under a single write lock.
+func (c *memoryCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	expiresAt := c.resolveTTL(ttl...)
+	for key, value := range items {
+		c.store.set(key, value, expiresAt)
+	}
+	return nil
+}
+
+// MDelFunc removes multiple keys under a single write lock.
+func (c *memoryCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, key := range keys {
+		c.store.delete(key)
 	}
 	return nil
 }

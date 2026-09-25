@@ -1,19 +1,257 @@
 # Quality Report
 
 <p>
-<img src='https://img.shields.io/badge/Lint-0%20issues-brightgreen' alt='Lint'>
+<img src='https://img.shields.io/badge/Lint-191%20issues-red' alt='Lint'>
 <img src='https://img.shields.io/badge/Security-0%20known-brightgreen' alt='Security'>
-<img src='https://img.shields.io/badge/Coverage-79%25-yellow' alt='Coverage'>
+<img src='https://img.shields.io/badge/Coverage-75%25-yellow' alt='Coverage'>
 <img src='https://img.shields.io/badge/Build-passing-brightgreen' alt='Build'>
 </p>
-Generated: 2026-07-21T21:21:03Z
+Generated: 2026-08-08T10:55:49Z
 Project: github.com/guionardo/go
 
 ## Lint Results
 
-**Enabled linters:** 48  **Issues found:** 0
+**Enabled linters:** 48  **Issues found:** 191
 
-No issues found. Clean!
+| Linter | Issues |
+|--------|--------|
+| wsl_v5 | 98 |
+| modernize | 24 |
+| paralleltest | 19 |
+| errcheck | 16 |
+| copyloopvar | 9 |
+| funlen | 8 |
+| staticcheck | 6 |
+| cyclop | 3 |
+| gocognit | 3 |
+| errorlint | 2 |
+| decorder | 1 |
+| lll | 1 |
+| maintidx | 1 |
+
+<details>
+<summary>Issue Details (191 total)</summary>
+
+| Location | Linter | Message |
+|----------|--------|---------|
+| cache/bench_test.go:142 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:163 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:363 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:376 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:406 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:453 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:466 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:496 | copyloopvar | The copy of the 'for' variable "n" can be deleted (Go 1.22+) |
+| cache/bench_test.go:675 | copyloopvar | The copy of the 'for' variable "p" can be deleted (Go 1.22+) |
+| cache/bench_test.go:156 | cyclop | calculated cyclomatic complexity for function BenchmarkSingleflightGetOrSet is 17, max is 10 |
+| cache/bench_test.go:358 | cyclop | calculated cyclomatic complexity for function runBatchBenchmarks is 20, max is 10 |
+| cache/bench_test.go:446 | cyclop | calculated cyclomatic complexity for function BenchmarkBatch is 36, max is 10 |
+| cache/cache.go:34 | decorder | multiple "type" declarations are not allowed; use parentheses instead |
+| cache/bench_test.go:173 | errcheck | Error return value of `c.Close` is not checked |
+| cache/bench_test.go:203 | errcheck | Error return value of `provider.Close` is not checked |
+| cache/bench_test.go:237 | errcheck | Error return value of `provider.Close` is not checked |
+| cache/bench_test.go:268 | errcheck | Error return value of `provider.Close` is not checked |
+| cache/bench_test.go:311 | errcheck | Error return value of `pgProvider.Close` is not checked |
+| cache/bench_test.go:448 | errcheck | Error return value of `c.Close` is not checked |
+| cache/bench_test.go:678 | errcheck | Error return value of `c.Close` is not checked |
+| cache/memcache/memcache_test.go:99 | errcheck | Error return value of `c.Close` is not checked |
+| cache/memcache/memcache_test.go:112 | errcheck | Error return value of `c.Close` is not checked |
+| cache/memcache/memcache_test.go:120 | errcheck | Error return value of `c.Close` is not checked |
+| cache/memcache/memcache_test.go:136 | errcheck | Error return value of `c.Close` is not checked |
+| cache/memcache/memcache_test.go:153 | errcheck | Error return value of `c.Close` is not checked |
+| cache/memcache/memcache_test.go:161 | errcheck | Error return value of `c.Close` is not checked |
+| cache/postgres/postgres.go:160 | errcheck | Error return value of `br.Close` is not checked |
+| cache/postgres/postgres.go:202 | errcheck | Error return value of `br.Close` is not checked |
+| cache/postgres/postgres.go:231 | errcheck | Error return value of `br.Close` is not checked |
+| cache/memcache/memcache.go:235 | errorlint | comparing with == will fail on wrapped errors. Use errors.Is to check for a specific error |
+| cache/redis/redis.go:108 | errorlint | comparing with == will fail on wrapped errors. Use errors.Is to check for a specific error |
+| cache/bench_test.go:156 | funlen | Function 'BenchmarkSingleflightGetOrSet' is too long (149 > 60) |
+| cache/bench_test.go:358 | funlen | Function 'runBatchBenchmarks' is too long (82 > 60) |
+| cache/bench_test.go:446 | funlen | Function 'BenchmarkBatch' is too long (232 > 60) |
+| cache/concrete_cache_test.go:228 | funlen | Function 'TestConcreteCache_Batch' is too long (81 > 60) |
+| cache/mem/mem_test.go:166 | funlen | Function 'TestMemCache_Batch' is too long (74 > 60) |
+| cache/memcache/memcache_test.go:94 | funlen | Function 'TestMemcacheCache_Batch' is too long (71 > 60) |
+| cache/redis/redis_test.go:92 | funlen | Function 'TestRedisCache_Batch' is too long (78 > 60) |
+| cache/valkey/valkey_test.go:92 | funlen | Function 'TestValkeyCache_Batch' is too long (78 > 60) |
+| cache/bench_test.go:156 | gocognit | cognitive complexity 32 of func `BenchmarkSingleflightGetOrSet` is high (> 30) |
+| cache/bench_test.go:358 | gocognit | cognitive complexity 86 of func `runBatchBenchmarks` is high (> 30) |
+| cache/bench_test.go:446 | gocognit | cognitive complexity 118 of func `BenchmarkBatch` is high (> 30) |
+| cache/postgres/postgres.go:186 | lll | The line is 136 characters long, which exceeds the maximum of 120 characters. |
+| cache/bench_test.go:446 | maintidx | Function name: BenchmarkBatch, Cyclomatic Complexity: 36, Halstead Volume: 7574.08, Maintainability Index: 16 |
+| cache/bench_test.go:84 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:86 | modernize | waitgroupgo: Goroutine creation can be simplified using WaitGroup.Go |
+| cache/bench_test.go:115 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:117 | modernize | waitgroupgo: Goroutine creation can be simplified using WaitGroup.Go |
+| cache/bench_test.go:142 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:163 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:300 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:363 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:376 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:380 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:391 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:406 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:410 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:425 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:453 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:466 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:470 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:481 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:496 | modernize | forvar: copying variable is unneeded |
+| cache/bench_test.go:500 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:515 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:658 | modernize | rangeint: for loop can be modernized using range over int |
+| cache/bench_test.go:675 | modernize | forvar: copying variable is unneeded |
+| cache/concrete_cache_test.go:96 | modernize | mapsloop: Replace m[k]=v loop with maps.Copy |
+| cache/memcache/memcache_internal_test.go:23 | paralleltest | Function TestMemcacheBatch_NoServer missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_internal_test.go:28 | paralleltest | Function TestMemcacheBatch_NoServer missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_internal_test.go:34 | paralleltest | Function TestMemcacheBatch_NoServer missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_internal_test.go:40 | paralleltest | Function TestMemcacheBatch_NoServer missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_internal_test.go:45 | paralleltest | Function TestMemcacheBatch_NoServer missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_test.go:94 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel
+ |
+| cache/memcache/memcache_test.go:97 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_test.go:110 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_test.go:118 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_test.go:134 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_test.go:151 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel in the test run
+ |
+| cache/memcache/memcache_test.go:159 | paralleltest | Function TestMemcacheCache_Batch missing the call to method parallel in the test run
+ |
+| cache/postgres/postgres_test.go:130 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel
+ |
+| cache/postgres/postgres_test.go:134 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel in the test run
+ |
+| cache/postgres/postgres_test.go:145 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel in the test run
+ |
+| cache/postgres/postgres_test.go:150 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel in the test run
+ |
+| cache/postgres/postgres_test.go:163 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel in the test run
+ |
+| cache/postgres/postgres_test.go:168 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel in the test run
+ |
+| cache/postgres/postgres_test.go:182 | paralleltest | Function TestPostgresCache_Batch missing the call to method parallel in the test run
+ |
+| cache/bench_test.go:184 | staticcheck | SA1019: tcredis.RunContainer is deprecated: use Run instead RunContainer creates an instance of the Redis container type  |
+| cache/bench_test.go:215 | staticcheck | SA1019: wait.ForAll(
+	wait.ForLog("* Ready to accept connections"),
+	wait.ForListeningPort("6379/tcp"),
+).WithStartupTimeout is deprecated: use WithDeadline  |
+| cache/bench_test.go:276 | staticcheck | SA1019: tcpostgres.RunContainer is deprecated: use Run instead RunContainer creates an instance of the Postgres container type  |
+| cache/bench_test.go:545 | staticcheck | SA1019: tcredis.RunContainer is deprecated: use Run instead RunContainer creates an instance of the Redis container type  |
+| cache/bench_test.go:575 | staticcheck | SA1019: wait.ForAll(
+	wait.ForLog("* Ready to accept connections"),
+	wait.ForListeningPort("6379/tcp"),
+).WithStartupTimeout is deprecated: use WithDeadline  |
+| cache/bench_test.go:634 | staticcheck | SA1019: tcpostgres.RunContainer is deprecated: use Run instead RunContainer creates an instance of the Postgres container type  |
+| cache/bench_test.go:33 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:37 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:51 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:72 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:78 | wsl_v5 | missing whitespace above this line (invalid statement above for) |
+| cache/bench_test.go:88 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:92 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:96 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:98 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:109 | wsl_v5 | missing whitespace above this line (invalid statement above for) |
+| cache/bench_test.go:126 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:130 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:132 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:174 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:196 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:202 | wsl_v5 | missing whitespace above this line (too many statements above defer) |
+| cache/bench_test.go:204 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:230 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:236 | wsl_v5 | missing whitespace above this line (too many statements above defer) |
+| cache/bench_test.go:238 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:261 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:267 | wsl_v5 | missing whitespace above this line (too many statements above defer) |
+| cache/bench_test.go:269 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:290 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:299 | wsl_v5 | missing whitespace above this line (never cuddle decl) |
+| cache/bench_test.go:305 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:307 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:312 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:327 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:329 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:346 | wsl_v5 | missing whitespace above this line (no shared variables above range) |
+| cache/bench_test.go:351 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:383 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:394 | wsl_v5 | missing whitespace above this line (invalid statement above range) |
+| cache/bench_test.go:415 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:417 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:430 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:432 | wsl_v5 | missing whitespace above this line (invalid statement above range) |
+| cache/bench_test.go:449 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:473 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:484 | wsl_v5 | missing whitespace above this line (invalid statement above range) |
+| cache/bench_test.go:505 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:507 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:520 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:522 | wsl_v5 | missing whitespace above this line (invalid statement above range) |
+| cache/bench_test.go:557 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:563 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:590 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:596 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:620 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:626 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/bench_test.go:648 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/bench_test.go:657 | wsl_v5 | missing whitespace above this line (never cuddle decl) |
+| cache/bench_test.go:663 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/bench_test.go:665 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/bench_test.go:679 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/concrete_cache_test.go:84 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/concrete_cache_test.go:98 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/concrete_cache_test.go:112 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/mem/mem.go:96 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/mem/mem.go:108 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/mem/mem.go:119 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/memcache/memcache.go:171 | wsl_v5 | missing whitespace above this line (never cuddle decl) |
+| cache/memcache/memcache.go:175 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/memcache/memcache.go:177 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/memcache/memcache.go:198 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/memcache/memcache.go:207 | wsl_v5 | missing whitespace above this line (invalid statement above send) |
+| cache/memcache/memcache.go:212 | wsl_v5 | missing whitespace above this line (no shared variables above range) |
+| cache/memcache/memcache.go:239 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/memcache/memcache.go:243 | wsl_v5 | missing whitespace above this line (invalid statement above send) |
+| cache/memcache/memcache.go:248 | wsl_v5 | missing whitespace above this line (no shared variables above range) |
+| cache/postgres/postgres.go:165 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/postgres/postgres.go:169 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/postgres/postgres.go:172 | wsl_v5 | missing whitespace above this line (never cuddle decl) |
+| cache/postgres/postgres.go:176 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/postgres/postgres.go:178 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/postgres/postgres.go:198 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/postgres/postgres.go:206 | wsl_v5 | missing whitespace above this line (no shared variables above range) |
+| cache/postgres/postgres.go:235 | wsl_v5 | missing whitespace above this line (no shared variables above range) |
+| cache/redis/redis.go:99 | wsl_v5 | missing whitespace above this line (too many statements above range) |
+| cache/redis/redis.go:103 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/redis/redis.go:111 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/redis/redis.go:114 | wsl_v5 | missing whitespace above this line (never cuddle decl) |
+| cache/redis/redis.go:118 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/redis/redis.go:120 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/redis/redis.go:134 | wsl_v5 | missing whitespace above this line (invalid statement above expr) |
+| cache/redis/redis.go:140 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/redis/redis.go:149 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/redis/redis.go:152 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/valkey/valkey.go:129 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/valkey/valkey.go:137 | wsl_v5 | missing whitespace above this line (invalid statement above if) |
+| cache/valkey/valkey.go:140 | wsl_v5 | missing whitespace above this line (never cuddle decl) |
+| cache/valkey/valkey.go:144 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/valkey/valkey.go:146 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/valkey/valkey.go:164 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/valkey/valkey.go:168 | wsl_v5 | missing whitespace above this line (invalid statement above assign) |
+| cache/valkey/valkey.go:177 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+| cache/valkey/valkey.go:198 | wsl_v5 | missing whitespace above this line (too many lines above return) |
+
+</details>
 
 ## Security Vulnerabilities
 
@@ -21,7 +259,7 @@ No known vulnerabilities found.
 
 ## Test Coverage
 
-**Total coverage:** 79%
+**Total coverage:** 75%
 
 <details>
 <summary>Per-function coverage</summary>
@@ -33,22 +271,48 @@ github.com/guionardo/go/br_docs/brdocs.go:38:			isCadastro			100.0%
 github.com/guionardo/go/br_docs/brdocs.go:65:			calcCadastroDigit		100.0%
 github.com/guionardo/go/br_docs/brdocs.go:85:			RemoveNonDigitAndLetters	100.0%
 github.com/guionardo/go/br_docs/brdocs.go:98:			allEq				100.0%
-github.com/guionardo/go/cache/mem/mem.go:21:			New				100.0%
-github.com/guionardo/go/cache/mem/mem.go:42:			Get				100.0%
-github.com/guionardo/go/cache/mem/mem.go:65:			Set				100.0%
-github.com/guionardo/go/cache/mem/mem.go:76:			Delete				100.0%
-github.com/guionardo/go/cache/mem/mem.go:85:			GetOrSet			81.8%
-github.com/guionardo/go/cache/mem/mem.go:107:			Close				100.0%
-github.com/guionardo/go/cache/mem/mem.go:117:			resolveTTL			85.7%
-github.com/guionardo/go/cache/mem/sweeper.go:8:			sweepLoop			83.3%
-github.com/guionardo/go/cache/mem/sweeper.go:23:		sweep				100.0%
-github.com/guionardo/go/cache/memcache/memcache.go:27:		New				100.0%
-github.com/guionardo/go/cache/memcache/memcache.go:44:		Get				0.0%
-github.com/guionardo/go/cache/memcache/memcache.go:78:		Set				0.0%
-github.com/guionardo/go/cache/memcache/memcache.go:108:		Delete				0.0%
-github.com/guionardo/go/cache/memcache/memcache.go:129:		GetOrSet			0.0%
-github.com/guionardo/go/cache/memcache/memcache.go:150:		Close				100.0%
-github.com/guionardo/go/cache/memcache/memcache.go:156:		resolveTTL			90.9%
+github.com/guionardo/go/cache/concrete_cache.go:26:		NewConcreteCache		100.0%
+github.com/guionardo/go/cache/concrete_cache.go:33:		Get				100.0%
+github.com/guionardo/go/cache/concrete_cache.go:39:		Set				100.0%
+github.com/guionardo/go/cache/concrete_cache.go:44:		Delete				100.0%
+github.com/guionardo/go/cache/concrete_cache.go:55:		GetOrSet			100.0%
+github.com/guionardo/go/cache/concrete_cache.go:65:		Close				100.0%
+github.com/guionardo/go/cache/concrete_cache.go:71:		MGet				100.0%
+github.com/guionardo/go/cache/concrete_cache.go:76:		MSet				100.0%
+github.com/guionardo/go/cache/concrete_cache.go:81:		MDel				100.0%
+github.com/guionardo/go/cache/errors.go:23:			Error				100.0%
+github.com/guionardo/go/cache/errors.go:29:			Unwrap				75.0%
+github.com/guionardo/go/cache/errors.go:50:			newPanic			100.0%
+github.com/guionardo/go/cache/mem/config.go:14:			WithDefaultTTL			100.0%
+github.com/guionardo/go/cache/mem/config.go:20:			WithMaxEntries			100.0%
+github.com/guionardo/go/cache/mem/config.go:25:			WithSweepInterval		100.0%
+github.com/guionardo/go/cache/mem/mem.go:20:			New				100.0%
+github.com/guionardo/go/cache/mem/mem.go:43:			GetFunc				100.0%
+github.com/guionardo/go/cache/mem/mem.go:55:			SetFunc				100.0%
+github.com/guionardo/go/cache/mem/mem.go:63:			DeleteFunc			100.0%
+github.com/guionardo/go/cache/mem/mem.go:71:			CloseFunc			100.0%
+github.com/guionardo/go/cache/mem/mem.go:86:			MGetFunc			100.0%
+github.com/guionardo/go/cache/mem/mem.go:100:			MSetFunc			100.0%
+github.com/guionardo/go/cache/mem/mem.go:112:			MDelFunc			100.0%
+github.com/guionardo/go/cache/mem/mem.go:122:			resolveTTL			88.9%
+github.com/guionardo/go/cache/mem/store.go:21:			isExpired			100.0%
+github.com/guionardo/go/cache/mem/store.go:25:			newMemStore			100.0%
+github.com/guionardo/go/cache/mem/store.go:32:			get				100.0%
+github.com/guionardo/go/cache/mem/store.go:46:			set				100.0%
+github.com/guionardo/go/cache/mem/store.go:52:			validateMaxEntries		83.3%
+github.com/guionardo/go/cache/mem/store.go:66:			delete				100.0%
+github.com/guionardo/go/cache/mem/store.go:70:			removeExpired			100.0%
+github.com/guionardo/go/cache/mem/sweeper.go:8:			sweepLoop			85.7%
+github.com/guionardo/go/cache/mem/sweeper.go:24:		sweep				100.0%
+github.com/guionardo/go/cache/memcache/memcache.go:33:		New				100.0%
+github.com/guionardo/go/cache/memcache/memcache.go:50:		GetFunc				0.0%
+github.com/guionardo/go/cache/memcache/memcache.go:84:		SetFunc				0.0%
+github.com/guionardo/go/cache/memcache/memcache.go:114:		DeleteFunc			0.0%
+github.com/guionardo/go/cache/memcache/memcache.go:135:		CloseFunc			100.0%
+github.com/guionardo/go/cache/memcache/memcache.go:142:		MGetFunc			73.7%
+github.com/guionardo/go/cache/memcache/memcache.go:183:		MSetFunc			81.0%
+github.com/guionardo/go/cache/memcache/memcache.go:229:		MDelFunc			77.8%
+github.com/guionardo/go/cache/memcache/memcache.go:264:		resolveTTL			90.9%
 github.com/guionardo/go/cache/memcache/options.go:16:		defaultConfig			100.0%
 github.com/guionardo/go/cache/memcache/options.go:25:		WithServers			100.0%
 github.com/guionardo/go/cache/memcache/options.go:32:		WithTimeout			100.0%
@@ -62,13 +326,15 @@ github.com/guionardo/go/cache/postgres/options.go:35:		WithTableName			100.0%
 github.com/guionardo/go/cache/postgres/options.go:42:		WithPoolSize			100.0%
 github.com/guionardo/go/cache/postgres/options.go:49:		WithSweepInterval		100.0%
 github.com/guionardo/go/cache/postgres/options.go:56:		WithDefaultTTL			100.0%
-github.com/guionardo/go/cache/postgres/postgres.go:33:		New				53.8%
-github.com/guionardo/go/cache/postgres/postgres.go:66:		Get				0.0%
-github.com/guionardo/go/cache/postgres/postgres.go:93:		Set				0.0%
-github.com/guionardo/go/cache/postgres/postgres.go:114:		Delete				0.0%
-github.com/guionardo/go/cache/postgres/postgres.go:128:		GetOrSet			0.0%
-github.com/guionardo/go/cache/postgres/postgres.go:150:		Close				0.0%
-github.com/guionardo/go/cache/postgres/postgres.go:164:		resolveTTL			100.0%
+github.com/guionardo/go/cache/postgres/postgres.go:37:		New				53.8%
+github.com/guionardo/go/cache/postgres/postgres.go:70:		GetFunc				0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:97:		SetFunc				0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:118:		DeleteFunc			0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:133:		CloseFunc			0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:148:		MGetFunc			0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:184:		MSetFunc			0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:219:		MDelFunc			0.0%
+github.com/guionardo/go/cache/postgres/postgres.go:246:		resolveTTL			100.0%
 github.com/guionardo/go/cache/postgres/sweeper.go:13:		sweepLoop			0.0%
 github.com/guionardo/go/cache/postgres/sweeper.go:29:		sweep				0.0%
 github.com/guionardo/go/cache/redis/options.go:17:		defaultConfig			100.0%
@@ -77,31 +343,37 @@ github.com/guionardo/go/cache/redis/options.go:32:		WithPassword			100.0%
 github.com/guionardo/go/cache/redis/options.go:39:		WithDB				100.0%
 github.com/guionardo/go/cache/redis/options.go:46:		WithPoolSize			100.0%
 github.com/guionardo/go/cache/redis/options.go:53:		WithDefaultTTL			100.0%
-github.com/guionardo/go/cache/redis/redis.go:21:		New				100.0%
-github.com/guionardo/go/cache/redis/redis.go:41:		Get				0.0%
-github.com/guionardo/go/cache/redis/redis.go:62:		Set				71.4%
-github.com/guionardo/go/cache/redis/redis.go:77:		Delete				0.0%
-github.com/guionardo/go/cache/redis/redis.go:86:		GetOrSet			0.0%
-github.com/guionardo/go/cache/redis/redis.go:107:		Close				100.0%
-github.com/guionardo/go/cache/redis/redis.go:113:		resolveTTL			100.0%
+github.com/guionardo/go/cache/redis/redis.go:25:		New				100.0%
+github.com/guionardo/go/cache/redis/redis.go:45:		GetFunc				0.0%
+github.com/guionardo/go/cache/redis/redis.go:66:		SetFunc				71.4%
+github.com/guionardo/go/cache/redis/redis.go:81:		DeleteFunc			0.0%
+github.com/guionardo/go/cache/redis/redis.go:90:		CloseFunc			100.0%
+github.com/guionardo/go/cache/redis/redis.go:97:		MGetFunc			0.0%
+github.com/guionardo/go/cache/redis/redis.go:125:		MSetFunc			0.0%
+github.com/guionardo/go/cache/redis/redis.go:144:		MDelFunc			0.0%
+github.com/guionardo/go/cache/redis/redis.go:157:		resolveTTL			100.0%
+github.com/guionardo/go/cache/singleflight.go:35:		Do				93.3%
+github.com/guionardo/go/cache/singleflight.go:77:		callSetter			100.0%
 github.com/guionardo/go/cache/valkey/options.go:17:		defaultConfig			100.0%
 github.com/guionardo/go/cache/valkey/options.go:25:		WithAddr			100.0%
 github.com/guionardo/go/cache/valkey/options.go:32:		WithPassword			100.0%
 github.com/guionardo/go/cache/valkey/options.go:39:		WithDB				100.0%
 github.com/guionardo/go/cache/valkey/options.go:46:		WithPoolSize			100.0%
 github.com/guionardo/go/cache/valkey/options.go:53:		WithDefaultTTL			100.0%
-github.com/guionardo/go/cache/valkey/valkey.go:24:		New				100.0%
-github.com/guionardo/go/cache/valkey/valkey.go:44:		Get				0.0%
-github.com/guionardo/go/cache/valkey/valkey.go:69:		Set				16.7%
-github.com/guionardo/go/cache/valkey/valkey.go:92:		Delete				0.0%
-github.com/guionardo/go/cache/valkey/valkey.go:106:		GetOrSet			0.0%
-github.com/guionardo/go/cache/valkey/valkey.go:132:		Close				66.7%
-github.com/guionardo/go/cache/valkey/valkey.go:141:		resolveTTL			100.0%
+github.com/guionardo/go/cache/valkey/valkey.go:28:		New				100.0%
+github.com/guionardo/go/cache/valkey/valkey.go:48:		GetFunc				0.0%
+github.com/guionardo/go/cache/valkey/valkey.go:73:		SetFunc				16.7%
+github.com/guionardo/go/cache/valkey/valkey.go:96:		DeleteFunc			0.0%
+github.com/guionardo/go/cache/valkey/valkey.go:110:		CloseFunc			66.7%
+github.com/guionardo/go/cache/valkey/valkey.go:120:		MGetFunc			0.0%
+github.com/guionardo/go/cache/valkey/valkey.go:151:		MSetFunc			0.0%
+github.com/guionardo/go/cache/valkey/valkey.go:182:		MDelFunc			0.0%
+github.com/guionardo/go/cache/valkey/valkey.go:203:		resolveTTL			100.0%
 github.com/guionardo/go/cmd/example-updater/main.go:20:		main				0.0%
-github.com/guionardo/go/config/environment/environment.go:16:	GetEnv				100.0%
-github.com/guionardo/go/config/environment/environment.go:41:	ParseEnvironment		94.3%
-github.com/guionardo/go/config/environment/environment.go:116:	getFieldEnvValue		100.0%
-github.com/guionardo/go/config/environment/environment.go:126:	setField			86.4%
+github.com/guionardo/go/config/environment/environment.go:14:	GetEnv				100.0%
+github.com/guionardo/go/config/environment/environment.go:33:	ParseEnvironment		91.7%
+github.com/guionardo/go/config/environment/environment.go:109:	getFieldEnvValue		100.0%
+github.com/guionardo/go/config/environment/environment.go:119:	setField			82.6%
 github.com/guionardo/go/config/logging.go:15:			getConfigurationLog		100.0%
 github.com/guionardo/go/config/logging.go:28:			getMapFromStruct		100.0%
 github.com/guionardo/go/config/logging.go:57:			fieldPath			100.0%
@@ -118,16 +390,29 @@ github.com/guionardo/go/config/profile/profile.go:25:		getProfileMap			100.0%
 github.com/guionardo/go/config/profile/profile.go:46:		readProfileMap			100.0%
 github.com/guionardo/go/config/profile/profile.go:63:		getProfileFiles			100.0%
 github.com/guionardo/go/config/profile/profile.go:90:		findYAMLFile			100.0%
-github.com/guionardo/go/config/provider.go:41:			NewProvider			100.0%
-github.com/guionardo/go/config/provider.go:62:			GetConfiguration		100.0%
-github.com/guionardo/go/config/provider.go:83:			UpdateConfiguration		100.0%
-github.com/guionardo/go/config/provider.go:90:			updateConfiguration		100.0%
-github.com/guionardo/go/config/provider.go:112:			loadStaticConfiguration		72.7%
-github.com/guionardo/go/config/provider_base.go:20:		getProfilesPath			100.0%
-github.com/guionardo/go/config/provider_base.go:31:		validateConfiguration		100.0%
-github.com/guionardo/go/config/validation/validator.go:17:	Validate			100.0%
+github.com/guionardo/go/config/provider.go:43:			NewProvider			100.0%
+github.com/guionardo/go/config/provider.go:64:			GetConfiguration		100.0%
+github.com/guionardo/go/config/provider.go:85:			UpdateConfiguration		100.0%
+github.com/guionardo/go/config/provider.go:92:			updateConfiguration		100.0%
+github.com/guionardo/go/config/provider.go:114:			loadStaticConfiguration		64.7%
+github.com/guionardo/go/config/provider_base.go:19:		getProfilesPath			100.0%
+github.com/guionardo/go/config/provider_base.go:30:		validateConfiguration		100.0%
+github.com/guionardo/go/config/validation/validator.go:21:	getValidator			100.0%
+github.com/guionardo/go/config/validation/validator.go:32:	Validate			100.0%
 github.com/guionardo/go/flow/default.go:4:			Default				100.0%
 github.com/guionardo/go/flow/if.go:4:				If				100.0%
+github.com/guionardo/go/flow/ordered_map.go:13:			NewOrderedMap			100.0%
+github.com/guionardo/go/flow/ordered_map.go:19:			Set				100.0%
+github.com/guionardo/go/flow/ordered_map.go:24:			Get				100.0%
+github.com/guionardo/go/flow/ordered_map.go:29:			GetDefault			100.0%
+github.com/guionardo/go/flow/ordered_map.go:37:			Delete				100.0%
+github.com/guionardo/go/flow/ordered_map.go:41:			Keys				80.0%
+github.com/guionardo/go/flow/ordered_map.go:55:			Range				75.0%
+github.com/guionardo/go/flow/ordered_map.go:65:			Len				0.0%
+github.com/guionardo/go/flow/ordered_map.go:69:			validateRange			100.0%
+github.com/guionardo/go/flow/slices.go:3:			SliceFirstOrDefault		100.0%
+github.com/guionardo/go/flow/slices.go:11:			SliceLastOrDefault		100.0%
+github.com/guionardo/go/flow/slices.go:19:			RemoveItem			100.0%
 github.com/guionardo/go/fraction/fraction.go:55:		New				100.0%
 github.com/guionardo/go/fraction/fraction.go:86:		FromFloat64			93.8%
 github.com/guionardo/go/fraction/fraction.go:149:		Add				100.0%
@@ -180,13 +465,13 @@ github.com/guionardo/go/httptest_mock/request.go:112:		matchPath			100.0%
 github.com/guionardo/go/httptest_mock/request.go:143:		matchPathParams			100.0%
 github.com/guionardo/go/httptest_mock/request.go:161:		matchQueryParams		100.0%
 github.com/guionardo/go/httptest_mock/request.go:180:		matchHeaders			100.0%
-github.com/guionardo/go/httptest_mock/request.go:194:		matchBody			100.0%
-github.com/guionardo/go/httptest_mock/request.go:218:		compareBody			100.0%
-github.com/guionardo/go/httptest_mock/request.go:233:		marshalSorted			100.0%
+github.com/guionardo/go/httptest_mock/request.go:205:		matchBody			100.0%
+github.com/guionardo/go/httptest_mock/request.go:229:		compareBody			100.0%
+github.com/guionardo/go/httptest_mock/request.go:244:		marshalSorted			100.0%
 github.com/guionardo/go/httptest_mock/response.go:29:		String				100.0%
 github.com/guionardo/go/httptest_mock/response.go:39:		writeResponse			100.0%
 github.com/guionardo/go/httptest_mock/response.go:49:		writeHeaderAndBody		100.0%
-github.com/guionardo/go/httptest_mock/response.go:87:		setContentTypeIfNotSet		83.3%
+github.com/guionardo/go/httptest_mock/response.go:86:		setContentTypeIfNotSet		83.3%
 github.com/guionardo/go/httptest_mock/setup.go:41:		SetupServer			84.6%
 github.com/guionardo/go/httptest_mock/setup.go:84:		WithRequests			100.0%
 github.com/guionardo/go/httptest_mock/setup.go:109:		WithRequestsFrom		100.0%
@@ -214,11 +499,34 @@ github.com/guionardo/go/path_tools/root_directory.go:21:	IsRootDirectory			100.0
 github.com/guionardo/go/path_tools/root_directory.go:26:	windowsPathBaseFunc		100.0%
 github.com/guionardo/go/path_tools/root_folder.go:12:		GetRootFolder			92.9%
 github.com/guionardo/go/reflect_tools/reflect_tools.go:12:	IsZeroValue			100.0%
+github.com/guionardo/go/release/embed_swapper.go:19:		runtimeExeSuffix		66.7%
+github.com/guionardo/go/release/embed_swapper.go:27:		swapperFilename			100.0%
+github.com/guionardo/go/release/embed_swapper.go:31:		ExtractSwapper			75.0%
+github.com/guionardo/go/release/release.go:55:			getCurrentModule		71.4%
+github.com/guionardo/go/release/release.go:69:			GetThisLatestRelease		72.7%
+github.com/guionardo/go/release/release.go:108:			GetLatestRelease		83.3%
+github.com/guionardo/go/release/release.go:128:			Download			75.0%
+github.com/guionardo/go/release/self_update.go:47:		String				100.0%
+github.com/guionardo/go/release/self_update.go:63:		updateLockPath			75.0%
+github.com/guionardo/go/release/self_update.go:72:		computeFileSHA256		100.0%
+github.com/guionardo/go/release/self_update.go:84:		acquireUpdateLock		77.8%
+github.com/guionardo/go/release/self_update.go:103:		downloadAndSwap			27.3%
+github.com/guionardo/go/release/self_update.go:145:		resolveCurrentVersion		100.0%
+github.com/guionardo/go/release/self_update.go:154:		PerformSelfUpdate		89.7%
 github.com/guionardo/go/release/swapper/main.go:23:		main				0.0%
 github.com/guionardo/go/release/swapper/main.go:85:		restoreBackup			80.0%
 github.com/guionardo/go/release/swapper/main.go:97:		verifyChecksum			100.0%
 github.com/guionardo/go/release/swapper/swap_unix.go:11:	atomicReplace			88.9%
 github.com/guionardo/go/release/swapper/swap_unix.go:35:	relaunch			0.0%
+github.com/guionardo/go/release/update.go:27:			apply				100.0%
+github.com/guionardo/go/release/update.go:33:			WithOwner			100.0%
+github.com/guionardo/go/release/update.go:39:			WithRepo			100.0%
+github.com/guionardo/go/release/update.go:45:			WithGitHubToken			100.0%
+github.com/guionardo/go/release/update.go:51:			CheckForUpdate			60.5%
+github.com/guionardo/go/release/update.go:123:			DownloadUpdate			73.3%
+github.com/guionardo/go/release/update.go:149:			findAsset			100.0%
+github.com/guionardo/go/release/version.go:11:			ParseVersion			100.0%
+github.com/guionardo/go/release/version.go:20:			GetCurrentVersion		71.4%
 github.com/guionardo/go/set/marshal.go:7:			MarshalJSON			100.0%
 github.com/guionardo/go/set/marshal.go:12:			UnmarshalJSON			100.0%
 github.com/guionardo/go/set/scanner_valuer.go:9:		Scan				100.0%
@@ -238,13 +546,14 @@ github.com/guionardo/go/set/set.go:116:				HasAll				100.0%
 github.com/guionardo/go/set/set.go:127:				Filter				100.0%
 github.com/guionardo/go/set/set.go:140:				Equals				100.0%
 github.com/guionardo/go/set/set.go:155:				Clear				100.0%
-github.com/guionardo/go/shell_tools/environment.go:12:		GetEnv				85.7%
+github.com/guionardo/go/shell_tools/environment.go:8:		GetEnv				100.0%
 github.com/guionardo/go/shell_tools/shell_args.go:12:		NewQuotedShellArgs		95.2%
 github.com/guionardo/go/shell_tools/shell_args.go:59:		extractQuotedPrefix		84.6%
 github.com/guionardo/go/shell_tools/shell_args.go:86:		String				85.7%
-github.com/guionardo/go/time_tools/parser.go:46:		Parse				100.0%
-github.com/guionardo/go/time_tools/parser.go:80:		SetLayouts			100.0%
-total:								(statements)			79.4%
+github.com/guionardo/go/time_tools/parser.go:20:		init				100.0%
+github.com/guionardo/go/time_tools/parser.go:49:		Parse				100.0%
+github.com/guionardo/go/time_tools/parser.go:75:		SetLayouts			100.0%
+total:								(statements)			75.8%
 ```
 
 </details>
@@ -253,15 +562,15 @@ total:								(statements)			79.4%
 
 | Extension | Files | Lines |
 |-----------|-------|-------|
-| .go | 152 | 11463 |
+| .go | 165 | 14458 |
 | .mod | 1 | 119 |
-| .yml | 5 | 395 |
+| .yml | 6 | 409 |
 | .yaml | 10 | 198 |
-| .json | 3 | 17 |
-| .md | 11 | 2116 |
+| .json | 48 | 2455 |
+| .md | 47 | 7812 |
 | .sh | 2 | 356 |
 
-**Total files:** 194  **Total lines:** 71274
+**Total files:** 3866  **Total lines:** 1335925
 
 ## Direct Dependencies
 
@@ -479,7 +788,7 @@ github.com/guionardo/go
 | google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 | |
 | google.golang.org/genproto/googleapis/bytestream v0.0.0-20260630182238-925bb5da69e7 | |
 | google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 | |
-| google.golang.org/grpc v1.82.0 | |
+| google.golang.org/grpc v1.82.1 | |
 | google.golang.org/protobuf v1.36.11 | |
 | gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c | |
 | gopkg.in/yaml.v2 v2.2.8 | |

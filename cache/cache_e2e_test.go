@@ -23,7 +23,7 @@ import (
 
 type providerCase struct {
 	name string
-	fn   func(t *testing.T) cache.Cache[string, string]
+	fn   func(t *testing.T) cache.BatchCache[string, string]
 }
 
 func runCacheE2E(t *testing.T, providers []providerCase) {
@@ -136,6 +136,89 @@ func runCacheE2E(t *testing.T, providers []providerCase) {
 				}
 			})
 
+			t.Run("mget_returns_multiple", func(t *testing.T) {
+				_ = c.Set(ctx, "e2e_mget_a", "value_a")
+				_ = c.Set(ctx, "e2e_mget_b", "value_b")
+
+				result := c.MGet(ctx, "e2e_mget_a", "e2e_mget_b", "e2e_mget_missing")
+				if result["e2e_mget_a"] != "value_a" {
+					t.Fatalf("expected value_a, got %q", result["e2e_mget_a"])
+				}
+				if result["e2e_mget_b"] != "value_b" {
+					t.Fatalf("expected value_b, got %q", result["e2e_mget_b"])
+				}
+				if _, ok := result["e2e_mget_missing"]; ok {
+					t.Fatal("missing key should not be in result")
+				}
+			})
+
+			t.Run("mget_empty_keys", func(t *testing.T) {
+				result := c.MGet(ctx)
+				if len(result) != 0 {
+					t.Fatalf("expected empty map, got %v", result)
+				}
+			})
+
+			t.Run("mset_stores_all_keys", func(t *testing.T) {
+				items := map[string]string{
+					"e2e_mset_a": "val_a",
+					"e2e_mset_b": "val_b",
+				}
+				if err := c.MSet(ctx, items); err != nil {
+					t.Fatal(err)
+				}
+
+				got, err := c.Get(ctx, "e2e_mset_a")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != "val_a" {
+					t.Fatalf("got %q, want %q", got, "val_a")
+				}
+
+				got, err = c.Get(ctx, "e2e_mset_b")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != "val_b" {
+					t.Fatalf("got %q, want %q", got, "val_b")
+				}
+			})
+
+			t.Run("mset_empty_map", func(t *testing.T) {
+				if err := c.MSet(ctx, map[string]string{}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("mdel_removes_all_keys", func(t *testing.T) {
+				_ = c.Set(ctx, "e2e_mdel_a", "val_a")
+				_ = c.Set(ctx, "e2e_mdel_b", "val_b")
+
+				if err := c.MDel(ctx, "e2e_mdel_a", "e2e_mdel_b"); err != nil {
+					t.Fatal(err)
+				}
+
+				if _, err := c.Get(ctx, "e2e_mdel_a"); err == nil {
+					t.Fatal("expected error after MDel")
+				}
+				if _, err := c.Get(ctx, "e2e_mdel_b"); err == nil {
+					t.Fatal("expected error after MDel")
+				}
+			})
+
+			t.Run("mdel_idempotent", func(t *testing.T) {
+				if err := c.MDel(ctx, "e2e_mdel_nonexistent"); err != nil {
+					t.Fatalf("MDel of missing keys should not error: %v", err)
+				}
+			})
+
+			t.Run("mdel_empty_keys", func(t *testing.T) {
+				if err := c.MDel(ctx); err != nil {
+					t.Fatal(err)
+				}
+			})
+
 			t.Run("close", func(t *testing.T) {
 				err := c.Close()
 				if err != nil {
@@ -150,7 +233,7 @@ func TestCacheE2E_Mem(t *testing.T) {
 	runCacheE2E(t, []providerCase{
 		{
 			name: "in_memory",
-			fn: func(t *testing.T) cache.Cache[string, string] {
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return mem.New[string, string](t.Context())
 			},
 		},
@@ -186,7 +269,7 @@ func TestCacheE2E_Redis(t *testing.T) {
 	runCacheE2E(t, []providerCase{
 		{
 			name: "redis",
-			fn: func(t *testing.T) cache.Cache[string, string] {
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return redis.New[string, string](redis.WithAddr(addr))
 			},
 		},
@@ -229,7 +312,7 @@ func TestCacheE2E_Valkey(t *testing.T) {
 	runCacheE2E(t, []providerCase{
 		{
 			name: "valkey",
-			fn: func(t *testing.T) cache.Cache[string, string] {
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return valkey.New[string, string](valkey.WithAddr(addr))
 			},
 		},
@@ -269,7 +352,7 @@ func TestCacheE2E_Memcache(t *testing.T) {
 	runCacheE2E(t, []providerCase{
 		{
 			name: "memcache",
-			fn: func(t *testing.T) cache.Cache[string, string] {
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return memcache.New[string, string](memcache.WithServers(addr))
 			},
 		},
@@ -305,7 +388,7 @@ func TestCacheE2E_Postgres(t *testing.T) {
 	connStr := "postgres://test:test@" + host + ":" + port.Port() + "/cache_e2e?sslmode=disable"
 
 	// Retry connecting — Postgres may not accept connections immediately.
-	var pgCache cache.Cache[string, string]
+	var pgCache cache.BatchCache[string, string]
 	var lastErr error
 	for retry := 0; retry < 10; retry++ {
 		pgCache, lastErr = postgres.New[string, string](postgres.WithConnString(connStr))
@@ -322,7 +405,7 @@ func TestCacheE2E_Postgres(t *testing.T) {
 	runCacheE2E(t, []providerCase{
 		{
 			name: "postgres",
-			fn: func(t *testing.T) cache.Cache[string, string] {
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return pgCache
 			},
 		},

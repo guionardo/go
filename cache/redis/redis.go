@@ -21,8 +21,8 @@ type redisCache[K comparable, V any] struct {
 }
 
 // New creates a new Redis cache provider with optional functional options.
-// Returns a cache.Cache sharing the in-memory singleflight GetOrSet.
-func New[K comparable, V any](opts ...Option) cache.Cache[K, V] {
+// Returns a cache.BatchCache sharing the in-memory singleflight GetOrSet.
+func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
 	cfg := defaultConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -89,6 +89,67 @@ func (c *redisCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 // CloseFunc cleans up the Redis connection.
 func (c *redisCache[K, V]) CloseFunc() error {
 	return c.client.Close()
+}
+
+// MGetFunc retrieves values for multiple keys via go-redis Pipeline.
+// Each key is a separate GET command in the pipeline; missing keys are
+// silently excluded from the result (D-06 best-effort).
+func (c *redisCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	pipe := c.client.Pipeline()
+	cmds := make([]*redis.StringCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Get(ctx, fmt.Sprint(key))
+	}
+	_, _ = pipe.Exec(ctx) // ignore pipeline-level error; check per command
+
+	result := make(map[K]V, len(keys))
+	for i, key := range keys {
+		data, err := cmds[i].Bytes()
+		if err == redis.Nil {
+			continue // missing key — skip silently
+		}
+		if err != nil {
+			continue // per-key error — skip (D-06 best-effort)
+		}
+		var value V
+		if err := json.Unmarshal(data, &value); err != nil {
+			continue // deserialization error — skip
+		}
+		result[key] = value
+	}
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs via go-redis Pipeline.
+// A single TTL applies to all keys in the batch.
+func (c *redisCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	pipe := c.client.Pipeline()
+	expiration := c.resolveTTL(ttl...)
+
+	for key, value := range items {
+		data, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("cache/redis: %w", err) // hard failure on marshal
+		}
+		pipe.Set(ctx, fmt.Sprint(key), data, expiration)
+	}
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("cache/redis: %w", err)
+	}
+	return nil
+}
+
+// MDelFunc removes multiple keys via go-redis Pipeline.
+func (c *redisCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	pipe := c.client.Pipeline()
+	for _, key := range keys {
+		pipe.Del(ctx, fmt.Sprint(key))
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return fmt.Errorf("cache/redis: %w", err)
+	}
+	return nil
 }
 
 // resolveTTL resolves the effective TTL for a Set operation.
