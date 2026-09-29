@@ -39,12 +39,13 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
 - ✓ `project_probe` package foundation — never-fail `Probe` contract, `ProjectData` model, `Language` type, error sentinels, ordered detector registry, ignore list, `readManifest` — `project_probe/` — v1.7 (Phase 10)
 - ✓ Go, JavaScript/TypeScript, and PHP detectors — go.mod/package.json/composer.json parsing, README first-paragraph fallback, name/description chains — `project_probe/` — v1.7 (Phase 11)
+- ✓ TOML-subset reader + Python/Rust detectors — `readTOMLSection` with quote-aware skip states (strict degrade, never fabricates), pyproject.toml [project]/[tool.poetry], Cargo.toml [package] — `project_probe/` — v1.7 (Phase 12)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] `project_probe` remaining detectors — Python, Rust, C#/.NET, Java/Kotlin (v1.7, phases 12-13)
+- [ ] `project_probe` remaining detectors — C#/.NET, Java/Kotlin (v1.7, Phase 13)
 
 ## Current Milestone: v1.7 Project Probe
 
@@ -92,6 +93,10 @@ Deleted the broken `project_detector/` sample and shipped the `projectprobe` pac
 **Phase 11 — Text/JSON Detectors** (completed 2026-09-29)
 
 Wired the first three detectors into the Phase 10 registry: `detectGo` (go.mod — module path verbatim, `go` directive as toolchain-floor Version), `detectJS` (package.json — always LanguageJavaScript), `detectPHP` (composer.json — full vendor/package name, absent version → empty). Shared `readJSONManifest` never-fail helper, `readmeDescription` first-real-paragraph fallback (README.md → README.rst → README, skipping badges/TOC/headings/comments), WR-01 FIFO regular-file gate on readManifest. Registry at 7-slot literal with 3 live entries (Go@0, JS@3, PHP@6). 96 tests, 96.4% package coverage.
+
+**Phase 12 — TOML Subset + Python/Rust Detectors** (completed 2026-09-29)
+
+`readTOMLSection` (section-aware, stdlib-only, three global skip states, strict degrade-to-empty) plus `detectPython` (pyproject `[project]` PEP 621 primary, `[tool.poetry]` whole-section fallback) and `detectRust` (Cargo `[package]`, `version.workspace` → empty). Registry 5-of-7 live (Go@0, Python@1, JS@3, Rust@4, PHP@6). Code review found a fabrication gap (whole-line skip-state clearing) — closed via gap plan 12-04 with quote-aware scanning (closesMultiLine/clearsBracket/opensMultiLine + pendingMLS); verifier's 9-row adversarial probe confirms no fabrication. 185 tests, 93.1% package coverage.
 
 **Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
@@ -146,6 +151,8 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | README first-real-paragraph fallback (README.md → README.rst → README) | Description chain when manifest lacks one; skips badges/TOC/headings | ✓ Good (v1.7, Phase 11) |
 | README extraction skip predicates | Badges, TOC lists, rst/setext underline headings, ATX, HTML comments | ✓ Good (v1.7, Phase 11) |
 | `_javascript` filename over `_js` | `_js` suffix is a legacy GOARCH build constraint (silently excludes from non-js builds) | ✓ Good (v1.7, Phase 11) |
+| Quote-aware skip-state scanning in TOML reader | Whole-line delimiter detection fabricated data from malformed TOML (SC4); closesMultiLine/clearsBracket/opensMultiLine + pendingMLS fix it | ✓ Good (v1.7, Phase 12, gap closure) |
+| `version.workspace = true` → empty Version (no resolution) | Dotted-key classification degrades naturally; never fabricated, never resolved | ✓ Good (v1.7, Phase 12) |
 
 ## Evolution
 
@@ -165,4 +172,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-29 after Phase 11 (v1.7 Text/JSON Detectors)*
+*Last updated: 2026-09-29 after Phase 12 (v1.7 TOML Subset + Python/Rust Detectors)*

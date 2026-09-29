@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-29)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 12 — TOML Subset + Python/Rust Detectors
+**Current focus:** Phase 13 — XML Detectors — C#/.NET + Java/Kotlin
 
 ## Current Position
 
@@ -102,6 +102,7 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 12-toml-subset-python-rust-detectors]: registry_test.go final flip ONLY (plan prohibition): exactly one assertion changed (detectors[4] Nil→NotNil) plus gofmt alignment of the 7-slot literal in registry.go (the literal was already non-gofmt at HEAD from prior edits; formatting the file I modified is the clean end state); no parallel marker added
 - [Phase 12-toml-subset-python-rust-detectors]: Skip-state clearing is quote-aware (CR-01 fix): closesMultiLine (run of 3 closes, run > 3 closes+reopens → state persists), clearsBracket (]/} inside quoted strings honoring escapes never clear; [/{ depth tracking), opensMultiLine + cross-line pendingMLS for multi-line strings opened inside bracket bodies
 - [Phase 12-toml-subset-python-rust-detectors]: enterSkip uses the same quote-aware scans: 4-quote opening lines ("""a"""") and bracket-in-string opening lines (["A ] B",) now ENTER the skip state — closing both CR-01 missed-entry fabrication paths
+- [Phase 12-toml-subset-python-rust-detectors]: CR-01 fabrication gap closed by plan 12-04 (gap closure): verifier's 9-row adversarial probe re-run shows 9/9 no-fabrication; 5 quote-aware matrix functions (13 subtests) pin the fix
 
 ### Pending Todos
 
@@ -128,6 +129,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T06:58:57.622Z
+Last session: 2026-09-29
 Stopped at: Phase 12 complete, ready to plan Phase 13
 Resume file: None
