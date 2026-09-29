@@ -70,7 +70,7 @@ func TestRunDetectors_PanicRecovery(t *testing.T) { //nolint:paralleltest // glo
 func TestDetectorPositions(t *testing.T) { //nolint:paralleltest // reads global detectors
 	assert.Len(t, detectors, 7)
 	assert.NotNil(t, detectors[0]) // Go
-	assert.Nil(t, detectors[1])    // Python — Phase 12
+	assert.NotNil(t, detectors[1]) // Python — Phase 12
 	assert.Nil(t, detectors[2])    // C#/.NET — Phase 13
 	assert.NotNil(t, detectors[3]) // JS/TS
 	assert.Nil(t, detectors[4])    // Rust — Phase 12
