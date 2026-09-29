@@ -192,7 +192,14 @@ func TestCheckForUpdate_WithToken(t *testing.T) {
 	defer mu.Unlock()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
-		require.Equal(t, "Bearer ghp_test123", auth)
+		if auth != "Bearer ghp_test123" {
+			// t.Errorf is goroutine-safe; require.Equal would FailNow/Goexit
+			// on the handler goroutine (14 WR-02) — respond non-2xx so the
+			// client side fails with a clear message.
+			t.Errorf("Authorization header = %q, want %q", auth, "Bearer ghp_test123")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
 		releaseJSON := `{
 			"tag_name": "v2.0.0",
@@ -253,7 +260,14 @@ func TestCheckForUpdate_NoOptionsDerivesOwnerRepo(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Derived from the module path (getCurrentModule → url.Parse → words[1]/words[2]).
-		require.Equal(t, "/repos/guionardo/go/releases/latest", r.URL.Path)
+		if r.URL.Path != "/repos/guionardo/go/releases/latest" {
+			// t.Errorf is goroutine-safe; require.Equal would FailNow/Goexit
+			// on the handler goroutine (14 WR-02) — respond non-2xx so the
+			// client side fails with a clear message.
+			t.Errorf("handler path = %q, want %q", r.URL.Path, "/repos/guionardo/go/releases/latest")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		_, _ = fmt.Fprint(w, `{"tag_name": "v2.0.0", "name": "v2.0.0", "assets": []}`)
 	}))
 	defer server.Close()
