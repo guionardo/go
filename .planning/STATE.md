@@ -5,15 +5,15 @@ milestone_name: Project Probe
 current_phase: 14
 current_phase_name: Semantics, Hardening, and Release Polish
 status: executing
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-09-29T10:15:40.719Z"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-09-29T10:26:32.139Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 14 execution started
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 16
-  completed_plans: 13
+  completed_plans: 14
   percent: 80
 state_head: 98b812adde54787686890f2abff0e190e59de3c9
 ---
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 ## Current Position
 
 Phase: 14 (Semantics, Hardening, and Release Polish) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-29 — Phase 14 execution started
 
-Progress: [████████░░] 81%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [████████░░] 81%
 | Phase 13 P01 | 7min | 2 tasks | 4 files |
 | Phase 13 P02 | 9min | 2 tasks | 6 files |
 | Phase 14 P01 | 6min | 2 tasks | 21 files |
+| Phase 14 P02 | 6min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 14]: No detector-result assertions in f.Fuzz bodies (Pitfall 3): presence-match (TOML/XML) vs parse-success (JSON) semantics differ; a panic IS the failure signal
 - [Phase 14]: Corpus mixes real-world shapes (composer.json without version, pyproject dynamic, Cargo version.workspace, old-style padded .csproj, pom parent version) with pinned malformed shapes (truncated, BOM, whitespace-only, 12 CR-01 6-quote/bracket-in-string) — not byte-copies of test fixtures (Pitfall 6)
 - [Phase 14]: FuzzXMLManifest writes 'MyApp.csproj', never bare '.csproj' — the 13 IN-03 exact-name guard makes a bare suffix file non-matchable
+- [Phase 14]: readme.go badge rule: TrimSpace-empty OR Trim(line, "!")-empty with the existing '!['-presence guard; multi-line comment state machine with inComment FIRST (blank lines inside the block never return a partial paragraph)
+- [Phase 14]: XML trim is decode hygiene per field BEFORE chain resolution — whitespace-only elements no longer count as present, so Version→VersionPrefix, <version>→<parent><version>, name→artifactId/folder-base chains fire (DATA-03)
+- [Phase 14]: exact-name guard len(e.Name()) <= len(suffix) precedes HasSuffix — a file literally named '.csproj' can never match (13 IN-03)
+- [Phase 14]: TestRunDetectors_EmptyRegistry injects []detectorFunc{} and probes the non-colliding folder 'x' (12/13 WR-02)
 
 ### Pending Todos
 
@@ -140,6 +145,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T10:15:40.714Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-09-29T10:26:24.241Z
+Stopped at: Completed 14-02-PLAN.md
 Resume file: None
