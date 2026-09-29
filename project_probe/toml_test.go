@@ -340,3 +340,129 @@ func TestReadTOMLSection_Adversarial(t *testing.T) {
 		})
 	}
 }
+
+// TestReadTOMLSection_QuoteAware_SixQuoteBody pins CR-01 shape 1 (VERIFICATION
+// lines 130-131): a 6-quote run on a body line of a multi-line string is TOML's
+// close+reopen — the string continues on the next line, so a keyval after it is
+// still inside the string and never stored. Both """ (basic) and ”' (literal,
+// IN-03 — the ”' branch is currently never exercised) are covered.
+func TestReadTOMLSection_QuoteAware_SixQuoteBody(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		open string
+	}{
+		{"six_quote_basic", `"""`},
+		{"six_quote_literal", `'''`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			content := []byte("[project]\nname = \"acme\"\ndescription = " + tt.open + "\ntext " + strings.Repeat(string(tt.open[0]), 6) + "\nname = \"evil\"\n" + tt.open + "\n")
+			want := map[string]string{"name": "acme"}
+			assert.Equal(t, want, readTOMLSection(content, "project"))
+		})
+	}
+}
+
+// TestReadTOMLSection_QuoteAware_FourQuoteOpening pins CR-01 shape 3
+// (VERIFICATION line 132): a 4-quote run on the multi-line string's opening
+// line is close+reopen — the skip state MUST be entered, so the following
+// keyval is inside the reopened string and never stored.
+func TestReadTOMLSection_QuoteAware_FourQuoteOpening(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\ndescription = \"\"\"a\"\"\"\"\nname = \"evil\"\n\"\"\"\n")
+	assert.Equal(t, map[string]string{}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_QuoteAware_BracketInQuotedString pins CR-01 shapes 4-6
+// (VERIFICATION lines 133-134): a ] or } inside a quoted string in a multi-line
+// array/inline-table body never clears the bracket skip state. Also pins the
+// enterSkip same-line flaw: a ] inside a quoted string ON the opening line
+// must still enter the bracket state (array_opening_line).
+func TestReadTOMLSection_QuoteAware_BracketInQuotedString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		section string
+		want    map[string]string
+	}{
+		{
+			"array_body",
+			"[package]\nname = \"crate\"\nauthors = [\n\"Alice ] Bob\"\nname = \"evil\"\n]\nversion = \"1.2.3\"\n",
+			"package",
+			map[string]string{"name": "crate", "version": "1.2.3"},
+		},
+		{
+			"inline_table_body",
+			"[project]\nname = \"acme\"\nmetadata = {\nversion = \"0.0.1 }\"\nname = \"evil\"\n}\n",
+			"project",
+			map[string]string{"name": "acme"},
+		},
+		{
+			"array_opening_line",
+			"[project]\nname = \"acme\"\nauthors = [\"A ] B\",\nname = \"evil\"\n]\n",
+			"project",
+			map[string]string{"name": "acme"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, readTOMLSection([]byte(tt.content), tt.section))
+		})
+	}
+}
+
+// TestReadTOMLSection_QuoteAware_FakeHeaderAfterDelimiterRun pins CR-01 shape 7
+// (VERIFICATION line 135) — 12-01 truth 4 / 12-02 truth 5: a fake [project]
+// header after a 6-quote delimiter-run body line inside a [build-system]
+// multi-line string must not switch the section — the string is still open.
+func TestReadTOMLSection_QuoteAware_FakeHeaderAfterDelimiterRun(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[build-system]\ndescription = \"\"\"\ntext \"\"\"\"\"\"\n[project]\nname = \"evil\"\n\"\"\"\n")
+	assert.Equal(t, map[string]string{}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_QuoteAware_MultiLineStringInBracketBody pins the
+// revision-raised family: a multi-line-string OPENER inside a bracket body,
+// where a ]/} on a LATER line must not clear the bracket state. body_line_opener
+// and body_line_opener_literal open the string on a body line; opening_line_opener
+// opens it ON the array's opening line (enterSkip must seed the cross-line
+// string state).
+func TestReadTOMLSection_QuoteAware_MultiLineStringInBracketBody(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			"body_line_opener",
+			"[package]\nname = \"crate\"\nauthors = [\n\"\"\"\nAlice ] Bob\nname = \"evil\"\n]\n",
+		},
+		{
+			"body_line_opener_literal",
+			"[package]\nname = \"crate\"\nauthors = [\n'''\nAlice ] Bob\nname = \"evil\"\n]\n",
+		},
+		{
+			"opening_line_opener",
+			"[package]\nname = \"crate\"\nauthors = [ \"\"\"\nAlice ] Bob\nname = \"evil\"\n\"\"\"\n]\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			want := map[string]string{"name": "crate"}
+			assert.Equal(t, want, readTOMLSection([]byte(tt.content), "package"))
+		})
+	}
+}
