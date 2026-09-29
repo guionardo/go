@@ -55,9 +55,21 @@ func readmeDescription(folder string) string {
 func firstRealParagraph(content []byte) string {
 	var para []string
 	var prev string // last non-blank line (candidate heading title)
+	var inComment bool
 	for _, line := range strings.Split(string(content), "\n") {
 		trimmed := strings.TrimSpace(line)
 		switch {
+		case inComment:
+			// Consume the multi-line comment block (11 WR-02): the FIRST
+			// case, so blank lines and comment bodies inside the block are
+			// consumed — a blank line must not return a partial paragraph.
+			if strings.Contains(trimmed, "-->") {
+				inComment = false
+			}
+			prev = ""
+		case strings.HasPrefix(trimmed, "<!--") && !strings.HasSuffix(trimmed, "-->"):
+			inComment = true // multi-line comment opens — consume until "-->"
+			prev = ""
 		case trimmed == "":
 			if len(para) > 0 {
 				return strings.Join(para, " ") // first block is complete
@@ -66,7 +78,7 @@ func firstRealParagraph(content []byte) string {
 		case isUnderline(trimmed):
 			// Discard the underline AND the preceding non-blank line —
 			// an rst/setext heading pair.
-			if prev != "" && len(para) > 0 && para[len(para)-1] == prev {
+			if prev != "" && len(para) > 0 {
 				para = para[:len(para)-1]
 			}
 			prev = ""
@@ -131,7 +143,10 @@ func isBadgeLine(line string) bool {
 		line = line[:start] + line[linkEnd+1+urlEnd+1:]
 	}
 
-	return strings.TrimSpace(line) == ""
+	// The `![`-presence guard above keeps prose like "!!!" or "!important"
+	// out (they lack "!["); a stripped plain badge leaves exactly "!" —
+	// so a remainder of only "!" characters is still a badge line (11 WR-01).
+	return strings.TrimSpace(line) == "" || strings.Trim(line, "!") == ""
 }
 
 // isTOCLine reports whether line is a markdown TOC link: a bullet link
