@@ -289,6 +289,120 @@ func TestProbe_CascadePrecedence(t *testing.T) {
 			LanguagePython,
 			false,
 		},
+		{
+			// D-08 first-match: C#/.NET at index 2 beats JS/TS at index 3.
+			"csproj_and_package_json",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "MyApp.csproj"),
+					[]byte(`<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>MyApp</AssemblyName>
+  </PropertyGroup>
+</Project>
+`),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "package.json"),
+					[]byte(`{"name":"acme-widget"}`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageCSharp,
+			false,
+		},
+		{
+			// D-08 first-match: C#/.NET at index 2 beats Java/Kotlin at
+			// index 5.
+			"csproj_and_pom_xml",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "MyApp.csproj"),
+					[]byte(`<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>MyApp</AssemblyName>
+  </PropertyGroup>
+</Project>
+`),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "pom.xml"),
+					[]byte(`<project><name>AcmeJava</name></project>`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageCSharp,
+			false,
+		},
+		{
+			// D-08 first-match: Java/Kotlin at index 5 (pom presence, D-09)
+			// beats PHP at index 6.
+			"pom_xml_and_composer_json",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "pom.xml"),
+					[]byte(`<project><name>AcmeJava</name></project>`),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "composer.json"),
+					[]byte(`{"name":"acme/logger"}`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageJava,
+			false,
+		},
+		{
+			// D-08 first-match via the D-06 FALLBACK: settings.gradle (no
+			// pom.xml) at index 5 still beats PHP at index 6 — pins that the
+			// gradle fallback participates in cascade order.
+			"settings_gradle_and_composer_json",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "settings.gradle"),
+					[]byte("rootProject.name = 'acme-tool'\n"),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "composer.json"),
+					[]byte(`{"name":"acme/logger"}`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageJava,
+			false,
+		},
+		{
+			// D-06 fallback end-to-end: settings.gradle only → LanguageJava.
+			"settings_gradle_only",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "settings.gradle"),
+					[]byte("rootProject.name = 'acme-tool'\n"),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageJava,
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

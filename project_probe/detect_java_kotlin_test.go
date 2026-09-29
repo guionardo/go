@@ -189,9 +189,15 @@ func TestParseRootProjectName(t *testing.T) {
 		want    string
 	}{
 		{"single_quotes", "rootProject.name = 'acme-tool'\n", "acme-tool"},
+		{"double_quotes", "rootProject.name = \"acme-tool\"\n", "acme-tool"},
+		{"fully_qualified", "settings.rootProject.name = 'acme-tool'\n", "acme-tool"},
 		{"comment_line", "// rootProject.name = 'evil'\n", ""},
 		{"concat_expression", "rootProject.name = 'a' + 'b'\n", ""},
+		{"trailing_comment", "rootProject.name = 'x' // trailing comment\n", "x"},
+		{"unquoted", "rootProject.name = noquotes\n", ""},
+		{"unrelated_line", "include 'sub-a'\n", ""},
 		{"empty_content", "", ""},
+		{"bom_prefix", "\xEF\xBB\xBFrootProject.name = 'bom'\n", "bom"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -200,4 +206,129 @@ func TestParseRootProjectName(t *testing.T) {
 			assert.Equal(t, tt.want, parseRootProjectName([]byte(tt.content)))
 		})
 	}
+}
+
+// TestProbe_JavaNameChain pins the D-05 name chain: pom with artifactId but
+// NO <name> → Name == artifactId (Maven's own default, DATA-02); a pom with
+// neither <name> nor <artifactId> → Name == folder base.
+func TestProbe_JavaNameChain(t *testing.T) {
+	t.Parallel()
+
+	t.Run("artifact_id", func(t *testing.T) {
+		t.Parallel()
+		folder := t.TempDir()
+		require.NoError(t, os.WriteFile(
+			filepath.Join(folder, "pom.xml"),
+			[]byte(`<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <artifactId>acme-artifact</artifactId>
+</project>
+`),
+			0o600,
+		))
+
+		data, err := Probe(folder)
+		require.NoError(t, err)
+		assert.Equal(t, LanguageJava, data.Language)
+		assert.Equal(t, "acme-artifact", data.Name)
+	})
+
+	t.Run("folder_base", func(t *testing.T) {
+		t.Parallel()
+		folder := t.TempDir()
+		require.NoError(t, os.WriteFile(
+			filepath.Join(folder, "pom.xml"),
+			[]byte(`<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+</project>
+`),
+			0o600,
+		))
+
+		data, err := Probe(folder)
+		require.NoError(t, err)
+		assert.Equal(t, LanguageJava, data.Language)
+		assert.Equal(t, filepath.Base(folder), data.Name)
+	})
+}
+
+// TestProbe_JavaDescriptionFallback pins the DATA-04 chain on the pom arm: a
+// pom without <description> falls back to the README first real paragraph.
+func TestProbe_JavaDescriptionFallback(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pom.xml"),
+		[]byte(`<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <name>Acme Lib</name>
+</project>
+`),
+		0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "README.md"),
+		[]byte("# Acme Lib\n\nA Java library for acme.\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageJava, data.Language)
+	assert.Equal(t, "A Java library for acme.", data.Description)
+}
+
+// TestProbe_JavaGradleNameFallback pins the DATA-02 chain on the gradle arm:
+// a settings.gradle WITHOUT rootProject.name (only unrelated directives)
+// still matches on presence (D-09) with the folder-base Name.
+func TestProbe_JavaGradleNameFallback(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "settings.gradle"),
+		[]byte("include 'sub-a'\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageJava, data.Language)
+	assert.Equal(t, filepath.Base(folder), data.Name)
+}
+
+// TestProbe_JavaGradleKtsNotRead pins the A5/D-06 literal: the Kotlin-DSL
+// settings variant is NOT read — a .kts-only folder with no pom.xml yields
+// LanguageUnknown (the fallback never fires for it).
+func TestProbe_JavaGradleKtsNotRead(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "settings.gradle.kts"),
+		[]byte("rootProject.name = \"acme-kts\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageUnknown, data.Language)
+}
+
+// TestProbe_JavaPlaceholderRaw pins the A2/DATA-03 raw-manifest semantics: a
+// Maven CI-friendly ${revision} placeholder is reported VERBATIM — never
+// resolved, never stripped (no code branch for placeholder forms).
+func TestProbe_JavaPlaceholderRaw(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pom.xml"),
+		[]byte(`<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <artifactId>acme-rev</artifactId>
+  <version>${revision}</version>
+</project>
+`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageJava, data.Language)
+	assert.Equal(t, "${revision}", data.Version)
 }
