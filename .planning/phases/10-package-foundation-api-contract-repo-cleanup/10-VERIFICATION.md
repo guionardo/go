@@ -1,6 +1,6 @@
 ---
 phase: 10-package-foundation-api-contract-repo-cleanup
-verified: 2026-09-28T03:30:00Z
+verified: 2026-09-29T12:00:00Z
 status: passed
 score: 18/18 must-haves verified
 covered_files:
@@ -22,9 +22,16 @@ covered_files:
   - .planning/phases/10-package-foundation-api-contract-repo-cleanup/10-02-SUMMARY.md
   - .planning/phases/10-package-foundation-api-contract-repo-cleanup/10-03-PLAN.md
   - .planning/phases/10-package-foundation-api-contract-repo-cleanup/10-03-SUMMARY.md
-covered_digest: "v2:sha256:1d39b7e1ef685884cfb900d63419b56a285c7f53fa02d9f8cb8045072bdc5c20"
+covered_digest: "v2:sha256:e72f762004aba2e02e55bd3d037b4a1ae56006b956949ce0b8b789ac4ce395b5"
 behavior_unverified: 0
 overrides_applied: 0
+re_verification:
+  previous_status: passed
+  previous_score: 18/18
+  gaps_closed:
+    - "covered_digest did not recompute from declared covered_files (hand-rolled 'sorted per-file SHA-256' algorithm instead of the canonical gsd-core computeCoveredDigest) — regenerated with the canonical v2 digest over the identical 18-file list"
+  gaps_remaining: []
+  regressions: []
 advisory:
   - finding: "CR-01 (10-REVIEW.md): D-04 errno mapping claimed broken on Windows in 3 of 4 branches (syscall.EACCES is an invented value; ENOTDIR aliases ERROR_PATH_NOT_FOUND; ERROR_DIRECTORY unmatched) — no test exercises real Windows runtime errno behavior (errno tests use synthetic errors; permission test skips on Windows)"
     category: other
@@ -47,9 +54,9 @@ advisory:
 # Phase 10: Package Foundation — API Contract + Repo Cleanup Verification Report
 
 **Phase Goal:** The `project_probe` package exists with a documented never-fail contract, deterministic ordered registry, and shared safe-manifest helpers — and the broken `project_detector/` sample is gone.
-**Verified:** 2026-09-28T03:30:00Z
+**Verified:** 2026-09-29T12:00:00Z
 **Status:** passed
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — digest regeneration (previous report's covered_digest did not recompute from declared covered_files under the canonical gsd-core algorithm; all substantive claims re-verified against the codebase and found accurate)
 
 ## Goal Achievement
 
@@ -57,9 +64,9 @@ advisory:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | `go build ./...` exits 0 across the module (previously failed with 3 project_detector errors) | ✓ VERIFIED | `go build ./...` exit 0 (run during verification) |
-| 2 | `project_detector/` no longer exists on disk | ✓ VERIFIED | `test ! -d project_detector` — absent from disk and git index (`git ls-files project_detector` = 0) |
-| 3 | No .go file references `project_detector` | ✓ VERIFIED | `grep -rn "project_detector" --include="*.go" .` — no matches |
+| 1 | `go build ./...` exits 0 across the module (previously failed with 3 project_detector errors) | ✓ VERIFIED | `go build ./...` exit 0 (run during this verification) |
+| 2 | `project_detector/` no longer exists on disk | ✓ VERIFIED | `test ! -d project_detector` exit 0; `git ls-files project_detector` = 0 (untracked, filesystem deletion) |
+| 3 | No .go file references `project_detector` | ✓ VERIFIED | `grep -rn "project_detector" --include="*.go" .` — 0 matches |
 | 4 | Probe(missing folder) → error errors.Is ErrFolderNotFound, message contains cleaned path | ✓ VERIFIED | `TestProbe/missing_folder` + `TestMapFolderError` PASS (real fs + synthetic errno rows); errors.go wraps `probe %s: %w` |
 | 5 | Probe(file path) → ErrNotDirectory | ✓ VERIFIED | `TestProbe/path_is_a_file` PASS; probe.go `!info.IsDir()` arm |
 | 6 | Probe(empty or unrecognized folder) → LanguageUnknown, nil error | ✓ VERIFIED | `TestProbe/empty_folder` + `unknown_content` PASS; hasContent gate |
@@ -69,7 +76,7 @@ advisory:
 | 10 | All 13 D-10 ignore names exact-case; `Node_Modules` does not match | ✓ VERIFIED | `TestIgnoreList` PASS; ignore.go map has all 13 names |
 | 11 | Registry: first match wins; recovered panic = non-match never escapes; empty registry no match | ✓ VERIFIED | `TestRunDetectors_EmptyRegistry/OrderAndFirstMatch/PanicRecovery` PASS; callDetector defer-recover |
 | 12 | Language constants exact display values incl. LanguageUnknown == "unknown" | ✓ VERIFIED | project.go const block: "Go", "Python", "JavaScript", "C#/.NET", "Rust", "Java", "PHP", "unknown" |
-| 13 | Package compiles and vets cleanly for GOOS=windows (filepath only, ROBT-04) | ✓ VERIFIED | `GOOS=windows go build` + `go vet ./project_probe/...` exit 0 |
+| 13 | Package compiles and vets cleanly for GOOS=windows (filepath only, ROBT-04) | ✓ VERIFIED | `GOOS=windows go build` + `go vet ./project_probe/...` exit 0 (run during this verification) |
 | 14 | readManifest ≤1 MB returns content with UTF-8 BOM stripped | ✓ VERIFIED | `TestReadManifest/exactly_1mb` + `bom_stripped` PASS |
 | 15 | readManifest >1 MB → (nil, false); never truncates, never panics, never OOMs | ✓ VERIFIED | `TestReadManifest/over_1mb` PASS; LimitReader(maxManifestSize+1) probe |
 | 16 | readManifest missing/unreadable/dir-at-path → (nil, false) | ✓ VERIFIED | `TestReadManifest/missing_file` + `path_is_directory` + `empty_name` PASS |
@@ -90,7 +97,7 @@ The 10-REVIEW.md findings (CR-01, WR-01, WR-02, IN-01, IN-02) are recorded in th
 
 | Artifact | Expected | Status | Details |
 | -------- | -------- | ------ | ------- |
-| `project_probe/project.go` | ProjectData + Language + 8 constants | ✓ VERIFIED | 52 lines, godoc'd, explicit values (D-05..D-08) |
+| `project_probe/project.go` | ProjectData + Language + 8 constants | ✓ VERIFIED | 53 lines, godoc'd, explicit values (D-05..D-08) |
 | `project_probe/errors.go` | 3 sentinels + mapFolderError | ✓ VERIFIED | ENOENT/ENOTDIR/EACCES+EPERM mapping (D-01/D-04) |
 | `project_probe/probe.go` | Probe entry point | ✓ VERIFIED | empty-guard, clean-once, stat/readdir, content gate, dispatch (FND-03/D-09) |
 | `project_probe/registry.go` | detectorFunc + ordered empty registry + callDetector | ✓ VERIFIED | first-match loop, defer-recover (DETC-01/D-03) |
@@ -154,7 +161,7 @@ The 10-REVIEW.md findings (CR-01, WR-01, WR-02, IN-01, IN-02) are recorded in th
 | ROBT-02 | 10-03 | Shared readManifest — size cap + BOM strip | ✓ SATISFIED | manifest.go + 8 boundary rows PASS |
 | ROBT-04 | 10-02/10-03 | Stdlib-only; filepath not path; Windows-safe | ✓ SATISFIED | grep bare `path` empty; GOOS=windows build+vet exit 0 |
 
-All 9 phase requirement IDs accounted for. No orphaned requirements (REQUIREMENTS.md traceability maps exactly these 9 to Phase 10; DETC-02..08, ROBT-03, ROBT-05, DATA-02..04 belong to phases 11-14).
+All 9 phase requirement IDs accounted for. No orphaned requirements (REQUIREMENTS.md traceability maps exactly these 9 to Phase 10; all marked Complete in REQUIREMENTS.md lines 80-99; DETC-02..08, ROBT-03, ROBT-05, DATA-02..04 belong to phases 11-14).
 
 ### Anti-Patterns Found
 
@@ -163,7 +170,7 @@ All 9 phase requirement IDs accounted for. No orphaned requirements (REQUIREMENT
 | (none) | — | TBD/FIXME/XXX/TODO/HACK/placeholder markers | — | grep over project_probe/*.go: no matches |
 | (none) | — | stub returns (`return nil, false`, `ProjectData{}, false`) | — | contract-mandated never-fail degrade paths (D-03), NOT stubs — verified each has a passing boundary test |
 | (none) | — | empty registry | — | Phase-10 design: detectors land in phases 11-13 per roadmap |
-| (none) | — | no empty commits in phase range | — | `git log ce7d370..HEAD` — 9 commits, all with content; deletion of untracked files correctly produced no diff |
+| (none) | — | no empty commits in phase range | — | `git log ce7d370..HEAD` — 10 commits, all with content; deletion of untracked files correctly produced no diff |
 
 ### Human Verification Required
 
@@ -177,9 +184,9 @@ No gaps. All 18 must-have truths verified with behavioral evidence; all 9 requir
 
 **TDD adaptation note:** The two TDD plans (10-02, 10-03) used the sanctioned RED-verified-but-uncommitted adaptation (pre-commit go-test hook requires a green tree). RED evidence is recorded in the feat commit message bodies (`57cd875`, `16becb8` — both verified present with RED documentation). The TDD gate override was accepted by the user (commit f08dbb6 "record review disposition + TDD gate override").
 
-**Fingerprint note:** `gsd_run query verification.fingerprint` is unavailable in this gsd_run build (only `verification.status` exists); `covered_digest` was computed deterministically (sorted per-file SHA-256 over the 18 covered files) and the limitation recorded here.
+**Fingerprint note (#4155):** The previous report's `covered_digest` was computed with a hand-rolled "sorted per-file SHA-256" algorithm that does not recompute under the canonical `computeCoveredDigest` (gsd-core `bin/lib/verification.cjs`), leaving the report `stale` for canonical readers. This report's `covered_digest` (`v2:sha256:e72f762004aba2e02e55bd3d037b4a1ae56006b956949ce0b8b789ac4ce395b5`) is computed by the canonical implementation over the byte-identical `covered_files` list (12 project_probe impl/test files + 3 PLANs + 3 SUMMARYs) and was re-verified by recomputation after writing.
 
 ---
 
-_Verified: 2026-09-28T03:30:00Z_
+_Verified: 2026-09-29T12:00:00Z_
 _Verifier: the agent (gsd-verifier)_
