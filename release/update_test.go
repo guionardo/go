@@ -397,11 +397,9 @@ func TestDownloadUpdate_NoAsset(t *testing.T) {
 	require.Contains(t, err.Error(), "no asset found")
 }
 
-//nolint:paralleltest // global state mutation: githubAPIBase
+//nolint:paralleltest // no global state mutation — file-local fixtures only
 func TestDownloadUpdate_MkdirAllError(t *testing.T) {
 	t.Parallel()
-	mu.Lock()
-	defer mu.Unlock()
 
 	dir := t.TempDir()
 	fileAsParent := filepath.Join(dir, "file")
@@ -419,11 +417,9 @@ func TestDownloadUpdate_MkdirAllError(t *testing.T) {
 	require.Error(t, err)
 }
 
-//nolint:paralleltest // global state mutation: githubAPIBase
+//nolint:paralleltest // no global state mutation — file-local fixtures only
 func TestDownloadUpdate_CreateError(t *testing.T) {
 	t.Parallel()
-	mu.Lock()
-	defer mu.Unlock()
 
 	dir := t.TempDir()
 	subAsFile := filepath.Join(dir, "sub")
@@ -445,11 +441,9 @@ func TestDownloadUpdate_CreateError(t *testing.T) {
 	require.Error(t, err)
 }
 
-//nolint:paralleltest // global state mutation: githubAPIBase
+//nolint:paralleltest // no global state mutation — file-local fixtures only
 func TestDownloadUpdate_DigestMismatch(t *testing.T) {
 	t.Parallel()
-	mu.Lock()
-	defer mu.Unlock()
 
 	content := []byte("test binary content for download")
 	differentContent := []byte("different content than expected")
