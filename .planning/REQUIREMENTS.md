@@ -16,7 +16,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 ### Detection
 
 - [x] **DETC-01**: Ordered manifest-first cascade, first match wins, root-scoped only (no subdir probing)
-- [ ] **DETC-02**: Go detector — go.mod module → name, `go` directive → Version (documented as toolchain floor)
+- [x] **DETC-02**: Go detector — go.mod module → name, `go` directive → Version (documented as toolchain floor)
 - [ ] **DETC-03**: JS/TS detector — package.json name/version/description
 - [ ] **DETC-04**: PHP detector — composer.json name/version/description
 - [ ] **DETC-05**: Python detector — pyproject.toml `[project]` + legacy `[tool.poetry]`, PEP 621 fields
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FND-02 | Phase 10 | Complete |
 | FND-03 | Phase 10 | Complete |
 | DETC-01 | Phase 10 | Complete |
-| DETC-02 | Phase 11 | Pending |
+| DETC-02 | Phase 11 | Complete |
 | DETC-03 | Phase 11 | Pending |
 | DETC-04 | Phase 11 | Pending |
 | DETC-05 | Phase 12 | Pending |

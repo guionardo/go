@@ -5,15 +5,15 @@ milestone_name: Project Probe
 current_phase: 11
 current_phase_name: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
 status: executing
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-09-29T04:10:55.946Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-09-29T04:24:13.656Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 11 execution started
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 20
 state_head: e9a3369736e1ecffc42a289f64abc275d3649de3
 ---
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 ## Current Position
 
 Phase: 11 (Text/JSON Detectors — Go, JS/TS, PHP + README Fallback) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-29 — Phase 11 execution started
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [███████░░░] 67%
 | Phase 10 P02 | 15 min | 3 tasks | 10 files |
 | Phase 10-package-foundation-api-contract-repo-cleanup P03 | 5min | 2 tasks | 2 files |
 | Phase 11 P01 | 19min | 3 tasks | 6 files |
+| Phase 11 P02 | 8min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,10 @@ D-08 exact-case enforced against real directory entries (os.ReadDir): os.Open al
 isBadgeLine strips innermost [..](..) segments via the first '](' + nearest prior '[' so wrapped [![..](..)](..) badges strip to empty
 Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log --oneline -1 checks)
 
+- [Phase 11]: Go detector matches on go.mod presence, not parse success (D-disc-1): a garbage go.mod still yields Language=Go with folder-base Name and empty Version
+- [Phase 11]: Registry becomes a 7-position nil-slot literal (D-11): detectGo at index 0, nil at 1/2/3/4/5/6; nil entries skipped in runDetectors before the panic-recover path
+- [Phase 11]: Version = raw go directive string, never normalized (D-02/DATA-03): 1.21rc1 stays 1.21rc1; toolchain lines never match the go directive (Pitfall 6)
+
 ### Pending Todos
 
 None yet.
@@ -99,6 +104,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T04:10:40.608Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-09-29T04:24:04.087Z
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
