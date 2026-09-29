@@ -5,15 +5,15 @@ milestone_name: Project Probe
 current_phase: 14
 current_phase_name: Semantics, Hardening, and Release Polish
 status: executing
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-09-29T10:26:32.139Z"
+stopped_at: Completed 14-03-PLAN.md
+last_updated: "2026-09-29T10:40:44.262Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 14 execution started
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 80
 state_head: 98b812adde54787686890f2abff0e190e59de3c9
 ---
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 ## Current Position
 
 Phase: 14 (Semantics, Hardening, and Release Polish) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-29 — Phase 14 execution started
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [█████████░] 88%
 | Phase 13 P02 | 9min | 2 tasks | 6 files |
 | Phase 14 P01 | 6min | 2 tasks | 21 files |
 | Phase 14 P02 | 6min | 3 tasks | 7 files |
+| Phase 14-semantics-hardening-release-polish P03 | 8min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 14]: XML trim is decode hygiene per field BEFORE chain resolution — whitespace-only elements no longer count as present, so Version→VersionPrefix, <version>→<parent><version>, name→artifactId/folder-base chains fire (DATA-03)
 - [Phase 14]: exact-name guard len(e.Name()) <= len(suffix) precedes HasSuffix — a file literally named '.csproj' can never match (13 IN-03)
 - [Phase 14]: TestRunDetectors_EmptyRegistry injects []detectorFunc{} and probes the non-colliding folder 'x' (12/13 WR-02)
+- [Phase 14]: The mandatory no-options row derives owner/repo from the module path: CheckForUpdate(ctx, "v1.0.0") with NO options enters getCurrentModule → debug.ReadBuildInfo Main.Path "github.com/guionardo/go" → url.Parse (scheme-less → Path) → words[1]=guionardo, words[2]=go; the mock handler's require.Equal on /repos/guionardo/go/releases/latest pins the derivation (T-14-12 mitigation)
+- [Phase 14]: Seven error-path rows pin error-not-panic on every failure branch of CheckForUpdate (91-92 request creation, 102-103 network, 112-113 decode, 117-118 version) and DownloadUpdate (130-131 MkdirAll, 136-137 Create, 141-144 digest mismatch with os.Remove cleanup)
+- [Phase 14]: ENOTDIR triggers (file-as-parent, slash-in-matched-name) + closed-server URLs replace permission-based triggers — cross-platform on all three CI OSes, no chmod anywhere (T-14-11 mitigation)
+- [Phase 14]: Coverage arithmetic adjusted from research: 71/74 = 95.9% not 74/74 = 100% — the three remaining blocks (62-63, 67-68, 72-73) are module-derivation error sub-branches unreachable from a test binary (debug.ReadBuildInfo always returns Main.Path); gate (file:70) green regardless
 
 ### Pending Todos
 
@@ -145,6 +150,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T10:26:24.241Z
-Stopped at: Completed 14-02-PLAN.md
+Last session: 2026-09-29T10:40:44.256Z
+Stopped at: Completed 14-03-PLAN.md
 Resume file: None
