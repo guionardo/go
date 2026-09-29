@@ -15,7 +15,7 @@ import (
 func FuzzJSONManifest(f *testing.F) {
 	f.Add([]byte(`{"name":"acme","version":"1.2.3","description":"A pkg"}`))
 	f.Add([]byte(`{"name":"vendor/pkg","description":"A composer package"}`)) // composer norm: no version
-	f.Add([]byte(`{"name":`))                                                  // truncated
+	f.Add([]byte(`{"name":`))                                                 // truncated
 	f.Fuzz(func(t *testing.T, data []byte) {
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, "package.json"), data, 0o600); err != nil {

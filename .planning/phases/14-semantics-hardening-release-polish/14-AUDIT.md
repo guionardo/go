@@ -78,6 +78,8 @@ Measured on the **clean committed state** (the state CI and the verifier consume
 
 **Working-tree artifact (documented for verifier reproducibility):** running the same commands inside the *dirty* main working tree (which carries uncommitted drift from prior phases — `.planning/`, `docs/`, `.github/`, `config/profile/profile_test.go`) surfaces ~300 pre-existing issues: golangci's `new`-filter mis-resolves its diff base in that state (it reports the *entire v1.7 branch* as new — the same phases-10-13 debt the 28-item baseline records; the count grows as the branch grows, advisory per A3). The `--new-from-rev` CLI flag is also ineffective in the dirty tree (config `new-from-rev: HEAD` + `new-from-merge-base: main` both set; the diff processor falls back). **Verifier instruction:** run the gate on the committed tree (fresh clone/checkout) to reproduce delta-zero — the dirty-tree output is a working-tree artifact, not Phase-14-introduced issues.
 
+**Gate disclosure (14-REVIEW WR-03):** the repo `.golangci.yml` sets `new-from-rev: HEAD` alongside `new-from-merge-base: main`, so on the clean committed tree a delta run that resolves to the *config* base compares the tree against its own commit — that `new-from-rev: HEAD` comparison is **vacuous** (nothing can ever be reported; it is a self-comparison, not independent evidence). The meaningful delta is the explicit `--new-from-rev=8461196` (the pre-Phase-14 commit) run recorded above, which pins the phase's edits to zero new issues; the primary cleanliness evidence is the **clean-committed-state full run (0 issues, exit 0)**, which is filter-independent.
+
 ---
 
 ## 4. Final Gates (D-10 / SC4 — milestone close)
