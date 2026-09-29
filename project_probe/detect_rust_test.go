@@ -166,3 +166,163 @@ func TestDetectRust_MissingManifest(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, ProjectData{}, pd)
 }
+
+// TestProbe_RustBOM pins Pitfall 1: a Cargo.toml prefixed with the literal
+// UTF-8 BOM bytes (0xEF 0xBB 0xBF) parses identically — readManifest strips
+// the BOM upstream, and the reader tolerates it directly too.
+func TestProbe_RustBOM(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "Cargo.toml"),
+		[]byte("\xEF\xBB\xBF[package]\nname = \"acme\"\nversion = \"1.0.0\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageRust, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "1.0.0", data.Version)
+}
+
+// TestProbe_RustCRLF pins P5: Windows-edited Cargo.toml with \r\n line
+// endings parses identically — the reader's per-line TrimSpace handles \r.
+func TestProbe_RustCRLF(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "Cargo.toml"),
+		[]byte("[package]\r\nname = \"acme\"\r\nversion = \"1.0.0\"\r\ndescription = \"CRLF file.\"\r\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageRust, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "1.0.0", data.Version)
+	assert.Equal(t, "CRLF file.", data.Description)
+}
+
+// TestProbe_RustNoVersion pins the Cargo ecosystem norm: name is the only
+// field Cargo requires — a [package] without a version key is legal, so
+// Version is "" (never fabricated).
+func TestProbe_RustNoVersion(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "Cargo.toml"),
+		[]byte("[package]\nname = \"acme\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageRust, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "", data.Version)
+}
+
+// TestProbe_RustMultiLineAuthors pins P4 at probe level: a multi-line
+// authors array spans lines, so the reader's global bracket-skip state holds
+// until the closing bracket — the following version keyval is still read.
+func TestProbe_RustMultiLineAuthors(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "Cargo.toml"),
+		[]byte("[package]\nname = \"acme\"\nauthors = [\n    \"Alice\",\n    \"Bob\",\n]\nversion = \"1.2.3\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageRust, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "1.2.3", data.Version)
+}
+
+// TestDetectRust pins the detector-level edges (detect_go_test.go table
+// shape with a folder-setup column): folder-base edges (nested temp subdir →
+// short base), workspace-description README fallback (DATA-04 on the
+// workspace arm), and empty-file presence match (D-09). A wantName of ""
+// means the row expects the filepath.Base(folder) fallback.
+func TestDetectRust(t *testing.T) { //nolint:funlen
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		folder   func(t *testing.T) string // nil → t.TempDir()
+		wantName string                    // "" → filepath.Base(folder)
+		wantVer  string
+		wantDesc string
+	}{
+		{
+			// A7 (DATA-02 edge): a folder nested under a subdirectory yields
+			// the short base name, not the full temp path.
+			"folder_base_nested",
+			"[package]\nversion = \"1.0.0\"\n",
+			func(t *testing.T) string {
+				sub := filepath.Join(t.TempDir(), "sub")
+				require.NoError(t, os.Mkdir(sub, 0o700))
+
+				return sub
+			},
+			"",
+			"1.0.0",
+			"",
+		},
+		{
+			// DATA-04 on the workspace arm: description.workspace = true
+			// degrades to "" so the README first real paragraph fires.
+			"workspace_description_readme_fallback",
+			"[package]\nname = \"acme\"\ndescription.workspace = true\n",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "README.md"),
+					[]byte("[![badge](https://example.com/x.svg)](https://example.com)\n\nA Rust library.\n"),
+					0o600,
+				))
+
+				return folder
+			},
+			"acme",
+			"",
+			"A Rust library.",
+		},
+		{
+			// D-09 presence: an EMPTY Cargo.toml still matches, with
+			// folder-base Name and empty fields.
+			"empty_file_presence",
+			"",
+			nil,
+			"",
+			"",
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			folder := t.TempDir()
+			if tt.folder != nil {
+				folder = tt.folder(t)
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(folder, "Cargo.toml"), []byte(tt.content), 0o600))
+
+			pd, ok := detectRust(folder)
+			require.True(t, ok)
+			assert.Equal(t, LanguageRust, pd.Language)
+			wantName := tt.wantName
+			if wantName == "" {
+				wantName = filepath.Base(folder)
+			}
+			assert.Equal(t, wantName, pd.Name)
+			assert.Equal(t, tt.wantVer, pd.Version)
+			assert.Equal(t, tt.wantDesc, pd.Description)
+		})
+	}
+}

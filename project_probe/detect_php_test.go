@@ -242,6 +242,53 @@ func TestProbe_CascadePrecedence(t *testing.T) {
 			LanguageJavaScript,
 			false,
 		},
+		{
+			// D-08 first-match across the Phase 12 detectors: Python at
+			// index 1 beats Rust at index 4 — the ordered cascade proven
+			// across both TOML detectors.
+			"pyproject_toml_and_cargo_toml",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "pyproject.toml"),
+					[]byte("[project]\nname = \"acme\"\n"),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "Cargo.toml"),
+					[]byte("[package]\nname = \"acme\"\n"),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguagePython,
+			false,
+		},
+		{
+			// D-09/D-04 match-rule asymmetry: Python at index 1 matches on
+			// presence (garbage or valid, the file IS the marker) and beats
+			// JS at index 3, which needs parse success — a broken
+			// package.json falls through to the valid pyproject.toml.
+			"broken_package_json_valid_pyproject_toml",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "package.json"),
+					[]byte("{invalid"),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "pyproject.toml"),
+					[]byte("[project]\nname = \"acme\"\n"),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguagePython,
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
