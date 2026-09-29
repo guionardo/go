@@ -174,7 +174,7 @@ Plans:
 
 - [ ] 14-01-PLAN.md — Fuzz targets FuzzJSONManifest/FuzzTOMLManifest/FuzzXMLManifest + go-test-fuzz-v1-encoded seed corpus (D-04/D-05, ROBT-05)
 - [ ] 14-02-PLAN.md — Correctness fold-in: readme badge/HTML-comment fixes, XML trim + exact-name guard, registry test hygiene (D-06/D-07, DATA-03)
-- [ ] 14-03-PLAN.md — release/update.go coverage closure: no-options row + six error-path rows, make coverage-quick green (D-09)
+- [ ] 14-03-PLAN.md — release/update.go coverage closure: no-options row + seven error-path rows, make coverage-quick green (D-09)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
