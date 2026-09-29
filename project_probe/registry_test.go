@@ -63,16 +63,16 @@ func TestRunDetectors_PanicRecovery(t *testing.T) { //nolint:paralleltest // glo
 }
 
 // TestDetectorPositions pins the D-11 order contract: the registry literal
-// has exactly 7 positions, Go is live at index 0, and the future-phase slots
-// (Python, C#/.NET, Rust, Java) plus the in-phase JS/TS and PHP slots are nil
-// until their plans land. A future phase edits slots in place, never
-// reorders — this test guards the cascade precedence (T-11-07).
+// has exactly 7 positions, Go is live at index 0, JS/TS is live at index 3,
+// and the future-phase slots (Python, C#/.NET, Rust, Java) plus the in-phase
+// PHP slot are nil until their plans land. A future phase edits slots in
+// place, never reorders — this test guards the cascade precedence (T-11-07).
 func TestDetectorPositions(t *testing.T) { //nolint:paralleltest // reads global detectors
 	assert.Len(t, detectors, 7)
 	assert.NotNil(t, detectors[0]) // Go
 	assert.Nil(t, detectors[1])    // Python — Phase 12
 	assert.Nil(t, detectors[2])    // C#/.NET — Phase 13
-	assert.Nil(t, detectors[3])    // JS/TS — plan 11-03
+	assert.NotNil(t, detectors[3]) // JS/TS
 	assert.Nil(t, detectors[4])    // Rust — Phase 12
 	assert.Nil(t, detectors[5])    // Java/Kotlin — Phase 13
 	assert.Nil(t, detectors[6])    // PHP — plan 11-03
