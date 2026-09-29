@@ -17,8 +17,8 @@ Best-effort project detection: read a folder's contents and report language, nam
 
 - [x] **DETC-01**: Ordered manifest-first cascade, first match wins, root-scoped only (no subdir probing)
 - [x] **DETC-02**: Go detector — go.mod module → name, `go` directive → Version (documented as toolchain floor)
-- [ ] **DETC-03**: JS/TS detector — package.json name/version/description
-- [ ] **DETC-04**: PHP detector — composer.json name/version/description
+- [x] **DETC-03**: JS/TS detector — package.json name/version/description
+- [x] **DETC-04**: PHP detector — composer.json name/version/description
 - [ ] **DETC-05**: Python detector — pyproject.toml `[project]` + legacy `[tool.poetry]`, PEP 621 fields
 - [ ] **DETC-06**: Rust detector — Cargo.toml `[package]` fields
 - [ ] **DETC-07**: C#/.NET detector — .csproj XML (namespace-agnostic, XMLName pattern)
@@ -28,9 +28,9 @@ Best-effort project detection: read a folder's contents and report language, nam
 ### Data Model
 
 - [x] **DATA-01**: `ProjectData{Folder, Language, Name, Version, Description}` with independent per-field fallbacks
-- [ ] **DATA-02**: Name chain: manifest name → folder base
+- [x] **DATA-02**: Name chain: manifest name → folder base
 - [ ] **DATA-03**: Version: raw manifest string, empty when absent/dynamic, never fabricated
-- [ ] **DATA-04**: Description: manifest → README first-paragraph → empty
+- [x] **DATA-04**: Description: manifest → README first-paragraph → empty
 
 ### Robustness
 
@@ -82,17 +82,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FND-03 | Phase 10 | Complete |
 | DETC-01 | Phase 10 | Complete |
 | DETC-02 | Phase 11 | Complete |
-| DETC-03 | Phase 11 | Pending |
-| DETC-04 | Phase 11 | Pending |
+| DETC-03 | Phase 11 | Complete |
+| DETC-04 | Phase 11 | Complete |
 | DETC-05 | Phase 12 | Pending |
 | DETC-06 | Phase 12 | Pending |
 | DETC-07 | Phase 13 | Pending |
 | DETC-08 | Phase 13 | Pending |
 | DETC-09 | Phase 10 | Complete |
 | DATA-01 | Phase 10 | Complete |
-| DATA-02 | Phase 11 | Pending |
+| DATA-02 | Phase 11 | Complete |
 | DATA-03 | Phase 14 | Pending |
-| DATA-04 | Phase 11 | Pending |
+| DATA-04 | Phase 11 | Complete |
 | ROBT-01 | Phase 10 | Complete |
 | ROBT-02 | Phase 10 | Complete |
 | ROBT-03 | Phase 12 | Pending |

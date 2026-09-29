@@ -89,7 +89,7 @@ Plans:
   4. Name falls back to the folder base when the manifest has no name; Description falls back to the README's first paragraph when the manifest has none, and is empty when no README exists.
   5. README fallback skips badges, tables of contents, and rst-style underline headings, extracting the first real paragraph.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -102,7 +102,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 11-03-PLAN.md — JS/TS + PHP JSON detectors, cascade precedence, final registry positions (DETC-03, DETC-04, DATA-02, DATA-04)
+- [x] 11-03-PLAN.md — JS/TS + PHP JSON detectors, cascade precedence, final registry positions (DETC-03, DETC-04, DATA-02, DATA-04)
 
 ### Phase 12: TOML Subset + Python/Rust Detectors
 
@@ -160,7 +160,7 @@ Plans:
 | 8. Benchmark suite | v1.6 | 3/3 | Complete | 2026-08-08 |
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
 | 10. Package Foundation | v1.7 | 3/3 | Complete    | 2026-09-29 |
-| 11. Text/JSON Detectors | v1.7 | 2/3 | In Progress|  |
+| 11. Text/JSON Detectors | v1.7 | 3/3 | In Progress|  |
 | 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |
 | 14. Semantics, Hardening, Polish | v1.7 | 0/TBD | Not started | - |

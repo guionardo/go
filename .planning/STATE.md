@@ -4,17 +4,17 @@ milestone: v1.7
 milestone_name: Project Probe
 current_phase: 11
 current_phase_name: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
-status: executing
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-09-29T04:24:13.656Z"
+status: verifying
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-09-29T04:43:28.714Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 11 execution started
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 20
+  completed_plans: 6
+  percent: 40
 state_head: e9a3369736e1ecffc42a289f64abc275d3649de3
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 Phase: 11 (Text/JSON Detectors — Go, JS/TS, PHP + README Fallback) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-29 — Phase 11 execution started
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [████████░░] 83%
 | Phase 10-package-foundation-api-contract-repo-cleanup P03 | 5min | 2 tasks | 2 files |
 | Phase 11 P01 | 19min | 3 tasks | 6 files |
 | Phase 11 P02 | 8min | 2 tasks | 5 files |
+| Phase 11-text-json-detectors-go-js-ts-php-readme-fallback P03 | 15min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 11]: Go detector matches on go.mod presence, not parse success (D-disc-1): a garbage go.mod still yields Language=Go with folder-base Name and empty Version
 - [Phase 11]: Registry becomes a 7-position nil-slot literal (D-11): detectGo at index 0, nil at 1/2/3/4/5/6; nil entries skipped in runDetectors before the panic-recover path
 - [Phase 11]: Version = raw go directive string, never normalized (D-02/DATA-03): 1.21rc1 stays 1.21rc1; toolchain lines never match the go directive (Pitfall 6)
+- [Phase 11]: Rule 3 deviation: plan filenames detect_js.go/detect_js_test.go are excluded from every non-js build — "_js" is a legacy GOARCH in Go implicit file-constraint rules (verified via go/build.MatchFile + go list IgnoredGoFiles); renamed to detect_javascript.go/detect_javascript_test.go, identifier detectJS unchanged — Rule 3 deviation: plan filenames detect_js.go/detect_js_test.go are excluded from every non-js build — "_js" is a legacy GOARCH in Go implicit file-constraint rules (verified via go/build.MatchFile + go list IgnoredGoFiles); renamed to detect_javascript.go/detect_javascript_test.go, identifier detectJS unchanged
+- [Phase 11]: D-06 executed as zero-value behavior: no Private field in the JS decode struct; private:true without version yields Version "" pinned by TestProbe_JSPrivateNoVersion — D-06 executed as zero-value behavior: no Private field in the JS decode struct; private:true without version yields Version "" pinned by TestProbe_JSPrivateNoVersion
+- [Phase 11]: Parse-success match rule (D-04) proven by integration: broken package.json at position 3 falls through to a valid composer.json at position 6 (TestProbe_CascadePrecedence); Go@0 > JS@3 > PHP@6 first-match pinned — Parse-success match rule (D-04) proven by integration: broken package.json at position 3 falls through to a valid composer.json at position 6 (TestProbe_CascadePrecedence); Go@0 > JS@3 > PHP@6 first-match pinned
+- [Phase 11]: Verified json semantics shipped as test rows (T-11-10 accept): duplicate keys last-wins, unknown fields ignored, type mismatch -> decode error -> false -> cascade; "version": null -> "" — Verified json semantics shipped as test rows (T-11-10 accept): duplicate keys last-wins, unknown fields ignored, type mismatch -> decode error -> false -> cascade; "version": null -> ""
 
 ### Pending Todos
 
@@ -104,6 +109,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T04:24:04.087Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-09-29T04:42:55.346Z
+Stopped at: Completed 11-03-PLAN.md
 Resume file: None
