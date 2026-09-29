@@ -54,22 +54,26 @@
 **Depends on**: Nothing (v1.7 start; follows Phase 9)
 **Requirements**: FND-01, FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-02, ROBT-04
 **Success Criteria** (what must be TRUE):
+
   1. `go build ./...` passes across the module — the deprecated `project_detector/` sample is deleted in its own commit and CI stays green.
   2. User calls `projectprobe.Probe(folder)` and receives `ProjectData{Folder, Language, Name, Version, Description}`: a missing/unreadable folder returns an error; an empty or unrecognized folder returns `LanguageUnknown` with nil error — the probe never fails on content.
   3. Probing the same folder repeatedly returns identical results — the detector cascade is deterministic, ordered, first-match-wins, and root-scoped only (no subdir probing).
   4. A folder containing only vendored/build/IDE directories (node_modules/, vendor/, .git/, dist/, .idea/) is reported Unknown — ignore-list hygiene.
   5. Manifest reads are size-capped (1 MB) and BOM-stripped with no panics on pathological input; all path handling uses filepath — Windows-safe, no `path` imports.
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 10-01-PLAN.md — Delete deprecated project_detector sample so the module builds (FND-01)
+
+- [x] 10-01-PLAN.md — Delete deprecated project_detector sample so the module builds (FND-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 10-02-PLAN.md — Probe contract tracer: model, sentinels, entry point, ordered registry, ignore gate, never-fail docs (FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 10-03-PLAN.md — Shared readManifest helper: 1 MB cap + BOM strip, never-fail (ROBT-02)
 
 ### Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
@@ -78,6 +82,7 @@ Plans:
 **Depends on**: Phase 10
 **Requirements**: DETC-02, DETC-03, DETC-04, DATA-02, DATA-04
 **Success Criteria** (what must be TRUE):
+
   1. User probes a folder with go.mod and gets Language=Go, Name=module path, Version=go directive (raw string, documented as toolchain floor, not a release version); BOM and quoted module lines parse correctly.
   2. User probes a folder with package.json and gets Language=JavaScript with Name/Version/Description from the manifest.
   3. User probes a folder with composer.json and gets Language=PHP with Name/Version/Description from the manifest.
@@ -92,6 +97,7 @@ Plans:
 **Depends on**: Phase 11
 **Requirements**: DETC-05, DETC-06, ROBT-03
 **Success Criteria** (what must be TRUE):
+
   1. User probes a folder with pyproject.toml `[project]` and gets Language=Python with PEP 621 name/version/description.
   2. User probes a Poetry-managed folder (`[tool.poetry]`) and gets Language=Python with poetry name/version/description.
   3. User probes a folder with Cargo.toml `[package]` and gets Language=Rust with name/version/description; `version.workspace = true` yields an empty Version — never fabricated.
@@ -105,6 +111,7 @@ Plans:
 **Depends on**: Phase 12
 **Requirements**: DETC-07, DETC-08
 **Success Criteria** (what must be TRUE):
+
   1. User probes a folder with .csproj and gets Language=C#/.NET with name/version extracted via XMLName local-name matching — correct with or without xmlns, and with BOM.
   2. User probes a folder with pom.xml and gets Language=Java with name/version; child modules inherit `<parent><version>` from the parent POM.
   3. User probes a folder with settings.gradle (rootProject.name) and no pom.xml and gets Java/Kotlin with name from the gradle file.
@@ -118,6 +125,7 @@ Plans:
 **Depends on**: Phase 13
 **Requirements**: DATA-03, ROBT-05
 **Success Criteria** (what must be TRUE):
+
   1. Version is always the raw manifest string across all detectors: go.mod `go` directive (documented toolchain floor), Maven parent inheritance, Cargo `version.workspace` and pyproject `dynamic` → empty; never normalized, never fabricated.
   2. Package-wide audit confirms anti-features are absent: no build-tool execution, no network calls, no symlink following, no version normalization in any code path.
   3. Fuzz targets seeded with real manifests run under normal `go test` — malformed JSON/XML/TOML inputs never panic and never crash the probe.
@@ -138,7 +146,7 @@ Plans:
 | 7. Batch operations | v1.6 | 4/4 | Complete | 2026-08-08 |
 | 8. Benchmark suite | v1.6 | 3/3 | Complete | 2026-08-08 |
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
-| 10. Package Foundation | v1.7 | 0/3 | Not started | - |
+| 10. Package Foundation | v1.7 | 1/3 | In Progress|  |
 | 11. Text/JSON Detectors | v1.7 | 0/TBD | Not started | - |
 | 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |

@@ -9,7 +9,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 
 ### Foundation
 
-- [ ] **FND-01**: Delete deprecated `project_detector/` sample in its own commit — it fails `go build ./...` (missing gs-dev, BurntSushi go.sum)
+- [x] **FND-01**: Delete deprecated `project_detector/` sample in its own commit — it fails `go build ./...` (missing gs-dev, BurntSushi go.sum)
 - [ ] **FND-02**: `project_probe/` package skeleton with `doc.go` documenting the never-fail contract (error reserved for hard I/O failures; Unknown = nil error)
 - [ ] **FND-03**: `Probe(folder) (ProjectData, error)` entry point backed by private ordered detector registry with `(ProjectData, bool)` contract
 
@@ -77,7 +77,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 10 | Pending |
+| FND-01 | Phase 10 | Complete |
 | FND-02 | Phase 10 | Pending |
 | FND-03 | Phase 10 | Pending |
 | DETC-01 | Phase 10 | Pending |
@@ -100,6 +100,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROBT-05 | Phase 14 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 21 total (Foundation 3, Detection 9, Data Model 4, Robustness 5)
 - Mapped to phases: 21
 - Unmapped: 0 ✓
