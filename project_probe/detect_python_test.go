@@ -170,3 +170,226 @@ func TestDetectPython_MissingManifest(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, ProjectData{}, pd)
 }
+
+// TestProbe_PythonOptionalDepsIsolation pins P2 sub-table isolation for the
+// [project] arm: keys inside [project.optional-dependencies] (a sibling
+// sub-table per PEP 621) must never leak into the [project] read — the
+// reader's exact-header equality is load-bearing.
+func TestProbe_PythonOptionalDepsIsolation(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("[project]\nname = \"acme\"\nversion = \"1.0.0\"\n\n"+
+			"[project.optional-dependencies]\nname = \"evil\"\ntest = [\"pytest\"]\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "1.0.0", data.Version)
+}
+
+// TestProbe_PythonPoetryDepsIsolation pins P2 sub-table isolation for the
+// [tool.poetry] arm: legacy files always carry [tool.poetry.dependencies] —
+// its entries must never leak into the poetry read.
+func TestProbe_PythonPoetryDepsIsolation(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("[tool.poetry]\nname = \"poet\"\nversion = \"1.0.0\"\n\n"+
+			"[tool.poetry.dependencies]\nrequests = \"^2.13.0\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, "poet", data.Name)
+	assert.Equal(t, "1.0.0", data.Version)
+}
+
+// TestProbe_PythonEmptyProjectFallsToPoetry pins D-disc-3: a [project] whose
+// values ALL degrade (name = 123 is unquoted → never stored) yields an empty
+// map, so the len==0 guard falls back to [tool.poetry] — "section present
+// but everything unsupported" is covered by the same guard as "section
+// absent".
+func TestProbe_PythonEmptyProjectFallsToPoetry(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("[project]\nname = 123\n\n[tool.poetry]\nname = \"poet\"\nversion = \"2.0.0\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, "poet", data.Name)
+	assert.Equal(t, "2.0.0", data.Version)
+}
+
+// TestProbe_PythonBOM pins Pitfall 1: a pyproject.toml prefixed with the
+// literal UTF-8 BOM bytes (0xEF 0xBB 0xBF) parses identically — readManifest
+// strips the BOM upstream, and the reader tolerates it directly too.
+func TestProbe_PythonBOM(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("\xEF\xBB\xBF[project]\nname = \"acme\"\nversion = \"1.0.0\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "1.0.0", data.Version)
+}
+
+// TestProbe_PythonCRLF pins P5: Windows-edited pyproject.toml with \r\n line
+// endings parses identically — the reader's per-line TrimSpace handles \r.
+func TestProbe_PythonCRLF(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("[project]\r\nname = \"acme\"\r\nversion = \"1.0.0\"\r\ndescription = \"CRLF file.\"\r\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, "acme", data.Name)
+	assert.Equal(t, "1.0.0", data.Version)
+	assert.Equal(t, "CRLF file.", data.Description)
+}
+
+// TestProbe_PythonPoetryPackagesTable pins P4 at detector level: an inline
+// table value (packages = [{include = "acme"}]) degrades without disturbing
+// the poetry read — Name stays intact.
+func TestProbe_PythonPoetryPackagesTable(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("[tool.poetry]\nname = \"poet\"\npackages = [{include = \"acme\"}]\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, "poet", data.Name)
+	assert.Equal(t, "", data.Version)
+}
+
+// TestProbe_PythonPoetryNameAbsent pins the DATA-02 chain on the poetry arm:
+// a [tool.poetry] without name still matches, Name falls back to the folder
+// base.
+func TestProbe_PythonPoetryNameAbsent(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "pyproject.toml"),
+		[]byte("[tool.poetry]\nversion = \"2.0.0\"\ndescription = \"No name here.\"\n"),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePython, data.Language)
+	assert.Equal(t, filepath.Base(folder), data.Name)
+	assert.Equal(t, "2.0.0", data.Version)
+	assert.Equal(t, "No name here.", data.Description)
+}
+
+// TestDetectPython pins the detector-level edges (detect_go_test.go table
+// shape with a folder-setup column): folder-base edges (nested temp subdir →
+// short base), poetry-description README fallback (DATA-04 on the poetry
+// arm), and empty-file presence match (D-09). A wantName of "" means the row
+// expects the filepath.Base(folder) fallback.
+func TestDetectPython(t *testing.T) { //nolint:funlen
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		folder   func(t *testing.T) string // nil → t.TempDir()
+		wantName string                    // "" → filepath.Base(folder)
+		wantVer  string
+		wantDesc string
+	}{
+		{
+			// A7 (DATA-02 edge): a folder nested under a subdirectory yields
+			// the short base name, not the full temp path.
+			"folder_base_nested",
+			"[tool.poetry]\nversion = \"1.0.0\"\n",
+			func(t *testing.T) string {
+				sub := filepath.Join(t.TempDir(), "sub")
+				require.NoError(t, os.Mkdir(sub, 0o700))
+
+				return sub
+			},
+			"",
+			"1.0.0",
+			"",
+		},
+		{
+			// DATA-04 on the poetry arm: description absent in
+			// [tool.poetry] → README first real paragraph.
+			"poetry_description_readme_fallback",
+			"[tool.poetry]\nname = \"poet\"\nversion = \"0.9.0\"\n",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "README.md"),
+					[]byte("[![badge](https://example.com/x.svg)](https://example.com)\n\nA poet's library.\n"),
+					0o600,
+				))
+
+				return folder
+			},
+			"poet",
+			"0.9.0",
+			"A poet's library.",
+		},
+		{
+			// D-09 presence: an EMPTY pyproject.toml still matches, with
+			// folder-base Name and empty fields.
+			"empty_file_presence",
+			"",
+			nil,
+			"",
+			"",
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			folder := t.TempDir()
+			if tt.folder != nil {
+				folder = tt.folder(t)
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(folder, "pyproject.toml"), []byte(tt.content), 0o600))
+
+			pd, ok := detectPython(folder)
+			require.True(t, ok)
+			assert.Equal(t, LanguagePython, pd.Language)
+			wantName := tt.wantName
+			if wantName == "" {
+				wantName = filepath.Base(folder)
+			}
+			assert.Equal(t, wantName, pd.Name)
+			assert.Equal(t, tt.wantVer, pd.Version)
+			assert.Equal(t, tt.wantDesc, pd.Description)
+		})
+	}
+}
