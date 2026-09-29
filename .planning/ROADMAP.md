@@ -144,12 +144,12 @@ Plans:
   3. User probes a folder with settings.gradle (rootProject.name) and no pom.xml and gets Java/Kotlin with name from the gradle file.
   4. A .csproj or pom.xml in a subdirectory never triggers detection for the parent folder — root-scoped markers only.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 13-01-PLAN.md — C#/.NET detector: readFirstManifest discovery + inline XML decode + detectCSharp + registry slot 2, interim position flip (DETC-07)
+- [x] 13-01-PLAN.md — C#/.NET detector: readFirstManifest discovery + inline XML decode + detectCSharp + registry slot 2, interim position flip (DETC-07)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -185,5 +185,5 @@ Plans:
 | 10. Package Foundation | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 11. Text/JSON Detectors | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete    | 2026-09-29 |
-| 13. XML Detectors | v1.7 | 0/TBD | Not started | - |
+| 13. XML Detectors | v1.7 | 1/2 | In Progress|  |
 | 14. Semantics, Hardening, Polish | v1.7 | 0/TBD | Not started | - |
