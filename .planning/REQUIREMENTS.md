@@ -29,7 +29,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 
 - [x] **DATA-01**: `ProjectData{Folder, Language, Name, Version, Description}` with independent per-field fallbacks
 - [x] **DATA-02**: Name chain: manifest name → folder base
-- [ ] **DATA-03**: Version: raw manifest string, empty when absent/dynamic, never fabricated
+- [x] **DATA-03**: Version: raw manifest string, empty when absent/dynamic, never fabricated
 - [x] **DATA-04**: Description: manifest → README first-paragraph → empty
 
 ### Robustness
@@ -38,7 +38,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 - [x] **ROBT-02**: Shared `readManifest` helper — size cap + BOM strip
 - [x] **ROBT-03**: Unexported section-aware TOML-subset reader (~80 lines) for pyproject/Cargo; strict degrade-to-empty
 - [x] **ROBT-04**: Stdlib-only imports; `path/filepath` not `path`; Windows-safe
-- [ ] **ROBT-05**: No build-tool execution, no network, no symlink following, no version normalization (anti-features enforced)
+- [x] **ROBT-05**: No build-tool execution, no network, no symlink following, no version normalization (anti-features enforced)
 
 ## v2 Requirements
 
@@ -91,13 +91,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DETC-09 | Phase 10 | Complete |
 | DATA-01 | Phase 10 | Complete |
 | DATA-02 | Phase 11 | Complete |
-| DATA-03 | Phase 14 | Pending |
+| DATA-03 | Phase 14 | Complete |
 | DATA-04 | Phase 11 | Complete |
 | ROBT-01 | Phase 10 | Complete |
 | ROBT-02 | Phase 10 | Complete |
 | ROBT-03 | Phase 12 | Complete |
 | ROBT-04 | Phase 10 | Complete |
-| ROBT-05 | Phase 14 | Pending |
+| ROBT-05 | Phase 14 | Complete |
 
 **Coverage:**
 

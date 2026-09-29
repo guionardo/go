@@ -4,17 +4,17 @@ milestone: v1.7
 milestone_name: Project Probe
 current_phase: 14
 current_phase_name: Semantics, Hardening, and Release Polish
-status: executing
-stopped_at: Completed 14-03-PLAN.md
-last_updated: "2026-09-29T10:40:44.262Z"
+status: verifying
+stopped_at: Completed 14-04-PLAN.md
+last_updated: "2026-09-29T11:21:13.205Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 14 execution started
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 16
-  completed_plans: 15
-  percent: 80
+  completed_plans: 16
+  percent: 100
 state_head: 98b812adde54787686890f2abff0e190e59de3c9
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 Phase: 14 (Semantics, Hardening, and Release Polish) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-29 — Phase 14 execution started
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [█████████░] 94%
 | Phase 14 P01 | 6min | 2 tasks | 21 files |
 | Phase 14 P02 | 6min | 3 tasks | 7 files |
 | Phase 14-semantics-hardening-release-polish P03 | 8min | 2 tasks | 1 files |
+| Phase 14 P04 | 34 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 14]: Seven error-path rows pin error-not-panic on every failure branch of CheckForUpdate (91-92 request creation, 102-103 network, 112-113 decode, 117-118 version) and DownloadUpdate (130-131 MkdirAll, 136-137 Create, 141-144 digest mismatch with os.Remove cleanup)
 - [Phase 14]: ENOTDIR triggers (file-as-parent, slash-in-matched-name) + closed-server URLs replace permission-based triggers — cross-platform on all three CI OSes, no chmod anywhere (T-14-11 mitigation)
 - [Phase 14]: Coverage arithmetic adjusted from research: 71/74 = 95.9% not 74/74 = 100% — the three remaining blocks (62-63, 67-68, 72-73) are module-derivation error sub-branches unreachable from a test binary (debug.ReadBuildInfo always returns Main.Path); gate (file:70) green regardless
+- [Phase 14]: Version semantics contract documented in doc.go with all six detector rules: go.mod toolchain floor, pyproject dynamic → '', Cargo version.workspace → '', .csproj Version→VersionPrefix (never MSBuild 1.0.0), pom.xml parent inheritance (never Super POM 4.0.0), package.json/composer.json verbatim; placeholders raw; XML TrimSpace named as decode hygiene, not normalization (D-02/DATA-03)
+- [Phase 14]: Anti-feature audit recorded as evidence file (14-AUDIT.md): five grep families + XML-entity family all zero matches; f.Stat() read-path nuance and TrimSpace decode-hygiene nuance stated (D-03/ROBT-05)
+- [Phase 14]: Deferred dispositions ledger recorded with rationale: Phase 10 CR-01 (Windows errno — needs Windows CI evidence, tracked) and WR-02 (panic logging — future milestone); residual INFO findings (11 IN-01/IN-02, 13 IN-02) accepted not-in-scope, recorded not dropped (D-08)
+- [Phase 14]: Lint delta-zero verified on the clean committed state: full run 0 issues, Phase-14 delta (8461196..HEAD) 0 issues; the dirty working tree's ~300 pre-existing issues documented as a new-filter diff-base artifact, advisory per A3 (D-10)
 
 ### Pending Todos
 
@@ -150,6 +155,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T10:40:44.256Z
-Stopped at: Completed 14-03-PLAN.md
+Last session: 2026-09-29T11:19:32.049Z
+Stopped at: Completed 14-04-PLAN.md
 Resume file: None

@@ -167,7 +167,7 @@ Plans:
   3. Fuzz targets seeded with real manifests run under normal `go test` — malformed JSON/XML/TOML inputs never panic and never crash the probe.
   4. The package ships complete: `make coverage-quick` passes, doc.go contract finalized, README package index row added, `go vet` and lint clean.
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 
 Plans:
 **Wave 1**
@@ -178,7 +178,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 14-04-PLAN.md — doc.go Version-semantics contract, README package row, anti-feature audit + deferred ledger, final gates (D-02/D-03/D-08/D-10, DATA-03/ROBT-05)
+- [x] 14-04-PLAN.md — doc.go Version-semantics contract, README package row, anti-feature audit + deferred ledger, final gates (D-02/D-03/D-08/D-10, DATA-03/ROBT-05)
 
 ## Progress
 
@@ -197,4 +197,4 @@ Plans:
 | 11. Text/JSON Detectors | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete    | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 2/2 | Complete    | 2026-09-29 |
-| 14. Semantics, Hardening, Polish | v1.7 | 3/4 | In Progress|  |
+| 14. Semantics, Hardening, Polish | v1.7 | 4/4 | In Progress|  |
