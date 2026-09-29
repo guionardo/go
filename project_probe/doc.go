@@ -34,14 +34,17 @@
 //
 // Detector implementations land across phases 11-13: the ordered registry
 // (Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP) currently holds
-// live detectors at positions 0 (Go), 3 (JS/TS), and 6 (PHP). A folder with
+// live detectors at positions 0 (Go), 1 (Python), 3 (JS/TS), 4 (Rust), and 6
+// (PHP); slots 2 (C#/.NET) and 5 (Java/Kotlin) fill in Phase 13. A folder with
 // go.mod reports LanguageGo, with Name from the module line (folder-base
 // fallback), Version from the go directive (toolchain floor, never
 // normalized), and Description from the README first real paragraph via the
 // readmeDescription fallback; a folder with a parseable package.json reports
 // LanguageJavaScript with Name/Version/Description from the manifest
 // (DETC-03); a folder with a parseable composer.json reports LanguagePHP
-// with the full vendor/package name (DETC-04). The remaining slots
-// (Python, C#/.NET, Rust, Java/Kotlin) fill in phases 12-13. Content-bearing
-// folders without a matching manifest still yield LanguageUnknown.
+// with the full vendor/package name (DETC-04); a folder with a pyproject.toml
+// reports LanguagePython with [project] (or legacy [tool.poetry]) fields; a
+// folder with a Cargo.toml reports LanguageRust with [package] fields,
+// workspace-inherited versions degrading to empty. Content-bearing folders
+// without a matching manifest still yield LanguageUnknown.
 package projectprobe
