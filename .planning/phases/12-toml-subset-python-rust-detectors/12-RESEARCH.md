@@ -534,27 +534,31 @@ func TestDetectorPositions(t *testing.T) { //nolint:paralleltest // reads global
 | A8 | `detect_python.go`/`detect_rust.go`/`toml.go` filename suffixes are build-safe | Project Structure | Verified via `go tool dist list` this session — `python`/`rust` appear in neither GOOS nor GOARCH lists (unlike `_js`) |
 | A9 | Lint (golangci-lint) is advisory, not a gate: CI runs no lint job; pre-commit hooks are not installed | Pitfall 8 | If a contributor installs pre-commit hooks and CI gains a lint job, Phase 11's files already fail it — a future cleanup task, not this phase's blocker |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Section precedence interpretation (A1) — confirm whole-section, not per-field, fallback.**
    - What we know: D-04 says legacy fallback "when `[project]` absent"; D-05 says "name → folder-base fallback (DATA-02) when both sections lack a name". The reader returns a map per section; `len(fields) == 0` cleanly covers absent-and-empty.
    - What's unclear: whether "both sections lack a name" implies name may be looked up in `[tool.poetry]` even when `[project]` exists but lacks the name.
    - Recommendation: whole-section precedence (D-disc-3) — deterministic, matches D-04's wording, and Poetry 2.x migration files carry both sections with deprecated legacy fields that must not mix. The planner should note this choice in the plan; no user confirmation strictly required (within discretion), but it is the one interpretation risk worth recording.
+   - **RESOLVED — adopted by plan 12-02** (whole-section precedence D-disc-3; pinned by TestProbe_PythonProjectWins + TestProbe_PythonEmptyProjectFallsToPoetry).
 
 2. **`[workspace]`-only virtual manifests — confirm folder-base Name is desired.**
    - What we know: D-09 locks presence-match for detectRust; a virtual manifest has no `[package]`, so Name = folder base, Version = "", Description = README fallback.
    - What's unclear: nothing technically — this is the natural consequence of the locked decisions; recorded for visibility.
    - Recommendation: no action; pin with a test row so the behavior is explicit.
+   - **RESOLVED — adopted by plan 12-03** (TestProbe_RustVirtualManifest row; D-09 presence-match yields folder-base Name).
 
 3. **Reader size budget (~80 lines) vs the skip states.**
    - What we know: the strict-degrade contract (SC4) needs global skip states (P3); with doc comments the reader lands ~100-110 lines.
    - What's unclear: whether the CONTEXT's "~80 lines" is a hard budget.
    - Recommendation: treat as soft — correctness first (A7); the skip states are ~15 lines. Note the deviation in the plan if it matters.
+   - **RESOLVED — adopted by plan 12-01** (soft-budget flagged assumption in the prohibitions; ~100-110 lines with doc comments documented).
 
 4. **golangci-lint enforcement (A9) — confirm advisory status.**
    - What we know: verified this session — CI (`go.yml`) has no lint job; `.git/hooks/pre-commit` does not exist; `golangci-lint run` typecheck-panics under the default go1.27.0 toolchain.
    - What's unclear: whether the user wants lint enforced via some other path (e.g. a Makefile target) in this phase.
    - Recommendation: keep advisory; the plan's verification uses `go test ./...` + `make coverage-quick` (project_probe rows) as gates, matching Phase 11's effective practice.
+   - **RESOLVED — adopted by plans 12-01/12-02/12-03** (lint stays advisory; verification gates are `go test ./...` + `make coverage-quick` project_probe rows).
 
 ## Environment Availability
 
