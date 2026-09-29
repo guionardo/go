@@ -13,16 +13,17 @@ import (
 // package-level detectors slice; parallel tests on global state race
 // (AGENTS.md mid/collectFuncs precedent, RESEARCH Pitfall 4).
 
-// TestRunDetectors_EmptyRegistry pins the empty-cascade behavior: with no
-// detector matching (the injected slice below never matches the "" folder),
-// runDetectors yields no match. The production registry now holds real
-// detectors, but this test replaces the slice wholesale, so it still passes
-// (Pitfall 4 — the comment, not the test, was stale).
+// TestRunDetectors_EmptyRegistry pins the empty-cascade behavior: the
+// explicit empty slice injection (12/13 WR-02) means runDetectors sees
+// zero live detectors, so any folder — "x" cannot collide with
+// package-root fixtures — yields no match, never a production-registry
+// side effect.
 func TestRunDetectors_EmptyRegistry(t *testing.T) { //nolint:paralleltest // global-state mutation: detectors slice
 	original := detectors
+	detectors = []detectorFunc{} // explicit: no live detectors
 	defer func() { detectors = original }()
 
-	pd, ok := runDetectors("")
+	pd, ok := runDetectors("x")
 	assert.False(t, ok)
 	assert.Equal(t, ProjectData{}, pd)
 }
