@@ -12,7 +12,7 @@ The phase's one genuinely new mechanism is **Go fuzzing**, and the single most d
 
 The coverage gate is provably closeable with a tiny test addition: `release/update.go` has **74 statements, 51 covered = 68.9%**; 70% needs only **52 covered statements** (verified from the coverage profile). A single new test — `CheckForUpdate` called with **no options** — enters the module-path derivation branch and covers 13 statements (86.5% file), because Go's cover instrumentation counts a block as covered when its entry executes, not per-branch. A full 7-row set covers 100% of the file; the no-options row alone closes the gate. The anti-feature audit is already provably clean: greps for `os/exec`, `net/http`, `EvalSymlinks`/`Readlink`, `WalkDir`, and version-normalization calls (`ParseVersion`, `semver`, `regexp`) return **zero matches** across `project_probe/` (verified this session). Version semantics are likewise raw-string across all 7 detectors by construction — every Version assignment is a verbatim manifest value or `""`, and the two structural degrades (Cargo `version.workspace`, pyproject `dynamic`) have no code branches at all (Phase 12 pinned both by tests).
 
-**Primary recommendation:** four plans mirroring prior-phase granularity — **P01 = fuzz targets + encoded seed corpus** (new `fuzz_test.go` with `FuzzJSONManifest`/`FuzzTOMLManifest`/`FuzzXMLManifest` calling the detectors directly, plus `testdata/fuzz/Fuzz<Name>/` encoded real-manifest seeds); **P02 = correctness fold-in** (readme.go WR-01 plain badge + WR-02 multi-line HTML comments with matrix rows, XML `strings.TrimSpace` per field in both XML detectors with rows, `.csproj` exact-name guard 13 IN-03, decode-comment rewording 13 IN-01, registry test hygiene 12/13 WR-02); **P03 = release/update.go coverage closure** (no-options test mandatory, six error-path rows recommended); **P04 = docs + audit + gate** (doc.go Version-semantics contract section D-02, README row + section D-10, anti-feature grep audit recorded in the verification report D-03, `GOTOOLCHAIN=go1.26.4 golangci-lint run` delta-zero, `make coverage-quick` green, milestone complete).
+**Primary recommendation:** four plans mirroring prior-phase granularity — **P01 = fuzz targets + encoded seed corpus** (new `fuzz_test.go` with `FuzzJSONManifest`/`FuzzTOMLManifest`/`FuzzXMLManifest` calling the detectors directly, plus `testdata/fuzz/Fuzz<Name>/` encoded real-manifest seeds); **P02 = correctness fold-in** (readme.go WR-01 plain badge + WR-02 multi-line HTML comments with matrix rows, XML `strings.TrimSpace` per field in both XML detectors with rows, `.csproj` exact-name guard 13 IN-03, decode-comment rewording 13 IN-01, registry test hygiene 12/13 WR-02); **P03 = release/update.go coverage closure** (no-options test mandatory, seven error-path rows recommended); **P04 = docs + audit + gate** (doc.go Version-semantics contract section D-02, README row + section D-10, anti-feature grep audit recorded in the verification report D-03, `GOTOOLCHAIN=go1.26.4 golangci-lint run` delta-zero, `make coverage-quick` green, milestone complete).
 
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
@@ -273,7 +273,7 @@ Encoding rules (verified):
 
 **The mandatory row — `TestCheckForUpdate_NoOptions`:** every existing test passes `WithOwner`/`WithRepo`, so the whole module-path derivation branch (lines 59-81, 13 statements) is dead. Calling `CheckForUpdate(ctx, "v1.0.0")` with NO options enters it: `getCurrentModule()` reads `debug.ReadBuildInfo()` of the test binary — verified to succeed with `Main.Path` set in test binaries (live experiment) — `url.Parse("github.com/guionardo/go")` yields `Path="github.com/guionardo/go"` → `words = [github.com, guionardo, go]` → `owner="guionardo"`, `repo="go"`. The mock server (existing `httptest` + `githubAPIBase` override + `mu` lock pattern from update_test.go:87-132) must serve `/repos/guionardo/go/releases/latest` — assert the path in the handler to pin the derivation. This row alone: 51 + 13 = 64/74 = **86.5%**, gate closed.
 
-**Six recommended error-path rows** (each ~10 lines, mirroring existing shapes; together 74/74 = 100%):
+**Seven recommended error-path rows** (each ~10 lines, mirroring existing shapes; together 74/74 = 100%):
 
 | Row | Trigger (cross-platform — NO chmod tricks, AGENTS.md Windows rule) | Covers |
 |-----|------------------------------------------------------------------------|--------|
@@ -624,22 +624,22 @@ for _, line := range strings.Split(string(content), "\n") {
 | A6 | `url.Parse("github.com/guionardo/go")` yields `Path="github.com/guionardo/go"` (no scheme) | Pattern 3 | Low — standard stdlib behavior for scheme-less input; the no-options test asserts the derived path in the mock handler, so a wrong derivation fails the test visibly |
 | A7 | The 16-hex corpus filenames (fuzzer convention) vs readable names both work today | Pattern 2 | Low — verified `ReadCorpus` reads all files; readable names chosen for reviewability, hash names for fuzzer-written files |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Lint baseline disposition (A3)**
+1. **Lint baseline disposition (A3)** — RESOLVED: 14-04 (delta-zero reading adopted; gate encoded in 14-04 Task 3)
    - What we know: `GOTOOLCHAIN=go1.26.4 golangci-lint run` works and reports 28 new-vs-main issues, all pre-existing in project_probe/release from phases 10-13 (verified this session). D-10 says "go vet + golangci-lint clean".
-   - What's unclear: whether "clean" means delta-zero (consistent with prior phases' advisory treatment) or fixing all 28.
-   - Recommendation: plan for delta-zero (record baseline in the verification report); if the user wants the 28 fixed, that is a separate scope decision — surface at plan review.
+   - What was unclear: whether "clean" means delta-zero (consistent with prior phases' advisory treatment) or fixing all 28.
+   - Resolution: delta-zero on Phase 14's own touched files, with the 28 recorded as the advisory baseline in 14-AUDIT.md (14-04 Task 3) — A3's recommended reading. Fixing the 28 stays out of scope unless the user decides otherwise.
 
-2. **README row position**
+2. **README row position** — RESOLVED: 14-04 Task 2 (alphabetical, between `path_tools` and `reflect_tools`, anchor `#package-project_probe`)
    - What we know: the table is sorted by package name; `project_probe` sorts between `path_tools` and `reflect_tools`.
-   - What's unclear: whether the user prefers alphabetical strictness or a "newest package last" convention.
-   - Recommendation: alphabetical (repo precedent), agent's discretion per CONTEXT.
+   - What was unclear: whether the user prefers alphabetical strictness or a "newest package last" convention.
+   - Resolution: alphabetical (repo precedent) — the row is locked to its position and anchor; wording is the agent's discretion per CONTEXT (14-04 Task 2).
 
-3. **fuzz target file layout**
+3. **fuzz target file layout** — RESOLVED: 14-01 Task 1 (one `fuzz_test.go`, three targets)
    - What we know: one `fuzz_test.go` with three targets vs three files — both valid; the corpus dirs are per-target regardless.
-   - What's unclear: reviewer preference for file-per-target.
-   - Recommendation: one file (smaller diff, no filename-suffix risk); split only if the executor finds it unwieldy.
+   - What was unclear: reviewer preference for file-per-target.
+   - Resolution: one file (smaller diff, no filename-suffix risk) — adopted by 14-01 Task 1; split only if the executor finds it unwieldy.
 
 ## Environment Availability
 
