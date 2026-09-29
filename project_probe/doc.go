@@ -51,4 +51,27 @@
 // <parent><version> inheritance, and a settings.gradle rootProject.name
 // fallback fires only when no pom.xml exists (DETC-08). Content-bearing
 // folders without a matching manifest still yield LanguageUnknown.
+//
+// # Version semantics (DATA-03)
+//
+// Version is always the raw manifest string — verbatim, never normalized,
+// never fabricated. Absent or unsupported values yield "". The rules:
+//
+//   - go.mod: the "go" directive, reported as the toolchain floor — the
+//     minimum Go version the module was written for, NOT the release
+//     version; "toolchain" lines are never the directive.
+//   - pyproject.toml: the [project] version; a "dynamic" version array
+//     degrades to "" — never resolved, never guessed.
+//   - Cargo.toml: the [package] version; version.workspace = true degrades
+//     to "" — never resolved from a workspace root.
+//   - .csproj: <Version>, falling back to <VersionPrefix>; the MSBuild
+//     implicit 1.0.0 default is never reported.
+//   - pom.xml: <version>, inheriting <parent><version> when absent (single
+//     level, from the same file); the Maven Super POM 4.0.0 default is
+//     never reported.
+//   - package.json / composer.json: the "version" field verbatim.
+//
+// Placeholders ($(...) in MSBuild, ${...} in Maven) are reported raw, never
+// resolved. XML element text is whitespace-trimmed at decode time; that trim
+// is decode hygiene — the value itself is still never normalized.
 package projectprobe
