@@ -1,20 +1,16 @@
 ---
-gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Cache Dedup
-current_phase: 9
-status: Awaiting next milestone
-stopped_at: Phase 9 Plan 01 complete — all cleanup items resolved
-last_updated: "2026-08-08T11:19:42.326Z"
-last_activity: 2026-08-08
-last_activity_desc: Milestone v1.6 completed and archived
+gsd_state_version: "1.0"
+milestone: v1.7
+milestone_name: Project Probe
+status: planning
+last_updated: "2026-09-29T00:28:50.843Z"
+last_activity: 2026-09-28
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 80
-current_phase_name: Post-v1.6 cleanup
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE
@@ -97,10 +93,10 @@ current_phase_name: Post-v1.6 cleanup
 
 ## Current Position
 
-Phase: Milestone v1.6 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-08 — Milestone v1.6 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-28 — Milestone v1.7 started
 
 ## Operator Next Steps
 

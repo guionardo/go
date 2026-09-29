@@ -42,8 +42,21 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] String utilities package (truncation, padding, join/split)
-- [ ] Retry package with backoff strategies and jitter support
+- [ ] `project_probe` package — folder content reader reporting language, name, version, description (v1.7)
+
+## Current Milestone: v1.7 Project Probe
+
+**Goal:** A stdlib-only `project_probe` package that reads a folder's contents and reports the project's language, name, version, and description — best-effort, never failing.
+
+**Target features:**
+- `ProjectData{Folder, Language, Name, Version, Description}` — description from manifest, fallback README first paragraph
+- 7 language detectors: Go, Python, JavaScript/TypeScript, C#/.NET, Rust, Java/Kotlin, PHP
+- Name from manifest (go.mod module, package.json name...), fallback folder name
+- Version = manifest version (go.mod go directive, package.json version, Cargo.toml version...)
+- Unknown folders → `Unknown` type, no error
+- Framework detection deferred (dependencies-based, later milestone)
+
+**Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
 
 ## Completed Milestones
 
@@ -66,7 +79,11 @@ Eliminated duplicate setter work in cache misses and reduced round trips via sin
 
 ## Current State
 
-**v1.6 — Cache Dedup** (shipped 2026-08-08)
+**v1.7 — Project Probe** (in progress)
+
+New `project_probe` package replacing the `project_detector/` sample: reads folder contents, reports language, name, version, and description across 7 languages. Stdlib-only, best-effort detection (Unknown type, no error).
+
+**Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
 All five cache providers now share a common `cacher` / `concreteCache` architecture with singleflight-wrapped `GetOrSet`, `BatchCache[K,V]` interface with MGet/MSet/MDel using provider-optimal strategies, and a benchmark suite proving the dedup and batching wins. Built on 9 validated spikes from 2026-08-06.
 
@@ -127,4 +144,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-06 after v1.6 Cache Dedup milestone started*
+*Last updated: 2026-09-28 after v1.7 Project Probe milestone started*
