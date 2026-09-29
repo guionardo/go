@@ -21,7 +21,7 @@ Three verified platform facts drive the design. (1) `os.ReadDir` returns entries
 - **D-01:** Three exported sentinel errors: `ErrFolderNotFound` (missing folder), `ErrNotDirectory` (path is a file), `ErrPermissionDenied` (EACCES). Any other I/O failure returns a plain wrapped error. — **Reversibility:** one-way — exported sentinels are a published contract; removing them later breaks consumer `errors.Is` checks.
 - **D-02:** Probe errors wrap the failing folder path: `fmt.Errorf("probe %s: %w", folder, err)` — callers get context AND `errors.Is` still matches. Matches repo convention (`config`, `fraction` sentinels).
 - **D-03:** Manifest-read failures inside detectors (e.g., unreadable go.mod in a readable folder) degrade to Unknown / nil error — never surface as Probe errors. The never-fail contract reserves errors for hard folder-level I/O failures only. — **Reversibility:** costly — changing this later means detectors need an error return channel, touching the `(ProjectData, bool)` registry contract.
-- **D-04:** Error mapping: `os.Stat`/`os.ReadDir` ENOENT → `ErrFolderNotFound`; ENOTDIR → `ErrNotDirectory`; EACCES → `ErrPermissionDenied`; everything else → wrapped raw error.
+- **D-04:** Error mapping: `os.Stat`/`os.ReadDir` ENOENT → `ErrFolderNotFound`; ENOTDIR → `ErrNotDirectory`; EACCES **or EPERM** → `ErrPermissionDenied`; everything else → wrapped raw error. *(Quoted per the 2026-09-28 amendment in CONTEXT.md — EPERM added to the permission arm following assumption A2; the original research-time text mapped EACCES only.)*
 
 #### Language Type
 - **D-05:** `type Language string` with exported constants: `LanguageGo`, `LanguagePython`, `LanguageJavaScript`, `LanguageCSharp`, `LanguageRust`, `LanguageJava`, `LanguagePHP`, `LanguageUnknown`. — **Reversibility:** one-way — exported type + constants are a published contract for switch statements and JSON output.
@@ -487,17 +487,19 @@ func TestProbe_Deterministic(t *testing.T) {
 | A6 | `.testcoverage-quick.yml` thresholds apply to the new package as-is (no override added) | Pitfall 5 | Verified file contents (pkg 80 / file 70 / total 75); if a future phase adds an override for `project_probe`, the threshold changes — Phase 10 must pass without one |
 | A7 | Detector-merge rule: winning detector's `Language/Name/Version/Description` override the Unknown defaults; `Folder` always owned by `Probe` | Pattern 1 | Not explicitly locked in CONTEXT.md; consistent with D-08/D-09 (one canonical path) and DATA-01's per-field fallbacks; cheap to adjust in 11–13 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`Probe("")` — error or cwd probe?**
+1. **`Probe("")` — error or cwd probe?** — RESOLVED (2026-09-28): guard `folder == ""` → `ErrFolderNotFound`.
    - What we know: `filepath.Clean("") == "."`, so an unguarded Probe would stat/read the current directory; CONTEXT.md D-08/D-09 don't address empty input.
    - What's unclear: whether the empty-string case should be `ErrFolderNotFound` (recommended — honest API, avoids silent cwd probing) or documented-as-probing-cwd.
    - Recommendation: guard `folder == ""` → `ErrFolderNotFound` (shown in the Probe skeleton); planner should add one table row + one test. If the user prefers literal D-08 semantics, drop the guard and add a doc sentence — either way, decide now, not at execution.
+   - **Resolution adopted:** the recommended guard. Plan 10-02 Task 1 adds the `empty_string` Probe row (`""` → `require.ErrorIs ErrFolderNotFound`), Task 2 implements the guard in `probe.go` before cleaning, and Task 3 documents it in `doc.go` ("never probes the cwd").
 
-2. **FND-01 "in its own commit" with an untracked directory**
+2. **FND-01 "in its own commit" with an untracked directory** — RESOLVED (2026-09-28): task-isolation + `go build ./...` verification satisfies the clause; no empty commit is created.
    - What we know: `project_detector/` has 0 tracked files; git cannot produce a deletion commit; the build failure is local-only (CI clones never contained the dir).
    - What's unclear: whether the phase must still produce a commit attributable to FND-01.
    - Recommendation: treat FND-01 as satisfied by (a) `rm -rf` as the phase's first task, (b) `go build ./...` green as its acceptance check, (c) the untracked reality noted in the phase's first commit message. No empty commits (repo rule). If strict commit separation is required, a `chore:` commit carrying the first `project_probe` skeleton immediately after the deletion task is the closest honest representation — planner's call; do not force a no-op commit.
+   - **Resolution adopted:** the recommendation. Plan 10-01 Task 1 performs the `rm -rf` as the phase's first isolated task with `go build ./...` as its acceptance check; plan 10-02 Task 2's first real commit records the untracked reality in its message body; no no-op commit is created.
 
 ## Environment Availability
 
@@ -577,7 +579,7 @@ Directives the planner must honor (verbatim intent from `./AGENTS.md`):
 - Standard stack: HIGH — stdlib-only mandate + testify verified in go.mod; no version risk
 - Architecture: HIGH — every pattern anchored to verified stdlib behavior or in-repo precedent; the two open questions are small, explicit decisions
 - Pitfalls: HIGH — five of six pitfalls verified against primary sources or reproduced this session; permission-test platform caveats are standard CI knowledge
-- Assumptions: 7 logged items, all LOW-risk; none block planning (OQ-1 is the only decision the planner must surface)
+- Assumptions: 7 logged items, all LOW-risk; none block planning (OQ-1 and OQ-2 were the only decisions the planner had to surface — both resolved and recorded in §Open Questions (RESOLVED))
 
 **Research date:** 2026-09-28
 **Valid until:** 2026-10-28 (stdlib semantics stable; Go 1.26/1.27 boundary noted in State of the Art)
