@@ -4,17 +4,17 @@ milestone: v1.7
 milestone_name: Project Probe
 current_phase: 12
 current_phase_name: TOML Subset + Python/Rust Detectors
-status: executing
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-09-29T05:55:54.168Z"
+status: verifying
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-09-29T06:08:33.462Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 12 execution started
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
-  percent: 40
+  completed_plans: 9
+  percent: 60
 state_head: e928a98cce6ea35edc1797358e0d1e8a9568bea3
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 Phase: 12 (TOML Subset + Python/Rust Detectors) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-29 — Phase 12 execution started
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [█████████░] 89%
 | Phase 11-text-json-detectors-go-js-ts-php-readme-fallback P03 | 15min | 3 tasks | 8 files |
 | Phase 12-toml-subset-python-rust-detectors P01 | 7min | 2 tasks | 2 files |
 | Phase 12-toml-subset-python-rust-detectors P02 | 6min | 2 tasks | 4 files |
+| Phase 12-toml-subset-python-rust-detectors P03 | 8min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 12-toml-subset-python-rust-detectors]: Presence-match asymmetry (D-09) shipped: garbage pyproject.toml claims Python at index 1 while JS needs parse success at index 3; cascade consequence pinned in plan 12-03's TestProbe_CascadePrecedence — The manifest file IS the ecosystem marker; fields degrade to empty with fallbacks, never fabricated (T-12-04 accept)
 - [Phase 12-toml-subset-python-rust-detectors]: dynamic = ["version"] has NO code branch in the detector — the reader degrades the array to an absent key, Version reads "" (DATA-03 never-fabricated); pinned by TestProbe_PythonDynamicVersion — A dynamic-field special case is the anti-pattern RESEARCH calls out; strict degrade is structural
 - [Phase 12-toml-subset-python-rust-detectors]: Interim registry flip only (Pitfall 9): TestDetectorPositions changes exactly one assertion (detectors[1] NotNil); detectors[4] stays Nil for plan 12-03's RED step; the flip is the ONLY registry_test.go change per the plan prohibition — Flipping both in 12-02 breaks plan 12-03's RED step; the 7-position order contract is guarded at every commit
+- [Phase 12-toml-subset-python-rust-detectors]: D-07 executed structurally: version.workspace = true degrades to Version "" with ZERO detector code branches — the reader's dotted-key classification (isBareKey rejects '.') is the only mechanism; no workspace-root resolution, no special-casing; pinned by TestProbe_RustWorkspaceVersion
+- [Phase 12-toml-subset-python-rust-detectors]: Virtual manifest (OQ-2 flagged): [workspace]-only Cargo.toml matches on presence (D-09) with folder-base Name and "" Version — natural consequence of the locked decisions; pinned by TestProbe_RustVirtualManifest
+- [Phase 12-toml-subset-python-rust-detectors]: Presence-match asymmetry shipped at cascade level: a garbage pyproject.toml claims Python at index 1 over a valid Cargo.toml at index 4 (T-12-08 accept — the manifest file IS the ecosystem marker); pinned by the pyproject_toml_and_cargo_toml cascade row
+- [Phase 12-toml-subset-python-rust-detectors]: registry_test.go final flip ONLY (plan prohibition): exactly one assertion changed (detectors[4] Nil→NotNil) plus gofmt alignment of the 7-slot literal in registry.go (the literal was already non-gofmt at HEAD from prior edits; formatting the file I modified is the clean end state); no parallel marker added
 
 ### Pending Todos
 
@@ -120,6 +125,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T05:55:40.729Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-09-29T06:08:25.437Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None
