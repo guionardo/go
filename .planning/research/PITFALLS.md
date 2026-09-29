@@ -1,496 +1,320 @@
-# Domain Pitfalls: Go Utility Library Authors
+# Domain Pitfalls: Best-Effort Project Detection & Manifest Parsing
 
-**Domain:** Go utility packages / developer tools
-**Researched:** 2026-07-21
-**Sources:** go.dev/blog, dave.cheney.net, Go skills (code-style, design-patterns, safety, security), Go team talks (Jonathan Amsterdam, Russ Cox)
-**Overall Confidence:** HIGH — authoritative sources (Go team blog, Dave Cheney's established design advice, plus project-specific concerns already validated in CONCERNS.md)
+**Domain:** Go utility library — folder probing, manifest parsing, language detection
+**Researched:** 2026-09-28
+**Confidence:** HIGH — stdlib behaviors verified locally on Go 1.26.4 and 1.27.0; ecosystem conventions cross-checked (linguist/enry, go-toml v2, BurntSushi/toml, golang.org/x/mod/modfile)
+**Scope:** Adding the `project_probe` package (v1.7) to `github.com/guionardo/go`, replacing the deprecated `project_detector/` sample. Detects language, name, version, description across Go, Python, JS/TS, C#/.NET, Rust, Java/Kotlin, PHP. Best-effort: `Unknown` type, no error.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, major version bumps, or break downstream consumers.
+Mistakes that cause rewrites, silently wrong data, or break the "best-effort, never failing" contract.
 
-### Pitfall 1: Changing Function Signatures Instead of Adding
+### Pitfall 1: API Contract Ambiguity — Error vs Unknown
 
-**What goes wrong:** Adding a required parameter, converting a parameter from positional to variadic, or changing parameter types on an exported function. This breaks all callers at compile time.
+**What goes wrong:** `Probe(folder) (ProjectData, error)` ships without a written contract for when the error is set. Two failure modes get conflated: (a) "folder is not a project" — benign, must yield `Unknown` with nil error; and (b) "cannot read folder" — permission denied, missing directory, genuinely broken. The old `DetectProject` conflated both: it returned `errors.New("folder is empty")` and `errors.New("could not detect project type")` for benign cases, and used `os.ErrNotExist` as a control-flow signal ("not my type") inside detectors.
 
-**Why it happens:** The author needs to pass additional information to a function. It seems "small" so the author changes the existing function rather than adding a new one.
+**Why it happens:** Best-effort tools start with "never fail", then the author discovers real I/O failures and starts returning errors for those — without redefining what the error channel means. The distinction is never written down, and callers end up string-matching error messages.
 
-**Consequences:** Every downstream caller stops compiling. In a utility library consumed by many projects, this forces mass updates or pins users to old versions.
+**How to avoid:**
+- Write the contract in `doc.go` on day one: `Probe(folder) (ProjectData, error)` where **error is reserved for hard failures only** (folder unreadable, not a directory). Not-a-project ⇒ `ProjectData{Language: Unknown, Name: filepath.Base(folder)}` with nil error.
+- Make detectors error-free internally: return `(data, matched bool)`, never error-as-control-flow (the old `os.ErrNotExist` pattern made "empty folder" a hard error).
+- Test the contract explicitly: empty folder → Unknown + nil error; nonexistent folder → error; unreadable folder → error.
+- Keep detector ordering in an **ordered slice** (the old `detectors` list), never a map iteration — Go map iteration order is random, which makes results nondeterministic.
 
-**Go-specific nuance:** Even adding variadic parameters breaks function type compatibility. `func Run(name string)` has type `func(string)`, but `func Run(name string, opts ...Option)` has type `func(string, ...Option)`. Assignments like `var fn func(string) = Run` break.
+**Warning signs:** Callers switching on `errors.Is(err, os.ErrNotExist)`; tests asserting on error strings; the package doc unable to state "never fails" truthfully; any `map` used as the detector registry.
 
-**Prevention:**
-- Never change an exported function's signature — **add, don't change or remove** (Go team's first rule of compatibility)
-- Use the *add new function* pattern: `Query()` → `QueryContext()` (stdlib pattern)
-- Plan ahead with option structs (`Config` struct with nil-acceptance), functional options (`type Option func(*T)`), or variadic option parameters
-- When adding a feature that needs new params, add a new function with a descriptive name rather than tacking on more arguments
-
-**Detection:**
-- `go vet` catches some type incompatibilities
-- `gorelease` (golang.org/x/exp/cmd/gorelease) detects API changes
-- `go build ./...` on downstream test projects
-- Adding `//go:build api-compat` tests that compile the old API surface
-
-**Phase mapping:** Every phase that adds or modifies exported functions. Enforce during code review — flag ANY change to exported function signatures.
+**Phase to address:** Package foundation phase (API design + `doc.go`) — must precede all detector work. The contract shapes every later phase.
 
 ---
 
-### Pitfall 2: Forcing Allocation on Callers
+### Pitfall 2: Naive Line-Scanning Silently Produces Wrong Values (BOM, Quotes, Comments)
 
-**What goes wrong:** An API allocates memory internally and returns it, preventing callers from reusing buffers. Over time this creates GC pressure that can't be eliminated without breaking the API.
+**What goes wrong:** Line scanners miss values silently — no error, no fallback, wrong data reported as if true. **Verified locally on Go 1.26.4:**
+1. A `go.mod` starting with a UTF-8 BOM makes `strings.CutPrefix(line, "module ")` fail on line 1 — the module name is silently lost (the old `readGoProjectNameFromGoMod` does exactly this).
+2. A quoted module directive `module "example.com/foo"` (legal since Go 1.17) extracts the name **with quotes**: `"example.com/foo"`.
+3. A trailing `// comment` on the module line keeps the comment inside the value.
+The same class of bug hits hand-rolled TOML scanners for `pyproject.toml` and `Cargo.toml` (comments, quoted strings, `version.workspace = true`).
 
-**Why it happens:** The author optimizes for convenience (returning `[]byte` or `string` from internal allocation) rather than allocation-control. Dave Cheney's example: `func Read() ([]byte, error)` vs `func Read(buf []byte) (int, error)`.
+**Why it happens:** Line-based parsing of "just the first directive" looks trivial and the happy path works; the failure modes are invisible because nothing errors.
 
-**Consequences:** Once the API is committed (v1+), the allocation pattern can't be changed without a breaking change. Callers who need performance can't pool or reuse allocations.
+**How to avoid:**
+- Strip the BOM once at read time (`bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF})`) in a single shared `readManifest` helper, and test every parser with a BOM-prefixed fixture.
+- For `go.mod`: prefer `golang.org/x/mod/modfile.ModulePath` — the Go toolchain's own parser (1,700+ importers), explicitly "tolerant of unrelated problems in the go.mod file", handles quotes, comments, and BOM. This is a deliberate, documented exception to stdlib-only — or replicate its three rules in a unit-tested helper (BOM strip + `strconv.Unquote` + comment trim).
+- For TOML: constrain extraction to known table roots (`[project]` / `[package]` / `[tool.poetry]`) and strict scalar rules: only single-line `key = "value"`; multiline strings, dotted keys, inline tables ⇒ **empty field, never a guess**.
+- Every extraction returns `(value string, ok bool)`; "not ok" must propagate to an empty field, never a partial value.
 
-**Prevention:**
-- Accept buffers from callers when the function reads or produces byte data
-- Use `io.Reader`/`io.Writer` patterns instead of returning allocated slices
-- If returning allocated values is necessary, document the allocation behavior
-- For utility functions that transform data, accept the destination as a parameter
+**Warning signs:** A parser returning a name containing `"` or `//`; fixture corpus missing a BOM case; no test asserting "malformed input ⇒ empty field, nil error"; any parser that logs or returns parse errors instead of empty fields.
 
-**Detection:**
-- Benchmark tests with `-benchmem` show allocation counts
-- Review: functions that return `[]byte` or `string` that they created internally
-- Review: methods that allocate without accepting a caller-provided buffer
-
-**Phase mapping:** New package creation phase. Retrofit requires breaking change (v2). Design for allocation control from day one.
-
----
-
-### Pitfall 3: Exporting Interfaces Users Must Implement
-
-**What goes wrong:** An exported interface with public methods that users outside the package implement. Later, adding a method to that interface breaks all external implementations.
-
-**Why it happens:** The author uses interfaces for testability or abstraction, but doesn't anticipate that downstream users will implement them.
-
-**Consequences:** Adding a method to the interface (even a useful one) becomes a breaking change. The author is locked into the interface shape forever.
-
-**Prevention:**
-- **Accept interfaces, return structs** (Jack Lindamood / Dave Cheney rule)
-- If you must export an interface, add an **unexported method** to prevent external implementation (stdlib pattern: `testing.TB` has a `private()` method)
-- Consider whether callers actually need to implement the interface vs. just consume it
-- Prefer returning concrete types from constructors so you can add methods later
-
-**Applied to this project (go):** The `config.Provider` type returns a concrete struct, not an interface — good. The `set.Set[T]` uses concrete methods — good. Avoid creating interfaces consumers would implement.
-
-**Detection:**
-- Dynamic: `gorelease` detects new methods added to exported interfaces
-- Static: grep for `type.*interface` in exported packages — review each for the "can external implement this?" question
-
-**Phase mapping:** API design / new package phase. Retroactively adding a private method to an interface breaks no one, but requires a major version if the interface is already published.
+**Phase to address:** Every manifest-parsing phase (Go line parser, TOML parsers). The shared `readManifest` helper belongs in the foundation phase.
 
 ---
 
-### Pitfall 4: Package-Level Global State (The Logger Anti-Pattern)
+### Pitfall 3: `encoding/xml` Root-Element Trap — Silent All-Empty Parse
 
-**What goes wrong:** Declaring a package-level variable (logger, config, DB connection) that creates a compile-time dependency on a specific library.
+**What goes wrong:** The natural struct pattern for `.csproj`/`pom.xml` — `struct{ Project struct{...} `xml:"Project"` }` — silently matches NOTHING. **Verified locally on Go 1.26.4:** the top-level struct IS the root element; the root name must be captured via `XMLName xml.Name `xml:"Project"`` and fields match the root's **children** by local name (namespace-agnostic — both the csproj `xmlns` and pom `xmlns` parse fine, as do prefixed namespaces). The broken pattern yields all-empty fields with nil error — the worst failure mode for best-effort parsing, because it looks like "valid but empty project" instead of "parse failed".
 
-**Why it happens:** "Every package needs to log" — the author adds `var log = mylogger.GetLogger(...)` which couples every importer to `mylogger`.
+**Why it happens:** Developers port patterns from DOM/ElementTree mental models where the root is a node you match; Go's decoder is positional (the struct you pass IS the root).
 
-**Consequences:** All downstream consumers inherit the transitive dependency. Projects composed of multiple utility packages end up coupled to multiple logging/monitoring frameworks. Testing becomes harder because global state is hard to replace.
+**How to avoid:**
+- Use the `XMLName` pattern in every XML parser (verified working with namespaces, BOM, XML declaration, and attributes via `xml:"Condition,attr"`).
+- Assert parse quality: after unmarshal, if no expected field was populated, treat the manifest as unparsed (empty fields), not as a valid manifest with empty values.
+- Golden fixtures of real-world files: SDK-style `.csproj` with and without `xmlns`; `pom.xml` with `<parent>` and with `<modules>`.
 
-**Prevention (from Dave Cheney's advice):**
-- Inject dependencies via struct fields, not package variables
-- Define narrow interfaces in the consuming package (e.g., `type logger interface { Printf(string, ...interface{}) }`)
-- Defer binding to runtime via constructor parameters
-- For configuration, pass it explicitly rather than relying on a global singleton
+**Warning signs:** XML parser unit tests that never assert a non-empty value; structs wrapping the root element in a field; a `.csproj` fixture that parses to zero PropertyGroups without a test noticing.
 
-**Applied to this project (go):** The `config` package already uses a `Provider` struct with injection — good. But `config/environment` uses recursive panic-recovery — see CONCERNS.md. Avoid adding more global singletons.
-
-**Detection:**
-- Search for `var (` at package level with dependencies on external packages
-- Search for `init()` functions — almost always wrong in library code
-- `go mod graph` reveals unexpected transitive dependencies
-
-**Phase mapping:** Any phase adding cross-cutting concerns (logging, metrics, tracing). Address early — retrofitting dependency injection is expensive.
+**Phase to address:** C#/.NET and Java/Kotlin detector phases (both parse XML).
 
 ---
 
-### Pitfall 5: Semantic Versioning Violations (Breaking Changes Under Same Module Path)
+### Pitfall 4: Version Semantics — Language Directives, Inherited and Missing Versions
 
-**What goes wrong:** Publishing a breaking change (removing an exported function, changing a type, modifying a signature) under the same module path without bumping the major version.
+**What goes wrong:** `Version` is populated with values that mean different things per language, or fabricated when absent:
+- **go.mod**: the `go 1.26` directive is the minimum *language* version, not a project release version — Go modules declare no version in `go.mod` (versions come from git tags). The milestone spec maps "go.mod go directive" → Version; flag this for a decision: report it as a separate `GoVersion` field or leave `Version` empty for Go, otherwise consumers see "1.26" as a release version.
+- **pom.xml**: child modules without `<version>` inherit from `<parent><version>` — **verified locally**: `artifactId` matched, root `version` was empty, `parent.version` = "2.0.0". Naive parsers report empty version for inheriting Maven modules.
+- **package.json**: `version` is optional (private packages omit it); values are sometimes non-semver ("1.0", date-based).
+- **pyproject.toml**: `dynamic = ["version"]` — computed at build time, absent from the file; Poetry stores it under `[tool.poetry]` instead of PEP 621 `[project]`.
+- **Cargo.toml**: `version.workspace = true` — inherited from the workspace root's `[workspace.package]`.
+- **composer.json**: `version` is rare — git tags are the source of truth.
 
-**Why it happens:** The author doesn't realize Go's import compatibility rule applies, or thinks "it's a small change."
+**How to avoid:**
+- Empty version = empty string. Never fabricate "0.0.0" or "unknown" — misleads consumers and breaks downstream semver comparisons.
+- Report the **raw string** as it appears (v-prefix, prerelease, build metadata preserved). Normalization is a later decision — `hashicorp/go-version` is already a repo dependency (v1.5 decision) if ordering ever becomes necessary.
+- Per-language fallback chain, documented in code: Java: root `<version>` → `<parent><version>` → empty; Cargo: `[package] version` → `version.workspace` (resolve from workspace root manifest) → empty; Python: PEP 621 `[project] version` → Poetry `[tool.poetry] version` → empty (never read `dynamic`).
+- Log the go-directive-as-version decision in PROJECT.md Key Decisions when the phase lands.
 
-**Go's rule (from research.swtch.com/vgo-import):** If an old package and a new package have the same import path, the new package must be backwards compatible with the old package.
+**Warning signs:** Tests asserting `Version == "0.0.0"` for versionless projects; `Version` populated from the go directive without a decision record; no pom-parent fixture; no Cargo workspace fixture.
 
-**Consequences:** When downstream users run `go get -u`, their code breaks silently at compile time. Some may pin to old versions, creating a fractured ecosystem. For pre-v1 (v0.x.x), breaking changes are expected — but for v1+, this breaks Go's compatibility promise.
-
-**Prevention:**
-- Follow semver strictly: breaking change = new major version = new module path with `/v2` suffix
-- Use `gorelease` to detect compatibility before tagging
-- Keep pre-v1 modules in v0 for as long as the API is experimental
-- For breaking internal changes: use `internal/` packages (see Pitfall 6)
-- Document your compatibility promises in your module's README and go.mod
-
-**What counts as breaking in Go:**
-- Removing or renaming an exported function, type, or constant
-- Changing a function's signature (add/remove/change params)
-- Adding a method to an exported interface (breaks implementations)
-- Changing a method's receiver from `T` to `*T` (or vice versa)
-- Changing a type from struct to interface (or vice versa)
-- Removing a field from an exported struct
-- Adding a non-comparable field to a previously comparable struct
-
-**Detection:**
-- Run `gorelease` before tagging — it compares against the last tag
-- `go build ./...` on a known downstream project
-- `go vet ./...` — catches some interface violations
-
-**Phase mapping:** Every release phase. Automate with CI (run `gorelease` as part of pre-tag checks).
+**Phase to address:** Version extraction phase (needs cross-file resolution for Cargo workspaces and Maven parents — comes after per-language name detection).
 
 ---
 
-### Pitfall 6: Failing to Use `internal/` Package Boundaries
+### Pitfall 5: Walk Performance — Unpruned Vendored Directories
 
-**What goes wrong:** Exporting symbols that are only meant for intra-module use, making them part of the public API commitment.
+**What goes wrong:** Probing a real project with `node_modules` (50–100k files), `target/`, or `.gradle/` takes minutes instead of milliseconds; tests become slow and flaky. The old code checks `ignoreDirs` only at the **top level** — a nested `apps/web/node_modules` is walked in full. The old ignore list also misses common dirs: `.next`, `.nuxt`, `.gradle`, `venv` (no dot — the most common Python venv name!), `env`, `Pods`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `htmlcov`, `.terraform`, `bower_components`, `jspm_packages`, `CMakeFiles`, `.cache`, `.yarn`.
 
-**Why it happens:** The author doesn't know about `internal/` packages, or organizes code into many small packages without visibility boundaries.
+**Why it happens:** The ignore list is applied once at the root instead of at every directory level; and the list reflects the author's own ecosystems, not the 7 target ecosystems plus common build tools.
 
-**Consequences:** Every exported name becomes a backward compatibility commitment. The author can't refactor internal helpers without potentially breaking external consumers.
+**How to avoid:**
+- `filepath.WalkDir` + `return fs.SkipDir` for ignored dir names at **every level**, before reading the directory. **Verified locally:** WalkDir does not follow symlinks (uses Lstat) — symlink cycles cannot occur; a symlink-to-dir is visited as one entry with `Type()&fs.ModeSymlink` set and is not descended into. Document this behavior (a symlinked `shared` → real project will be skipped).
+- Stop early: best-effort first-match — check the root's own `os.ReadDir` before any descent, and return as soon as the first manifest matches.
+- Keep the ignore set as one exported, documented variable so users can extend it.
+- Add a benchmark/fixture test: a tree with 10k+ files asserting the probe completes quickly.
 
-**Prevention (from Dave Cheney, Go team):**
-- Use `internal/` directories to hide implementation details from external consumers
-- Packages under `internal/` can only be imported by code sharing a common ancestor
-- Start with more things internal — you can always promote to public later
-- A `pkg/` directory at the project root is often a smell—it's usually an `internal/` opportunity
+**Warning signs:** Probe on a repo with `node_modules` takes >1s; walk visits files inside `.git`; test trees never contain nested vendor dirs; the walker reads directory contents before checking the ignore list.
 
-**Applied to this project (go):** The project's packages are all at top level (config, set, fraction, etc.). If cross-package helper functions exist, they should be in `internal/` not exported.
-
-**Detection:**
-- Search for exported functions/types that are only used within the module
-- `gorelease` flags public API that changed — internal packages won't appear
-
-**Phase mapping:** Project layout / initial structure phase. Adding `internal/` boundaries later requires moving code (non-breaking if you keep shims, but messy).
+**Phase to address:** Walker phase (foundation) — before any detector depends on it.
 
 ---
 
-### Pitfall 7: Value Receiver on Structs with Mutex or Slice Fields
+### Pitfall 6: `path` vs `filepath` on Windows — Silent Name Loss
 
-**What goes wrong:** Declaring methods with value receivers on structs that contain `sync.Mutex`, slices, maps, or other reference types.
+**What goes wrong:** **Verified locally:** `path.Base("C:\dev\proj\go.mod")` returns the WHOLE path (the `path` package splits on `/` only). The old `detector_go.go` check `path.Base(projectFile) == "go.mod"` therefore fails on Windows — the module name is silently lost and the name falls back to the folder name. Any `path` usage in the new package (Base/Join/Dir on discovered file paths) breaks the Windows CI leg the same way.
 
-**Why it happens:** The method doesn't mutate the struct, so the author uses value receivers for "immutability."
+**Why it happens:** `path` is for URL-style paths. On macOS/Linux both packages behave identically, so the bug ships unnoticed — exactly what happened to the old sample.
 
-**Consequences (from Dave Cheney's T vs *T analysis):**
-- Copying a struct with `sync.Mutex` breaks the mutex (it copies lock semantics)
-- Copying a struct with a slice field shares the backing array — mutations by one copy affect others
-- Copying a struct with a map shares the underlying map reference
-- Embedding a value-receiver type in another struct copies the mutex silently
+**How to avoid:**
+- `filepath` everywhere for filesystem paths; ban `path` in `project_probe` (code-review checklist item; the repo already has a Windows CI matrix).
+- Add a pure-string unit test for the Windows path shape: `filepath.Base(`C:\proj\go.mod`) == "go.mod"` — needs no OS, verifies separator handling in the exact function used.
+- Do not rely on the Windows CI leg to catch it — CI only runs on PRs.
 
-**Prevention:**
-- **Prefer `*T` receivers for all methods unless you have a strong reason** (Dave Cheney's rule)
-- Only use value receivers for small, immutable types (like `time.Time`, small numerical types)
-- For types with any reference field (slice, map, channel, mutex, pointer), use `*T`
-- For types that embed others with mutex fields, also use `*T`
+**Warning signs:** `import "path"` in any `project_probe` file; `path.Base`/`path.Join` on walk-discovered paths; go.mod name extraction returning the full absolute path on Windows.
 
-**Detection:**
-- `go vet` catches `Assignment: copy lock value to ...` for mutex fields
-- Manual review: check receiver type on methods of structs with reference fields
-
-**Phase mapping:** New type creation phase. Fixing later requires changing all callers from T to *T — a breaking change.
+**Phase to address:** Walker/detector foundation phase.
 
 ---
 
-## Moderate Pitfalls
+### Pitfall 7: Monorepos & Nested Projects — Undefined Manifest Precedence
 
-### Pitfall 8: Package Naming and Organization (base, util, common)
+**What goes wrong:** A monorepo root has `package.json` AND `apps/api/package.json` AND `apps/web/go.mod`. Which one wins? The old `FindFirst` returns the first file found in walk order — deterministic only because `os.ReadDir` sorts entries, but the rule is undocumented and depth-first order surprises users (a nested module's manifest can win over the root's). `go.work`-only Go workspaces (no `go.mod` at root) are missed entirely. Python has three competing manifest generations: `pyproject.toml` (PEP 621), Poetry `[tool.poetry]`, and legacy `setup.py`/`setup.cfg`.
 
-**What goes wrong:** Creating catch-all packages named `utils`, `helpers`, `common`, `base`, or `misc`.
+**Why it happens:** Detection looks like "find any manifest", so the precedence question is deferred until users file issues about wrong answers.
 
-**Why it happens:** Import loops force extracting unrelated functions into a shared package. The package name reflects what it *contains* rather than what it *provides*.
+**How to avoid:**
+- Define and document the rule: **root-first, then shallowest-first depth-first walk with sorted entries**; within a folder, per-language manifest precedence (`pyproject.toml` > `setup.cfg` > `setup.py`; `.sln` > `.csproj` etc.).
+- Detector ordering stays an ordered slice (never map iteration — random order).
+- Recognize `go.work` as a Go signal (Language = go; name from first `use` module path or folder name).
+- Fixture tests: monorepo tree (root manifest + nested manifests), git submodule dir containing its own `.git` (must be ignored), `go.work`-only root, PEP 621 vs Poetry `pyproject.toml`.
 
-**Consequences:** These packages accumulate unrelated functions, have no cohesive purpose, change frequently and for many reasons, and tell consumers nothing about what they do.
+**Warning signs:** Tests only cover single-manifest dirs; probe output differs between runs on the same tree (map ordering leak); no documented precedence rule; `go.work` root reported as Unknown.
 
-**Prevention (from Dave Cheney, Go team):**
-- Name packages after what they *provide*, not what they *contain*
-- A package's name should be a description of its purpose and a namespace prefix
-- Good examples: `net/http`, `encoding/json`, `os/exec`
-- Instead of `utils`, split into multiple packages with descriptive names (e.g., `strutil`, `fileutil` only if they have a focused purpose)
-- To break import loops, prefer duplicating a small amount of code over creating a `common` package
-
-**Applied to this project (go):** The project has `path_tools`, `shell_tools`, `time_tools`, `reflect_tools` — acceptable because each is focused on a specific domain. If any were named just `tools` or `utils`, that would be a problem.
-
-**Detection:**
-- Search for directory/package names: `util`, `utils`, `helper`, `helpers`, `common`, `base`, `misc`
-
-**Phase mapping:** Project initialization / new package phase. Renaming after publication breaks import paths.
+**Phase to address:** Walker phase (precedence + ordering tests) plus each per-language detector phase (manifest precedence within a language).
 
 ---
 
-### Pitfall 9: Orphaned Exported Symbols (Over-Exporting)
+### Pitfall 8: Manifest Robustness — BOM, JSONC, Size Caps, Encoding, Fuzzing
 
-**What goes wrong:** Exporting types, functions, and constants that are no longer needed or should be private.
+**What goes wrong:** Real-world manifests violate strict parsers: **verified locally** — `json.Unmarshal` fails on a UTF-8 BOM ("invalid character '\ufeff' looking for beginning of value") and on trailing commas/JSONC ("invalid character '}'..."). Hand-edited `package.json` files with trailing commas are common. A 10 MB minified README or malformed manifest read whole into memory; UTF-16 legacy manifests produce mojibake strings instead of empty fields. `encoding/xml` tolerates BOM and declarations (verified) — so the JSON path needs the BOM strip that XML does not.
 
-**Why it happens:** The author exports everything "just in case" or doesn't clean up when refactoring. Also, v0 APIs that are expanded prematurely.
+**Why it happens:** `encoding/json` is strict by spec; the tool author assumes manifests are well-formed because the ecosystem tooling requires it — but probe tools run against broken, hand-edited, or partially-written files.
 
-**Consequences:** Every exported symbol is a permanent commitment. Over-exporting bloats the API surface, increases documentation burden, and makes future breaking changes more painful.
+**How to avoid:**
+- One shared `readManifest` helper: size cap (1 MB) → `os.ReadFile` → BOM strip → parse; **parse failure ⇒ empty data, never an error** (best-effort contract).
+- Fuzz every parser with Go's built-in fuzzing (`FuzzXxx`): seed corpus of real manifests (go.mod, package.json, pyproject.toml, Cargo.toml, .csproj, pom.xml, composer.json). Seeds run during normal `go test` (they count toward the coverage gate); full fuzzing is a separate `make fuzz` target.
+- If content fails `utf8.Valid`, treat as unparseable (empty fields) — never report mojibake.
+- gosec: `os.ReadFile` on walk-discovered paths triggers G304 — keep the `#nosec G304` comment with the old justification ("path comes from local discovery in the inspected folder").
 
-**Prevention:**
-- **Unexport aggressively** — you can always export later; unexporting is a breaking change (Go code style skill)
-- After refactoring, review what's actually used outside the package
-- Use `internal/` to prevent external access to intra-module symbols
-- Mark unstable APIs with documentation comments (`// Deprecated:` or experimental package doc)
-- Use the `// Deprecated:` convention when you want to signal removal intent
+**Warning signs:** No fuzz targets; no BOM fixture for JSON parsers; `os.ReadFile` without a size cap; parsers returning errors to the caller instead of empty fields.
 
-**Detection:**
-- Tools like `staticcheck` detect unused exported symbols
-- `gorelease` shows all exported symbols and flags removals
-- `go list -u -m` can help identify what symbols are imported downstream
-
-**Phase mapping:** Every phase. Enforce in code review: "Is this export necessary?"
+**Phase to address:** Parser hardening — fold into each parser phase (fixtures + fuzz seeds per language), with a dedicated hardening pass at the end of the milestone.
 
 ---
 
-### Pitfall 10: Error Handling — Wrapping Implementation Details
+### Pitfall 9: README Description — Naive First-Paragraph Extraction
 
-**What goes wrong:** Wrapping errors from dependencies (especially database, network, or third-party libraries) with `%w`, making those errors part of the library's API contract.
+**What goes wrong:** The "first paragraph" of most READMEs is the **title line** (duplicated as the name), a row of badge images (no text at all), or a table of contents. README files vary in name (README, README.md, README.rst, README.txt) and markup — reStructuredText uses `====` underline headings, not `#`. Reading the whole file is wasteful for a one-paragraph description.
 
-**Why it happens:** The author uses `fmt.Errorf("context: %w", err)` without considering that `err` is from an underlying dependency.
+**Why it happens:** "First paragraph" seems self-evident until real READMEs are examined; the title line is the most common first line and the naive split lands on it.
 
-**Consequences (from Go 1.13 errors post, Damien Neil / Jonathan Amsterdam):**
-- Downstream callers can use `errors.Is(err, sql.ErrNoRows)` on your error — if you switch databases or the dependency's error changes, your callers break
-- The wrapped error becomes part of your API commitment
-- Violates abstraction — callers shouldn't need to know about your dependencies' errors
+**How to avoid:**
+- Skip heading lines (`# ..`, `====` underlines), image-only lines, HTML comments, and ToC blocks; take the first non-empty text paragraph after the title; truncate to a sane length (e.g. 200 chars).
+- Case-insensitive README name matching; support the common variants per language (Rust/Cargo projects often have no README; fall back to manifest description first, README second — the milestone already orders description: manifest → README fallback).
+- Cap read size (first 64 KB is plenty).
+- Fixtures: README whose first paragraph is the title; README starting with a badge; `.rst` README with underline headings.
 
-**Prevention:**
-- Use `%v` (not `%w`) when the error is from an implementation detail
-- Only use `%w` for errors that are part of your documented contract
-- Define your own sentinel errors or error types instead of exposing dependency errors
-- For utility libraries wrapping external APIs (like `release/release.go`), return your own error types
+**Warning signs:** `description == name` for most fixtures; description containing markdown syntax (`#`, `![]`); README.rst returning markup text; description from a 5 MB README.
 
-**Applied to this project (go):** The `config` package wraps `yaml.Unmarshal` errors — currently using `fmt.Errorf` which is good. The `release` package calls GitHub API — should use its own error types, not propagate HTTP errors.
-
-**Detection:**
-- Search for `%w` in error formatting — review each one: "Is this error part of my API?"
-- Search for `errors.Is` or `errors.As` in tests — these lock in specific error values
-
-**Phase mapping:** Error handling pattern phase. Can be retrofitted if errors were never exposed (wrapping with `%v` instead of `%w`).
+**Phase to address:** Description extraction phase (after name/version detection).
 
 ---
 
-### Pitfall 11: Ignoring Zero-Value Design
+### Pitfall 10: Dead Sample Left in Repo — `project_detector/` Does Not Build
 
-**What goes wrong:** Exporting types whose zero value is not useful (nil maps that panic on write, uninitialized fields that should have defaults).
+**What goes wrong:** **Verified:** `project_detector/` is untracked and imports `github.com/guionardo/gs-dev` and `github.com/BurntSushi/toml`, which are **not in go.mod** — `go build ./...` fails locally with 3 errors. CI stays green only because the directory is untracked. But: golangci-lint and pre-commit scan the filesystem and will lint/vet it (gofmt, G304, deprecation noise); a `git add .` commits it and all 3 CI legs go red; downstream consumers running `go test ./...` on the module break.
 
-**Why it happens:** The author assumes every consumer will use the constructor function, forgetting that struct literals bypass it.
+**Why it happens:** Sample code copied from another project (gs-dev) as a reference; "deprecated" was declared in prose but never made executable — no build tag, no removal.
+
+**How to avoid:**
+- The milestone **must delete `project_detector/`** — its knowledge (ignore list, ordered detectors, Unknown fallback) is ported into `project_probe` with tests, never by copying files.
+- Verify the repo builds clean (`go build ./...` and `make coverage-quick`) in the same phase that creates `project_probe`.
+- If any old behavior must be preserved, port it test-first; the git history retains the sample.
 
-**Consequences:** Users who declare `var t MyType` get a broken value. Maps panic, channels block, nil pointers crash.
+**Warning signs:** `git status` shows `project_detector` untracked; `go build ./...` fails locally; README still lists the sample as a package; pre-commit/lint output mentions project_detector files.
 
-**Prevention:**
-- **Design useful zero values** — `var buf bytes.Buffer` is the gold standard
-- Use lazy initialization for nil-unsafe fields (check-nil-and-init in methods)
-- Use `sync.Once` for lazily-initialized fields
-- For types that can't have a useful zero value, make the constructor mandatory and document it
-- Add `// zero value is not safe to use` to the type doc if necessary
+**Phase to address:** Package foundation phase — the deletion lands with (or immediately before) the first `project_probe` commit.
 
-**Examples of good zero-value design:**
-- `sync.Mutex` — unlocked and ready
-- `bytes.Buffer` — empty buffer ready for writing
-- `net/http.Client` — default timeout and transport
+## Technical Debt Patterns
 
-**Detection:**
-- Look for exported structs with map, slice, or channel fields that aren't initialized in methods
-- Test: `var x MyType; x.DoSomething()` should not panic
-- Test with `go test -fuzz`
-
-**Phase mapping:** New type creation phase. Fixing zero-value unsafety after release requires migration.
-
----
-
-### Pitfall 12: No Example Tests or Documentation Tests
-
-**What goes wrong:** Publishing packages without `Example` tests or runnable documentation that demonstrates API usage.
-
-**Why it happens:** The author considers tests a separate concern from documentation, or finds example tests verbose.
-
-**Consequences:**
-- Consumers can't see how the API is intended to be used
-- `go doc` output is minimal
-- Breaking changes to behavior may go undetected (example tests verify they compile and produce expected output)
-- Lower discoverability on pkg.go.dev (example tests are surfaced prominently)
-
-**Prevention:**
-- Write Example tests for every exported type and significant function
-- Example tests are compiled and run as part of `go test` — they verify API correctness
-- They double as documentation — `go doc` and pkg.go.dev display them
-
-**Applied to this project (go):** Check if packages like `set`, `fraction`, `flow` have Example tests. If not, add them.
-
-**Detection:**
-- `go doc -all | grep "Example"` or grep for `func Example` in `_test.go` files
-- Check pkg.go.dev page for the module
-
-**Phase mapping:** Test/documentation phase for each package. Should be part of the acceptance criteria.
-
----
-
-### Pitfall 13: Not Handling Context in Blocking Operations
-
-**What goes wrong:** Utility functions that perform I/O, network calls, or blocking operations without accepting a `context.Context`.
-
-**Why it happens:** The function "doesn't need cancellation" in its initial use case.
-
-**Consequences:** Adding context support later requires either adding a new function (e.g., `Do` → `DoContext`) or a breaking change. Callers who need to set deadlines or cancel operations can't use the library.
-
-**Go team guidance (from module-compatibility post):** The stdlib added `QueryContext`, `ReadContext`, etc. because changing the original signature was impossible.
-
-**Prevention:**
-- Accept `context.Context` as the first parameter for any function that does I/O, calls external APIs, or could block
-- For functions that don't block, no context needed
-- Plan for the `Do` / `DoContext` pattern if you must offer a convenience version without context
-
-**Applied to this project (go):** The `release` package's `GetLatestRelease()` and `Asset.Download()` don't accept context — already identified in CONCERNS.md (no timeout). Add `GetLatestReleaseContext(ctx)`.
-
-**Detection:**
-- Search for functions that call `http.Get`, `http.Post`, `os.Open`, `exec.Command`, or any blocking operation — check if they accept context
-- Linter: `contextcheck` / `noctx`
-
-**Phase mapping:** New function creation phase. Retrofitting requires the `Do + DoContext` pattern.
-
----
-
-## Minor Pitfalls
-
-### Pitfall 14: Missing Example Tests for API Evolution
-
-**What goes wrong:** Not having a test that explicitly verifies the API hasn't changed incompatibly.
-
-**Why it happens:** The author relies on manual review or "just being careful."
-
-**Consequences:** Incompatible changes slip through code review. By the time they're found, they've been published.
-
-**Prevention:**
-- Use `gorelease` in CI to compare API against the last published tag
-- Add a test file that explicitly asserts expected API shape (golden file of exported symbols)
-- For utility libraries, `gorelease` CI step should block PRs with incompatible changes
-
-**Detection:**
-- CI pipeline doesn't have `gorelease` step → add it
-
-**Phase mapping:** CI setup phase. Add before first v1 release.
-
----
-
-### Pitfall 15: Confusing Receiver Choice Inconsistency
-
-**What goes wrong:** Mixing value and pointer receivers inconsistently within the same type.
-
-**Why it happens:** Some methods don't mutate the receiver (value receiver used), others do (pointer receiver used).
-
-**Consequences:** The type doesn't satisfy interfaces consistently. Callers can't predict whether a method modifies the receiver. A type that has both value and pointer receivers is partially usable via values but not consistently.
-
-**Prevention:**
-- Be consistent: all methods on a type should use the same receiver type
-- When in doubt, use `*T` for all receivers (Dave Cheney's recommendation)
-- Only use value receivers for small (~<=4 fields), immutable types with no reference fields
-
-**Detection:**
-- `go vet` — catches some cases
-- Manual review: check consistency of `func (t T)` vs `func (t *T)` on the same type
-
-**Phase mapping:** Type creation phase. Fixing is a breaking change.
-
----
-
-### Pitfall 16: init() Functions in Library Code
-
-**What goes wrong:** Using `init()` functions to set up global state, register drivers, or validate configuration.
-
-**Why it happens:** Convenience — global registration runs automatically when the package is imported.
-
-**Consequences (from Go design patterns skill and Dave Cheney):**
-- `init()` cannot return errors — failures must panic or `log.Fatal`
-- Multiple `init()` functions run in declaration order across files in filename alphabetical order — fragile
-- Runs before `main()` and tests — side effects make tests unpredictable
-- Makes testing harder (global state persists across test cases)
-
-**Prevention:**
-- Use explicit constructors instead of `init()`
-- For registration patterns (e.g., SQL drivers), accept that `init()` is the convention but keep its scope minimal
-- Never use `init()` for logic that could fail — there's no way to signal failure to the caller
-
-**Detection:**
-- `grep -r 'func init()' .` — every result needs justification
-
-**Phase mapping:** Every phase. Ban `init()` in code review (except for `database/sql` driver registration or similar established patterns).
-
----
-
-### Pitfall 17: Relying on File System State in Library Code
-
-**What goes wrong:** Utility functions that depend on specific file paths, environment variables, or system state without making them configurable.
-
-**Why it happens:** The function "just needs to read this one file."
-
-**Consequences:** Testing becomes environment-dependent. Other users' systems may have different file layouts. The function is not portable.
-
-**Prevention:**
-- Accept `io.Reader` or `io.Writer` instead of file paths when possible (interface segregation)
-- Make file paths or environment variables configurable parameters
-- Document the assumptions about file system state
-- For platform-specific paths (like `mid/machineid_linux.go`), document the lookup strategy and fallbacks
-
-**Applied to this project (go):** The `mid` package reads `/var/lib/dbus/machine-id` and `/etc/machine-id` — already flagged in CONCERNS.md for fragile parsing (trailing whitespace not trimmed). The `config` package reads profile files from configurable paths — good.
-
-**Detection:**
-- Search for `/etc/`, `/var/`, `/usr/` or hardcoded absolute paths
-- Search for `os.Getenv` — is it configurable?
-
-**Phase mapping:** Platform-specific package creation phase. Document system assumptions alongside the code.
-
----
-
-## Already Present in CONCERNS.md
-
-These pitfalls are already manifest in the codebase. Each maps to a specific issue documented in `.planning/codebase/CONCERNS.md`:
-
-| CONCERNS.md Issue | Pitfall | Severity | Priority |
-|---|---|---|---|
-| `release/release.go` — unused HTTP request, lost headers | Pitfall 9 (orphaned exports) + Pitfall 13 (no context) | Critical | Immediate |
-| `release/release.go` — response body not closed | Resource leak (general Go safety, covered by golang-safety skill) | High | Immediate |
-| `config/provider.go` — silent error swallowing | Pitfall 10 (error handling) variant — errors should be returned | High | Next |
-| `release/release.go` — no HTTP timeouts | Pitfall 13 (no context) | Medium | Next |
-| Duplicate `GetEnv` functions | Pitfall 8 (poor naming/org) + code duplication | Low | Soon |
-| `mid/machineid_linux.go` — whitespace not trimmed | Pitfall 17 (filesystem assumptions) | Medium | Soon |
-| `config/environment` — panic-recovery instead of errors | Pitfall 16 (init-like patterns) + unsafe error handling | Medium | Next |
-| `time_tools/parser.go` — global lock contention | Pitfall 4 (global state) — performance variant | Low | Later |
-| `config/provider.go` — lock double-fetch race | Pitfall 4 (global state) — concurrency variant | High | Next |
-
----
-
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation |
-|---|---|---|
-| New package creation | Pitfall 5 (wrong major version), Pitfall 8 (bad naming) | Start at v0.x.x, choose a descriptive name, use functional options from day one |
-| API extension (new features) | Pitfall 1 (changing signatures), Pitfall 3 (interface pollution) | Add new functions, prefer config structs, keep interfaces minimal |
-| Error handling design | Pitfall 10 (wrapping implementation errors) | Use `%v` for dependency errors, define your own sentinels |
-| Concurrency support | Pitfall 13 (no context), Pitfall 7 (value receivers on mutex structs) | Accept `context.Context` first param, use `*T` receivers |
-| Testing and documentation | Pitfall 12 (no example tests), Pitfall 14 (no API compat tests) | Write Example tests, add `gorelease` to CI |
-| Cross-platform support | Pitfall 17 (filesystem assumptions) | Use build tags, accept io.Reader, document platform assumptions |
-| v1 stable release | Pitfall 5 (semver violations) | Run `gorelease` before tagging, audit exported surface |
-| Dependency management | Pitfall 4 (global state coupling) | Prefer interfaces over concrete logger/metrics types |
-
----
+Shortcuts that seem reasonable but create long-term problems.
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Hand-rolled TOML subset parser (stdlib-only) | Zero new dependencies | Breaks on legal TOML (multiline strings, dotted keys, inline tables) — silently empty fields | Acceptable for best-effort IF strict degrade-to-empty is tested; revisit when framework detection (dependency-based, later milestone) needs real TOML — then take `pelletier/go-toml/v2` |
+| Raw version passthrough (no semver normalization) | Simple, lossless | Consumers must normalize themselves; no version ordering | Correct for v1.7; normalization later via `hashicorp/go-version` (already a repo dep) |
+| Depth-first first-match walk | Simple walker | Nested manifests can shadow root intent; deep scans on monorepos | Acceptable with the documented root-first rule + monorepo fixture tests |
+| Swallowing unreadable-subdir errors | Quiet output | Projects silently reported Unknown | Acceptable ONLY for subdirectories; root-folder errors must surface per the API contract |
+| Copying old detector code into the new package | Fast start | Two divergent implementations drift; dead code retains bugs (path.Base, BOM) | **Never** — port behavior test-first, then delete the sample |
+| Ignore-list as a package-private constant | Simple | Users with exotic build dirs get slow probes and can't extend | Acceptable for v1.7; export the set when the first user asks |
+
+## Integration Gotchas
+
+Common mistakes when connecting to existing repo infrastructure.
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| `go.mod` name extraction | Naive `CutPrefix("module ")` | `golang.org/x/mod/modfile.ModulePath` (toolchain parser) or a BOM+Unquote+comment-trim helper |
+| `pyproject.toml` parsing | Reaching for `gopkg.in/yaml.v3` (already a repo dep) | pyproject.toml is **TOML, not YAML** — table-scoped hand-rolled reader or go-toml/v2 |
+| Coverage gate (`make coverage-quick`: pkg ≥80%, total ≥75%; CI 95%) | Parser error paths untested → gate fails on PR | Table-driven fixture tests + fuzz seeds (run during `go test`, count toward coverage) |
+| Windows CI leg | `path` instead of `filepath` | `filepath` everywhere + pure-string Windows-path unit test |
+| Symlink fixtures on Windows | `os.Symlink` needs admin/Developer Mode → CI fails | `t.Skip` symlink tests on Windows, or build symlinks via junctions |
+| Old package type names (`"nodejs"` for JS) | New `Language` enum drifts from old values | Document the mapping (or keep compatible string constants) in the migration note |
+| golangci-lint / pre-commit on untracked files | `project_detector` lint noise and gofmt failures | Delete the sample in the foundation phase |
+| README package index (main README table) | New package missing from index | Update README table in the same phase that ships the package |
+
+## Performance Traps
+
+Patterns that work at small scale but fail as usage grows.
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Unpruned recursive walk | Probe takes seconds on repos with `node_modules`/`target`/`.gradle` | `fs.SkipDir` on the ignore list at EVERY level, before reading dir contents | Dirs with >10k files (node_modules, .gradle, target) |
+| Whole-file read of huge manifests/READMEs | Memory spikes; reading package-lock.json needlessly | Size cap (1 MB) via `readManifest`; 64 KB LimitReader for README | Files >1 MB |
+| Full-tree scan when root already has a manifest | Unnecessary descent into subprojects | Check root `os.ReadDir` first; stop on first match | Any repo with a root manifest |
+| Reading lockfiles (`package-lock.json`, `Cargo.lock`, `go.sum`) | Wasted IO; false-positive detection | Manifest whitelist — never probe lockfiles | Always (they are huge) |
+| Per-detector re-walking the tree | Each of 7 detectors walks independently → 7× IO | One shared walk; detectors consume the collected candidate files | Monorepos with many files |
+
+## Security Mistakes
+
+Domain-specific security issues beyond general web security.
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| `os.ReadFile` on walk-discovered paths (gosec G304) | CI lint failure; flagged as arbitrary-file-read | `#nosec G304` with the existing justification comment (paths from local discovery, not user input) |
+| Unbounded file read | Memory DoS when probing a tree containing a 100 MB manifest | Size cap in `readManifest` before `ReadFile` |
+| Symlink traversal | Following links out of the probed tree (e.g. into /etc) | WalkDir doesn't follow symlinks (verified); add a fixture test asserting the behavior |
+| Reporting raw paths | Callers trust the `Folder` string and pass it to file APIs | `filepath.Abs` + `Clean` before returning; document that paths are local |
+| Panic on malformed input | Parser panics (nil map write, slice bounds) crash the caller | `defer recover` in `Probe` is a last resort; fuzz targets catch panics before release |
+
+## UX Pitfalls
+
+Common user experience mistakes in this domain.
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| `go` directive reported as Version | Downstream consumers see "1.26" as a release version | Version empty for Go, or a dedicated `GoVersion` field (decision record) |
+| Composer `vendor/name` reported as project name | Name like "acme/widget" surprises users | Strip the vendor prefix or document the format; prefer the `name` portion |
+| Description equals title line | Name duplicated as description | Skip headings/badges/ToC; take the first real text paragraph |
+| Unknown-with-error | Callers can't distinguish "no project" from "broken" | Error only for hard I/O failures; Unknown is nil-error |
+| Version with v-prefix for some languages, without for others | Inconsistent-looking output | Raw passthrough + document per-language semantics in the type docs |
+
+## "Looks Done But Isn't" Checklist
+
+Things that appear complete but are missing critical pieces.
+
+- [ ] **BOM handling:** every parser tested with a BOM-prefixed fixture (JSON fails without strip — verified; XML tolerates; line parsers silently miss — verified)
+- [ ] **go.work-only workspace** detected as Go, not Unknown
+- [ ] **pom.xml child without `<version>`** inherits from `<parent><version>` (fixture asserts inherited value — verified behavior)
+- [ ] **csproj conditional PropertyGroup** (Debug-only `Condition`) not chosen over the unconditional one
+- [ ] **Cargo `version.workspace = true`** resolved from the workspace root manifest
+- [ ] **package.json without name/version** → folder-name fallback + empty version (no "0.0.0")
+- [ ] **No `path` import** in the package; Windows-path unit test present
+- [ ] **Determinism:** same tree → same result across runs (sorted walk + ordered detector slice, no map iteration)
+- [ ] **Contract test:** empty folder → Unknown + nil error; unreadable folder → error
+- [ ] **README variants** (README, README.md, README.rst, badge-first) all yield sensible descriptions
+- [ ] **`project_detector/` deleted**; `go build ./...` green; `make coverage-quick` green
+- [ ] **Fuzz targets** exist with real-manifest seed corpora (run in normal `go test`)
+
+## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Silent wrong manifest values shipped | MEDIUM | Add assertion tests ("at least one field populated per fixture"); add BOM/quotes fixtures; release a patch |
+| Probe slow on real repos | LOW | Add missing ignore dirs + SkipDir; add the 10k-file benchmark fixture to prevent regression |
+| Wrong version semantics shipped | HIGH (API/UX) | Keep raw string; document per-language semantics; rename/redocument fields only in a next major version |
+| `project_detector/` committed accidentally | MEDIUM | `git rm -r project_detector/`; red CI is the alarm — it fails fast on all 3 OSes |
+| Parser panic found by fuzz | LOW | Fix + add the failing input as a regression fixture before the next release |
+
+## Pitfall-to-Phase Mapping
+
+How roadmap phases should address these pitfalls (proposed v1.7 phase structure).
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| C1 API contract (error vs Unknown) | Phase 1: Package foundation — API, `doc.go`, `readManifest` helper, delete `project_detector/` | Contract tests (Unknown nil-error, I/O error paths); `go build ./...` + `make coverage-quick` green |
+| C10 dead sample in repo | Phase 1 (same as above) | `git status` clean of project_detector; lint output clean |
+| C6 `path` vs `filepath` | Phase 1–2: foundation + walker | No `path` import; Windows-path unit test; windows CI leg |
+| C5 walk performance | Phase 2: Walker + ignore list + early-stop | 10k-file fixture benchmark; nested vendor dirs pruned; symlink fixture |
+| C7 monorepo/nested precedence | Phase 2: walker ordering + precedence tests | Monorepo fixture; determinism test; go.work fixture |
+| C2 line-scanning (BOM/quotes/comments) | Phase 3: Go + JSON parsers (shared helper from Phase 1) | BOM fixture, quoted-module fixture, comment fixture per parser |
+| C8 robustness + fuzz | Phases 3–7: each parser phase + final hardening pass | Fuzz targets with real-manifest seeds; size-cap test; utf8.Valid test |
+| C3 XML root trap | Phase 5: XML parsers (C#/.NET, Java/Kotlin) | Golden csproj/pom fixtures with namespace + BOM; non-empty assertion |
+| C4 version semantics | Phase 6: Version extraction (needs cross-file: Maven parent, Cargo workspace) | Per-language version fixtures; decision record for go directive |
+| C9 README description | Phase 6: Description extraction | README variant fixtures; description ≠ name assertion |
+| TOML stdlib gap (decision) | Phase 4: TOML parsers (Python, Rust) — decide hand-rolled vs go-toml/v2 | Decision record; workspace-inheritance fixture; strict degrade-to-empty tests |
 
 ## Sources
 
-- [Go Blog: Keeping Your Modules Compatible](https://go.dev/blog/module-compatibility) — HIGH confidence, official Go team guidance
-- [Go Blog: Go Modules: v2 and Beyond](https://go.dev/blog/v2-go-modules) — HIGH confidence
-- [Go Blog: Working with Errors in Go 1.13](https://go.dev/blog/go1.13-errors) — HIGH confidence
-- [Go Blog: Module Version Numbering](https://go.dev/doc/modules/version-numbers) — HIGH confidence
-- [Dave Cheney: Functional Options for Friendly APIs](https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis) — HIGH confidence, established Go design pattern
-- [Dave Cheney: SOLID Go Design](https://dave.cheney.net/2016/08/20/solid-go-design) — HIGH confidence
-- [Dave Cheney: Avoid Package Names Like base, util, or common](https://dave.cheney.net/2019/01/08/avoid-package-names-like-base-util-or-common) — HIGH confidence
-- [Dave Cheney: Use Internal Packages to Reduce Public API Surface](https://dave.cheney.net/2019/10/06/use-internal-packages-to-reduce-your-public-api-surface) — HIGH confidence
-- [Dave Cheney: Don't Force Allocations on the Callers of Your API](https://dave.cheney.net/2019/09/05/dont-force-allocations-on-the-callers-of-your-api) — HIGH confidence
-- [Dave Cheney: Should Methods Be Declared on T or *T](https://dave.cheney.net/2016/03/19/should-methods-be-declared-on-t-or-t) — HIGH confidence
-- [Dave Cheney: Package Level Logger Anti-Pattern](https://dave.cheney.net/2017/01/23/the-package-level-logger-anti-pattern) — HIGH confidence
-- [Go Code Style skill](/.agents/skills/golang-code-style/SKILL.md) — Community best practice
-- [Go Design Patterns skill](/.agents/skills/golang-design-patterns/SKILL.md) — Community best practice
-- [Go Safety skill](/.agents/skills/golang-safety/SKILL.md) — Community best practice
-- [Go Security skill](/.agents/skills/golang-security/SKILL.md) — Community best practice
-- [CONCERNS.md](/.planning/codebase/CONCERNS.md) — Project-specific verified issues
+- **Local verification experiments** (Go 1.26.4 and 1.27.0, run 2026-09-28): JSON/XML BOM behavior, JSONC rejection, `encoding/xml` root-element pattern + namespace handling + pom parent-version inheritance, `filepath.WalkDir` symlink behavior, `os.ReadDir` symlink reporting, `path.Base` on Windows paths, go.mod BOM/quoted-module parsing. Digests stored in `.planning/research/.cache/` (keys 3ec06cb3…, 9e7bd084…, 24cd49f7…, de674c6e…, f1d67377…).
+- **pkg.go.dev/golang.org/x/mod/modfile** — canonical go.mod parser used by the Go toolchain; `ModulePath` tolerant extraction (digest 6216feed…).
+- **github.com/pelletier/go-toml/v2** and **github.com/BurntSushi/toml** — TOML library landscape; BurntSushi maintainer's README recommends alternatives ("fallen behind the upstream TOML specification"); go-toml/v2 TOML 1.1.0, 5–10× faster, actively maintained (digest 9374a87e…).
+- **github.com/go-enry/go-enry** — strategy-cascade detection, `IsVendor` filtering, "unknown is empty, not error" semantics; wrong abstraction for project-level metadata (digest 36290e0c…).
+- **GitHub linguist strategy cascade** — ordered strategies, first single-candidate wins, vendor.yml hygiene, 50 KB content heuristics (digest 14e59e20…).
+- **aquasecurity/go-dep-parser** — per-format manifest-parser architecture reference (digest 0de693ec…).
+- **In-repo evidence:** `project_detector/` (untracked, non-building sample; `path.Base` bug; top-level-only ignoreDirs; error-as-control-flow) and CI workflow `.github/workflows/go.yml` (3-OS matrix, coverage gate).
+
+---
+*Pitfalls research for: project_probe (v1.7) — best-effort project detection and manifest parsing*
+*Researched: 2026-09-28*
