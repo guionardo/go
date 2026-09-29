@@ -58,7 +58,12 @@
   3. Probing the same folder repeatedly returns identical results — the detector cascade is deterministic, ordered, first-match-wins, and root-scoped only (no subdir probing).
   4. A folder containing only vendored/build/IDE directories (node_modules/, vendor/, .git/, dist/, .idea/) is reported Unknown — ignore-list hygiene.
   5. Manifest reads are size-capped (1 MB) and BOM-stripped with no panics on pathological input; all path handling uses filepath — Windows-safe, no `path` imports.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Delete deprecated project_detector sample so the module builds (FND-01)
+- [ ] 10-02-PLAN.md — Probe contract tracer: model, sentinels, entry point, ordered registry, ignore gate, never-fail docs (FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-04)
+- [ ] 10-03-PLAN.md — Shared readManifest helper: 1 MB cap + BOM strip, never-fail (ROBT-02)
 
 ### Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
 **Goal**: Go, JavaScript/TypeScript, and PHP projects are detected end-to-end, with name/version/description chains and README first-paragraph fallback.
@@ -118,7 +123,7 @@
 | 7. Batch operations | v1.6 | 4/4 | Complete | 2026-08-08 |
 | 8. Benchmark suite | v1.6 | 3/3 | Complete | 2026-08-08 |
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
-| 10. Package Foundation | v1.7 | 0/TBD | Not started | - |
+| 10. Package Foundation | v1.7 | 0/3 | Not started | - |
 | 11. Text/JSON Detectors | v1.7 | 0/TBD | Not started | - |
 | 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |
