@@ -44,11 +44,11 @@
 // name (DETC-04); a folder with a pyproject.toml reports LanguagePython with
 // [project] (or legacy [tool.poetry]) fields; a folder with a Cargo.toml
 // reports LanguageRust with [package] fields, workspace-inherited versions
-// degrading to empty; a folder with a .csproj reports LanguageCSharp with
-// AssemblyName→RootNamespace→folder-base Name and Version→VersionPrefix→
-// empty (DETC-07); a folder with a pom.xml reports LanguageJava with
-// <name>/<artifactId> and single-level <parent><version> inheritance, and a
-// settings.gradle rootProject.name fallback fires only when no pom.xml
-// exists (DETC-08). Content-bearing folders without a matching manifest
-// still yield LanguageUnknown.
+// degrading to empty; a folder with a .csproj reports LanguageCSharp via
+// detectCSharp with AssemblyName→RootNamespace→folder-base Name and
+// Version→VersionPrefix→empty (DETC-07); a folder with a pom.xml reports
+// LanguageJava via detectJavaKotlin with <name>/<artifactId> and single-level
+// <parent><version> inheritance, and a settings.gradle rootProject.name
+// fallback fires only when no pom.xml exists (DETC-08). Content-bearing
+// folders without a matching manifest still yield LanguageUnknown.
 package projectprobe
