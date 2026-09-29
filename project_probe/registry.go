@@ -12,13 +12,13 @@ type detectorFunc func(folder string) (ProjectData, bool)
 // Go at 0, JS/TS at 3, PHP at 6; Python/Rust in Phase 12, C#/.NET/Java in
 // Phase 13). nil entries are skipped by runDetectors.
 var detectors = []detectorFunc{
-	detectGo,     // index 0 — Go (Phase 11)
-	detectPython, // index 1 — Python (Phase 12)
-	nil,          // index 2 — C#/.NET (Phase 13)
-	detectJS,     // index 3 — JavaScript/TypeScript (Phase 11)
-	detectRust,   // index 4 — Rust (Phase 12)
-	nil,          // index 5 — Java/Kotlin (Phase 13)
-	detectPHP,    // index 6 — PHP (Phase 11)
+	detectGo,       // index 0 — Go (Phase 11)
+	detectPython,   // index 1 — Python (Phase 12)
+	detectCSharp,   // index 2 — C#/.NET (Phase 13)
+	detectJS,       // index 3 — JavaScript/TypeScript (Phase 11)
+	detectRust,     // index 4 — Rust (Phase 12)
+	nil,            // index 5 — Java/Kotlin (Phase 13)
+	detectPHP,      // index 6 — PHP (Phase 11)
 }
 
 // runDetectors dispatches folder to the ordered cascade and returns the

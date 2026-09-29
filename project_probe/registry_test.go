@@ -71,7 +71,7 @@ func TestDetectorPositions(t *testing.T) { //nolint:paralleltest // reads global
 	assert.Len(t, detectors, 7)
 	assert.NotNil(t, detectors[0]) // Go
 	assert.NotNil(t, detectors[1]) // Python — Phase 12
-	assert.Nil(t, detectors[2])    // C#/.NET — Phase 13
+	assert.NotNil(t, detectors[2]) // C#/.NET — Phase 13
 	assert.NotNil(t, detectors[3]) // JS/TS
 	assert.NotNil(t, detectors[4]) // Rust — Phase 12
 	assert.Nil(t, detectors[5])    // Java/Kotlin — Phase 13
