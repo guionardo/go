@@ -144,6 +144,7 @@ func TestFirstRealParagraph(t *testing.T) { //nolint:funlen
 		{"thematic_break", "para1\n\n---\n\npara2\n", "para1"},
 		{"multi_line_join", "line1\nline2\n", "line1 line2"},
 		{"html_comment", "<!-- TOC -->\npara\n", "para"},
+		{"comment_trailing_text", "<!-- note --> extra\npara\n", "para"},
 		{"plain_image_badge", "![logo](x)\npara\n", "para"},
 		{"two_plain_badges", "![ci](a) ![cov](b)\npara\n", "para"},
 		{"plain_plus_wrapped", "![a](b) [![c](d)](e)\npara\n", "para"},

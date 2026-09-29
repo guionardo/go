@@ -67,8 +67,12 @@ func firstRealParagraph(content []byte) string {
 				inComment = false
 			}
 			prev = ""
-		case strings.HasPrefix(trimmed, "<!--") && !strings.HasSuffix(trimmed, "-->"):
-			inComment = true // multi-line comment opens — consume until "-->"
+		case strings.HasPrefix(trimmed, "<!--") && !strings.Contains(trimmed, "-->"):
+			// Only enter when the comment is truly still open at EOL — a
+			// single-line comment with trailing text after "-->" closes on
+			// the same line and must not swallow the rest of the README
+			// (14 IN-01); it falls through to the single-line skip case.
+			inComment = true
 			prev = ""
 		case trimmed == "":
 			if len(para) > 0 {
@@ -83,7 +87,10 @@ func firstRealParagraph(content []byte) string {
 			}
 			prev = ""
 		case isBadgeLine(trimmed) || isTOCLine(trimmed) || isHeading(trimmed) ||
-			(strings.HasPrefix(trimmed, "<!--") && strings.HasSuffix(trimmed, "-->")):
+			(strings.HasPrefix(trimmed, "<!--") && strings.Contains(trimmed, "-->")):
+			// single-line comment — opens and closes on the same line
+			// (trailing text after "-->" included, 14 IN-01); the complement
+			// of the opener guard above, so no comment content enters para.
 			prev = ""
 		default:
 			para = append(para, trimmed)
