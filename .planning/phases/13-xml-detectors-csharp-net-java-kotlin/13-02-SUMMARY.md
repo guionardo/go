@@ -242,3 +242,12 @@ None - no external service configuration required.
 ---
 *Phase: 13-xml-detectors-csharp-net-java-kotlin*
 *Completed: 2026-09-29*
+## Self-Check: PASSED
+
+- Files: `project_probe/detect_java_kotlin.go`, `project_probe/detect_java_kotlin_test.go`, `13-02-SUMMARY.md` all present
+- Commits: `ed720d6` (feat), `ba87313` (test), `3558d8e` (docs) verified in git history; metadata commit `7b1e143`
+- Full suite: `go test ./project_probe/...` 236/236 green; `go build ./...` exits 0; `GOOS=windows go vet ./project_probe/...` clean
+- Coverage: project_probe 93.6% (≥80); detect_java_kotlin.go 93.8% file (≥70); total 79.9% (≥75); `make coverage-quick` project_probe rows pass (release/update.go 68.9% remains the documented known-red)
+- Anti-feature greps (`os/exec|net/http|EvalSymlinks|WalkDir`, `../|relativePath`, `Entity|CharsetReader`, bare `"path"` import, `settings.gradle.kts`) print nothing over `detect_java_kotlin.go`
+- registry_test.go carries no `t.Parallel` marker (0 non-comment occurrences)
+- Task acceptance greps: `grep -n 'slots 2' doc.go` prints nothing; `grep -n 'detectCSharp|detectJavaKotlin' doc.go` prints both tokens; cascade row count in detect_php_test.go = 5
