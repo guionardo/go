@@ -3,101 +3,75 @@ gsd_state_version: "1.0"
 milestone: v1.7
 milestone_name: Project Probe
 status: planning
-last_updated: "2026-09-29T00:28:50.843Z"
+last_updated: "2026-09-28T00:00:00.000Z"
 last_activity: 2026-09-28
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
 ---
 
-# STATE
+# Project State
 
-## Current
+## Project Reference
 
-- **Milestone:** v1.6 Cache Dedup ✅
-- **Phase:** 9 — Post-v1.6 cleanup (complete)
-- **Plan:** 1 plan completed (09-01)
-- **Progress:** [██████████] 100% — all cleanup items resolved!
+See: .planning/PROJECT.md (updated 2026-09-28)
 
-## Status
-
-- Phase 5 (Shared singleflight helper) — complete
-- Phase 6 (Provider integration) — retroactively closed (work already shipped)
-- Phase 7 (Batch operations) — 07-01 complete, 07-02 complete, 07-03 complete, 07-04 complete
-- Phase 8 (Benchmark suite) — 08-01 complete (thundering-herd benchmarks), 08-02 complete (batch benchmarks), 08-03 complete (make benchmark targets + Docker-gated batch providers)
-- Phase 9 (Post-v1.6 cleanup) — 09-01 complete (config HTTP endpoint + ServeMux routing + Windows header fix)
-
-## Phase 9 Plans
-
-| Plan | Wave | Description |
-|------|------|-------------|
-| 09-01 | 1 | ✅ Config HTTP endpoint + ServeMux routing + Windows header fix |
-
-## Phase 8 Plans
-
-| Plan | Wave | Description |
-|------|------|-------------|
-| 08-01 | 1 | ✅ Thundering-herd singleflight benchmark with mem + 4 Docker providers |
-| 08-02 | 1 | ✅ Batch benchmarks (MGet/MSet/MDel) |
-| 08-03 | 2 | ✅ Make benchmark targets + Docker-gated batch subtests |
-
-## Phase 7 Plans
-
-| Plan | Wave | Description |
-|------|------|-------------|
-| 07-01 | 1 | ✅ Core infrastructure: Cache/cacher interfaces, concreteCache, fakeCacher, unit tests, doc.go |
-| 07-02 | 2 | ✅ mem + memcache providers: single-lock batch ops, GetMulti, per-key goroutines |
-| 07-03 | 2 | redis + valkey providers: Pipeline/DoMulti batch ops, integration tests (parallel w/ 07-02) |
-| 07-04 | 3 | ✅ postgres SendBatch batch ops, E2E batch subtests, race detector |
-
-## Last Activity
-
-- **Date:** 2026-08-08
-- **Desc:** Phase 8 Plan 01 complete: thundering-herd benchmark in cache/bench_test.go with mem provider (always runs) and Docker-gated subtests for redis, valkey, memcache, postgres. All concurrency levels (10, 50, 100, 500) verified: naive ≈ N setter_runs/op, singleflight ≈ 1 setter_runs/op.
-
-## Session
-
-**Last session:** 2026-08-08T11:17:23.000Z
-**Stopped at:** Phase 9 Plan 01 complete — all cleanup items resolved
-**Resume file:** None
-
-## Performance Metrics
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 07-batch-operations P04 | 7min | 3 tasks | 3 files |
-| Phase 08-benchmark-suite P01 | 15min | 2 tasks | 1 file |
-| Phase 08-benchmark-suite P02 | 12min | 2 tasks | 1 file |
-| Phase 08-benchmark-suite P03 | 8min | 2 tasks | 2 files |
-| Phase 09-post-v1.6-cleanup P01 | 10m | 3 tasks | 5 files |
-
-## Decisions
-
-- [Phase ?]: pgx SendBatch used for all postgres batch ops (MGet/MSet/MDel) per D-11
-- [Phase ?]: providerCase.fn type changed to cache.BatchCache[string,string] for batch E2E access
-- [Phase ?]: Error accumulation via errors.Join for MSetFunc/MDelFunc per D-06
-- [Phase 8]: Naive herd benchmark uses TOCTOU pattern (check-outside/compute-outside-store) to demonstrate thundering-herd behavior
-- [Phase 8]: skipIfNoDocker checks DOCKER_HOST + docker info for robust detection of testcontainers-ready Docker daemon
-- [Phase ?]: Phase 8: Naive herd benchmark uses TOCTOU pattern (check-outside/compute-outside-store) to demonstrate thundering-herd behavior
-- [Phase ?]: Phase 8: skipIfNoDocker checks DOCKER_HOST + docker info for robust detection of testcontainers-ready Docker daemon
-- [Phase ?]: MSet native benchmarks show higher ns/op but lower allocs/op than per-key for mem provider — map iteration inside write lock adds overhead. Batching win more pronounced for network-backed providers where round-trip time dominates.
-- [Phase 8 P03]: DOCKER_HOST passthrough added to benchmark targets (like test-e2e) so Docker-backed benchmarks actually run
-- [Phase 8 P03]: runBatchBenchmarks helper extracted for provider-agnostic batch benchmark structure
-- [Phase 8 P03]: Docker-gated batch subtests added for redis, valkey, memcache, postgres with pinned images
-- [Phase 9 P01 D-04]: Config HTTP endpoint uses net/http stdlib — no new dependencies
-- [Phase 9 P01 D-05]: ServeMux routing groups mocks by method+path for efficiency, rebuilds on AddMocks for dynamic registration
-- [Phase 9 P01 D-06]: Header keys normalized to lowercase with underscore→hyphen before comparison for cross-platform compatibility
+**Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
+**Current focus:** v1.7 Project Probe — stdlib-only `project_probe` package (phases 10-14)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-28 — Milestone v1.7 started
+Phase: 10 of 14 — Package Foundation (phase 1 of 5 in v1.7)
+Plan: — (none yet)
+Status: Roadmap created — ready to plan Phase 10
+Last activity: 2026-09-28 — v1.7 roadmap written: 5 phases, 21/21 requirements mapped
 
-## Operator Next Steps
+Progress: [░░░░░░░░░░] 0%
 
-- Start the next milestone with /gsd-new-milestone
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 27 (through v1.6)
+- Average duration: ~10 min (v1.6 phases 8-9)
+
+**By Phase:** *(empty — no v1.7 plans completed yet)*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- [Research]: Unknown-without-error contract — error reserved for hard I/O failures; detectors return `(ProjectData, bool)`, never error-as-control-flow
+- [Research]: Manifest-first ordered cascade, first match wins, root-scoped only (no subdir probing)
+- [Research]: Stdlib-only — unexported TOML-subset reader for pyproject/Cargo; full TOML dep deferred to framework milestone (v2)
+- [Research]: go.mod `go` directive reported as Version with "toolchain floor, not release version" semantics — decision record lands in Phase 11
+- [Research]: Detector order Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP — confirm during Phase 13 planning
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- [Planning]: REQUIREMENTS.md claimed 18 v1 requirements; actual count is 21 (3+9+4+5) — traceability updated
+- [Phase 12]: TOML strict-degrade-to-empty on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) — research flag, needs fixture-driven validation during planning
+- [Phase 13]: .NET marker precedence and root-scoped vs 1-level subdir scan — resolved in favor of root-scoped (2-of-3 consensus); confirm during planning
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close, most recent first:
+
+| Category | Item | Status | Deferred At | Milestone |
+|----------|------|--------|-------------|-----------|
+| *(none)* | | | | |
+
+## Session Continuity
+
+Last session: 2026-09-28
+Stopped at: v1.7 roadmap created — ROADMAP.md, STATE.md written, REQUIREMENTS.md traceability updated
+Resume file: None

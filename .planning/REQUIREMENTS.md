@@ -77,12 +77,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| FND-01 | Phase 10 | Pending |
+| FND-02 | Phase 10 | Pending |
+| FND-03 | Phase 10 | Pending |
+| DETC-01 | Phase 10 | Pending |
+| DETC-02 | Phase 11 | Pending |
+| DETC-03 | Phase 11 | Pending |
+| DETC-04 | Phase 11 | Pending |
+| DETC-05 | Phase 12 | Pending |
+| DETC-06 | Phase 12 | Pending |
+| DETC-07 | Phase 13 | Pending |
+| DETC-08 | Phase 13 | Pending |
+| DETC-09 | Phase 10 | Pending |
+| DATA-01 | Phase 10 | Pending |
+| DATA-02 | Phase 11 | Pending |
+| DATA-03 | Phase 14 | Pending |
+| DATA-04 | Phase 11 | Pending |
+| ROBT-01 | Phase 10 | Pending |
+| ROBT-02 | Phase 10 | Pending |
+| ROBT-03 | Phase 12 | Pending |
+| ROBT-04 | Phase 10 | Pending |
+| ROBT-05 | Phase 14 | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18 ⚠️
+- v1 requirements: 21 total (Foundation 3, Detection 9, Data Model 4, Robustness 5)
+- Mapped to phases: 21
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-28*
-*Last updated: 2026-09-28 after initial definition*
+*Last updated: 2026-09-28 after roadmap creation*
