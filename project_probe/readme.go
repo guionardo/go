@@ -23,9 +23,9 @@ var readmeCandidates = []string{"README.md", "README.rst", "README"}
 // Candidates are README.md → README.rst → README, exact-case (D-08); every
 // candidate is read through readManifest, so the 1 MB cap and BOM strip
 // (ROBT-02) apply. The first readable candidate wins; "" when none exists
-// (D-10). Exact-case is enforced against the real directory entries —
-// os.Open alone resolves case-insensitively on macOS/Windows volumes, which
-// would silently break the D-08 contract (Pitfall 7).
+// (D-10). Exact-case is enforced against the real directory entries — a
+// plain open alone resolves case-insensitively on macOS/Windows volumes,
+// which would silently break the D-08 contract (Pitfall 7).
 func readmeDescription(folder string) string {
 	entries, err := os.ReadDir(folder)
 	if err != nil {
