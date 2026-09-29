@@ -1,21 +1,21 @@
 ---
-gsd_state_version: "1.0"
+gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Project Probe
 current_phase: 14
 current_phase_name: Semantics, Hardening, and Release Polish
 status: executing
-stopped_at: Phase 14 context gathered
-last_updated: "2026-09-29T10:01:06.260Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-09-29T10:15:40.719Z"
 last_activity: 2026-09-29
-last_activity_desc: Phase 13 complete, transitioned to Phase 14
-state_head: 9fb094c02f4d767530707d2bdc7601adbcb6a5c6
+last_activity_desc: Phase 14 execution started
 progress:
   total_phases: 5
-  completed_phases: 11
+  completed_phases: 4
   total_plans: 16
-  completed_plans: 12
-  percent: 75
+  completed_plans: 13
+  percent: 80
+state_head: 98b812adde54787686890f2abff0e190e59de3c9
 ---
 
 # Project State
@@ -29,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 ## Current Position
 
-Phase: 14 (Semantics, Hardening, and Release Polish) — READY TO EXECUTE
-Plan: Not started
+Phase: 14 (Semantics, Hardening, and Release Polish) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-09-29 — Phase 13 complete, transitioned to Phase 14
+Last activity: 2026-09-29 — Phase 14 execution started
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [████████░░] 75%
 | Phase 12-toml-subset-python-rust-detectors P04 | 37min | 2 tasks | 2 files |
 | Phase 13 P01 | 7min | 2 tasks | 4 files |
 | Phase 13 P02 | 9min | 2 tasks | 6 files |
+| Phase 14 P01 | 6min | 2 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 12-toml-subset-python-rust-detectors]: Skip-state clearing is quote-aware (CR-01 fix): closesMultiLine (run of 3 closes, run > 3 closes+reopens → state persists), clearsBracket (]/} inside quoted strings honoring escapes never clear; [/{ depth tracking), opensMultiLine + cross-line pendingMLS for multi-line strings opened inside bracket bodies
 - [Phase 12-toml-subset-python-rust-detectors]: enterSkip uses the same quote-aware scans: 4-quote opening lines ("""a"""") and bracket-in-string opening lines (["A ] B",) now ENTER the skip state — closing both CR-01 missed-entry fabrication paths
 - [Phase 12-toml-subset-python-rust-detectors]: CR-01 fabrication gap closed by plan 12-04 (gap closure): verifier's 9-row adversarial probe re-run shows 9/9 no-fabrication; 5 quote-aware matrix functions (13 subtests) pin the fix
+- [Phase 14]: Fuzz bodies call detectors directly (D-05) — readManifest → decode → chains — not Probe(): detector-direct is ~4x faster and reaches per-manifest targets the cascade order hides
+- [Phase 14]: No detector-result assertions in f.Fuzz bodies (Pitfall 3): presence-match (TOML/XML) vs parse-success (JSON) semantics differ; a panic IS the failure signal
+- [Phase 14]: Corpus mixes real-world shapes (composer.json without version, pyproject dynamic, Cargo version.workspace, old-style padded .csproj, pom parent version) with pinned malformed shapes (truncated, BOM, whitespace-only, 12 CR-01 6-quote/bracket-in-string) — not byte-copies of test fixtures (Pitfall 6)
+- [Phase 14]: FuzzXMLManifest writes 'MyApp.csproj', never bare '.csproj' — the 13 IN-03 exact-name guard makes a bare suffix file non-matchable
 
 ### Pending Todos
 
@@ -135,6 +140,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T09:15:59.327Z
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-semantics-hardening-release-polish/14-CONTEXT.md
+Last session: 2026-09-29T10:15:40.714Z
+Stopped at: Completed 14-01-PLAN.md
+Resume file: None
