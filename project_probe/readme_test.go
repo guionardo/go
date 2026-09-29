@@ -118,10 +118,13 @@ func TestReadmeDescription_NoiseOnly(t *testing.T) {
 	assert.Equal(t, "", readmeDescription(folder))
 }
 
-// TestFirstRealParagraph pins the extraction core: image-only badge lines are
-// skipped, numbered TOC links are skipped, an ellipsis line is NOT a heading
-// (D-disc-3), and a thematic break between blank lines discards only itself.
-func TestFirstRealParagraph(t *testing.T) {
+// TestFirstRealParagraph pins the full README extraction matrix (RESEARCH
+// Pitfall 5 + Pattern 4): every skip threshold — badge-only vs badge-plus-text,
+// bullet and numbered TOC links, rst/setext underline pairs, ATX headings,
+// HTML comment preambles, ellipsis/colon-colon non-headings, thematic breaks,
+// multi-line joins, empty and whitespace-only inputs, and the 3-char underline
+// floor (D-09 + D-disc-3/4/5).
+func TestFirstRealParagraph(t *testing.T) { //nolint:funlen
 	t.Parallel()
 
 	tests := []struct {
@@ -129,10 +132,21 @@ func TestFirstRealParagraph(t *testing.T) {
 		content string
 		want    string
 	}{
-		{"badge_only_skipped", "[![logo](x)](y)\n", ""},
-		{"numbered_toc_skipped", "1. [TOC](#x)\npara\n", "para"},
-		{"ellipsis_not_heading", "para\n...\n", "para ..."},
-		{"thematic_break_between_blank_lines", "para1\n\n---\n\npara2\n", "para1"},
+		{"badge_only", "[![logo](x)](y)\n", ""},
+		{"badge_plus_text", "[![logo](x)](y) Welcome!\n", "[![logo](x)](y) Welcome!"},
+		{"bullet_toc", "- [TOC](#x)\npara\n", "para"},
+		{"numbered_toc", "1. [TOC](#x)\npara\n", "para"},
+		{"rst_underline_pair", "Title\n=======\npara\n", "para"},
+		{"setext_pair", "Title\n---\npara\n", "para"},
+		{"atx_heading", "# Title\npara\n", "para"},
+		{"ellipsis", "para\n...\n", "para ..."},
+		{"colon_colon", "para\n::\n", "para ::"},
+		{"thematic_break", "para1\n\n---\n\npara2\n", "para1"},
+		{"multi_line_join", "line1\nline2\n", "line1 line2"},
+		{"html_comment", "<!-- TOC -->\npara\n", "para"},
+		{"empty", "", ""},
+		{"whitespace_only", "\n   \n\t\n", ""},
+		{"two_char_underline", "para\n==\n", "para =="},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
