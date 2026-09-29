@@ -149,7 +149,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 13-01-PLAN.md — C#/.NET detector: readXMLManifest + readFirstManifest discovery + detectCSharp + registry slot 2, interim position flip (DETC-07)
+- [ ] 13-01-PLAN.md — C#/.NET detector: readFirstManifest discovery + inline XML decode + detectCSharp + registry slot 2, interim position flip (DETC-07)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

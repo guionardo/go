@@ -10,7 +10,7 @@ Phase 13 fills the last two registry slots — `detectCSharp` at index 2 and `de
 
 Three ecosystem facts drive the detector shapes. (1) **MSBuild/.csproj**: the root element is *always* `Project` [CITED: learn.microsoft.com MSBuild project file schema]; properties live in `<PropertyGroup>` elements (multiple groups with `Condition` attributes are common — Debug/Release); `Version` is the most-used version property and defaults to `VersionPrefix[-VersionSuffix]` while an explicit `Version` overrides both [CITED: andrewlock.net/version-vs-versionsuffix-vs-packageversion]; Visual Studio writes UTF-8-with-BOM files (hence SC1's "with BOM" requirement, satisfied at the readManifest boundary per D-02). The C# detector needs one genuinely new mechanism vs every prior detector: `.csproj` is NOT a fixed filename, so `readManifest(folder, name)` cannot be called directly — discovery via `os.ReadDir(folder)` (entries sorted by filename, single level, root-scoped) + exact-case `.csproj` suffix filter (Phase 11 D-08 exact-case precedent), first **readable** candidate wins (deterministic stopgap; REFN-04's full multi-csproj selection rule is v2). (2) **Maven POM**: the research question "is `<parent><version>` in the child's own pom.xml or a sibling file?" is settled — **the child's own pom.xml**; Maven requires the parent block's version in every child POM ("You always have to specify parent's version"; what may be omitted is the *child's own* `<version>`, which then inherits the parent's) [CITED: maven.apache.org/pom.html, introduction-to-the-pom.html, stackoverflow 10582054]. So D-05's "inherit `<parent><version>`" is a single-file read — no sibling traversal, consistent with ROBT-05 root-scoped. `<name>` is the optional display name defaulting to `<artifactId>` [CITED: maven.apache.org/pom.html] — matching D-05's chain exactly. (3) **Gradle**: `rootProject.name = 'root-project'` (single quotes conventional in Groovy; double quotes valid and interpolate — never evaluate), fully-qualified `settings.rootProject.name = ...` also documented; the settings file lives in the project root [CITED: docs.gradle.org settings_file_basics + writing_settings_files]. D-06 locks `settings.gradle` only (the `.kts` variant is out of scope — flagged A5).
 
-**Primary recommendation:** Two plans mirroring Phase 12's P02/P03 shape — **P01 = `xml.go` (`readXMLManifest`, the `readJSONManifest` analog) + `detect_csharp.go` (`readFirstManifest` discovery + `csprojManifest` decode + chains) + registry slot 2 + interim `TestDetectorPositions` flip (`detectors[2]` NotNil, `detectors[5]` stays Nil)**; **P02 = `detect_java_kotlin.go` (pom.xml + `<parent><version>` single-level inheritance + settings.gradle `rootProject.name` fallback ONLY when no pom.xml) + registry slot 5 + FINAL `TestDetectorPositions` (all 7 NotNil) + `doc.go` refresh + cascade rows**. Both detectors match on manifest **presence** (D-09): a garbage .csproj/pom.xml still yields Language=C#/.NET or Java with empty fields and fallbacks; `readManifest` failure → `(ProjectData{}, false)`; malformed XML → empty fields, never a panic (xml.Unmarshal returns errors, never panics on malformed input; `callDetector` recover stays the outer net). Tests stay inline `t.TempDir()` + `os.WriteFile` with Go raw-string XML fixtures (repo convention — D-disc-7 precedent; XML contains no backticks so raw literals are safe). Inherited operational facts re-verified this session: `make coverage-quick` remains known-red on `release/update.go` 68.9% only (assert project_probe rows + total); 185 project_probe tests green; `_csharp`/`_java`/`_kotlin`/`_gradle` filename suffixes verified safe against `go tool dist list` (none in GOOS or GOARCH — the Phase 11 `_js` lesson); golangci-lint stays advisory (broken under default toolchain, CI runs no lint job).
+**Primary recommendation:** Two plans mirroring Phase 12's P02/P03 shape — **P01 = `detect_csharp.go` (`readFirstManifest` discovery + `csprojManifest` decode + chains, XML decode INLINE) + registry slot 2 + interim `TestDetectorPositions` flip (`detectors[2]` NotNil, `detectors[5]` stays Nil)**; **P02 = `detect_java_kotlin.go` (pom.xml + `<parent><version>` single-level inheritance + settings.gradle `rootProject.name` fallback ONLY when no pom.xml, same inline decode shape) + registry slot 5 + FINAL `TestDetectorPositions` (all 7 NotNil) + `doc.go` refresh + cascade rows**. There is **NO `xml.go` / `readXMLManifest` helper** — the shared-helper design was dropped in revision: an unexported helper with no production caller sits at 0% file coverage and fails the `.testcoverage-quick.yml` file:70 gate (no project_probe override); both detectors inline the 3-line decode instead (`_ = xml.Unmarshal(content, &v)` decode-error-ignored, the D-09 presence-match degrade). Both detectors match on manifest **presence** (D-09): a garbage .csproj/pom.xml still yields Language=C#/.NET or Java with empty fields and fallbacks; `readManifest` failure → `(ProjectData{}, false)`; malformed XML → empty fields, never a panic (xml.Unmarshal returns errors, never panics on malformed input; `callDetector` recover stays the outer net). Tests stay inline `t.TempDir()` + `os.WriteFile` with Go raw-string XML fixtures (repo convention — D-disc-7 precedent; XML contains no backticks so raw literals are safe). Inherited operational facts re-verified this session: `make coverage-quick` remains known-red on `release/update.go` 68.9% only (assert project_probe rows + total); 185 project_probe tests green; `_csharp`/`_java`/`_kotlin`/`_gradle` filename suffixes verified safe against `go tool dist list` (none in GOOS or GOARCH — the Phase 11 `_js` lesson); golangci-lint stays advisory (broken under default toolchain, CI runs no lint job).
 
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
@@ -59,7 +59,7 @@ Single-package stdlib library — no browser/SSR/CDN/database tiers exist. Every
 
 | Capability | Primary Tier | Secondary Tier | Rationale |
 |------------|-------------|----------------|-----------|
-| XML decode helper | API/Backend (package core) | — | `xml.go` — unexported `readXMLManifest(folder, name, v) bool`, the `readJSONManifest` analog [VERIFIED: project_probe/json.go:11-17]; consumed only by the two new detectors |
+| XML decode (inline) | API/Backend (package core) | — | Inline `_ = xml.Unmarshal(content, &v)` decode-error-ignored inside `detect_csharp.go` and `detect_java_kotlin.go` (D-09 presence-match degrade); NO shared `xml.go`/`readXMLManifest` helper — an uncalled unexported helper would fail the file:70 coverage gate (dropped in revision; the `readJSONManifest` analog [VERIFIED: project_probe/json.go:11-17] informed the shape but is not reproduced) |
 | .csproj discovery | API/Backend (package core) | — | `detect_csharp.go` — `readFirstManifest(folder, ".csproj")` via `os.ReadDir` (single level, root-scoped, sorted); the ONE new mechanism vs prior fixed-name detectors |
 | C# metadata extraction | API/Backend (package core) | — | `detect_csharp.go` — D-03 chains (AssemblyName → RootNamespace → folder base; Version → VersionPrefix → empty; DATA-04 description) |
 | Java/Kotlin metadata extraction | API/Backend (package core) | — | `detect_java_kotlin.go` — pom.xml decode + `<parent><version>` single-level (D-05) + settings.gradle fallback only-when-no-pom (D-06) |
@@ -152,16 +152,15 @@ Single-package stdlib library — no browser/SSR/CDN/database tiers exist. Every
                                                        merged into Probe's defaults — first match wins
 ```
 
-Entry point: `Probe` (unchanged). Processing: existing pipeline → registry (final 7/7) → two new detectors → shared `readXMLManifest`/`readManifest` helpers → shared fallbacks. Branching: both detectors match on manifest presence (D-09) or fall through; the Java detector branches pom.xml-first then settings.gradle only when pom.xml is absent (D-06); XML decode failure degrades to empty fields, never errors/panics. External dependencies: filesystem only (ROBT-05 anti-features preserved — single-level reads, no symlink following, no recursion).
+Entry point: `Probe` (unchanged). Processing: existing pipeline → registry (final 7/7) → two new detectors → `readManifest`/`readFirstManifest` reads with INLINE `xml.Unmarshal` decode (no shared XML helper — dropped in revision, see map row) → shared fallbacks. Branching: both detectors match on manifest presence (D-09) or fall through; the Java detector branches pom.xml-first then settings.gradle only when pom.xml is absent (D-06); XML decode failure degrades to empty fields, never errors/panics. External dependencies: filesystem only (ROBT-05 anti-features preserved — single-level reads, no symlink following, no recursion).
 
 ### Recommended Project Structure
 
 ```
 project_probe/
 ├── registry.go              # MODIFIED: detectCSharp at idx 2, detectJavaKotlin at idx 5 (D-08); comment refresh
-├── xml.go                   # NEW: readXMLManifest(folder, name, v any) bool — readJSONManifest analog
-├── detect_csharp.go         # NEW: readFirstManifest (.csproj discovery) + csprojManifest + detectCSharp (D-03/D-04)
-├── detect_java_kotlin.go    # NEW: pomManifest + parseRootProjectName + detectJavaKotlin (D-05/D-06/D-07)
+├── detect_csharp.go         # NEW: readFirstManifest (.csproj discovery) + csprojManifest + detectCSharp with INLINE xml.Unmarshal decode (D-03/D-04)
+├── detect_java_kotlin.go    # NEW: pomManifest + parseRootProjectName + detectJavaKotlin with INLINE xml.Unmarshal decode (D-05/D-06/D-07)
 ├── doc.go                   # MODIFIED: detector-list paragraph names all seven (D-08)
 ├── detect_csharp_test.go    # NEW: probe-level rows (inline t.TempDir + os.WriteFile; BOM/xmlns/multi-group/malformed/root-scope)
 ├── detect_java_kotlin_test.go # NEW: probe-level rows (pom canonical/parent version/gradle fallback/malformed/root-scope)
@@ -170,7 +169,7 @@ project_probe/
 └── (everything else)        # UNCHANGED — readManifest, readme, json, toml, probe, ignore, errors, example
 ```
 
-Conventions honored: snake_case files; internal `package projectprobe` tests (unexported `readXMLManifest`, `readFirstManifest`, `parseRootProjectName` reachable); `t.Parallel()` in fixture-only tests but NEVER in registry-mutating tests [VERIFIED: project_probe/registry_test.go:12-14]; decorder (type → const → var → func); composite literals with field names; `//nolint:paralleltest` on global-state tests. Filename suffixes verified build-safe this session via `go tool dist list`: `csharp`, `java`, `kotlin`, `gradle` appear in neither the GOOS list (`aix android darwin dragonfly freebsd illumos ios js linux netbsd openbsd plan9 solaris wasip1 windows`) nor the GOARCH list (`386 amd64 arm arm64 loong64 mips mips64 mips64le mipsle ppc64 ppc64le riscv64 s390x wasm`) — unlike Phase 11's `_js` GOOS collision.
+Conventions honored: snake_case files; internal `package projectprobe` tests (unexported `readFirstManifest`, `parseRootProjectName` reachable — the decode is inline, so there is no `readXMLManifest` to test); `t.Parallel()` in fixture-only tests but NEVER in registry-mutating tests [VERIFIED: project_probe/registry_test.go:12-14]; decorder (type → const → var → func); composite literals with field names; `//nolint:paralleltest` on global-state tests. Filename suffixes verified build-safe this session via `go tool dist list`: `csharp`, `java`, `kotlin`, `gradle` appear in neither the GOOS list (`aix android darwin dragonfly freebsd illumos ios js linux netbsd openbsd plan9 solaris wasip1 windows`) nor the GOARCH list (`386 amd64 arm arm64 loong64 mips mips64 mips64le mipsle ppc64 ppc64le riscv64 s390x wasm`) — unlike Phase 11's `_js` GOOS collision.
 
 ### Pattern 1: XMLName local-name matching — the verified decode contract (D-01)
 
@@ -195,24 +194,11 @@ Additional doc-verified rules that keep the detectors small: unknown elements an
 
 **When to use:** D-01 — both detectors. Two distinct XMLName tags are REQUIRED: `xml:"Project"` (capital P — csproj) and `xml:"project"` (lowercase — Maven); XML is case-sensitive so one struct can never serve both.
 
-### Pattern 2: `readXMLManifest` + `.csproj` discovery (D-03/D-04)
+### Pattern 2: `readFirstManifest` discovery + inline XML decode (D-03/D-04)
 
-**What:** The `readJSONManifest` shape [VERIFIED: project_probe/json.go:11-17] extends directly to XML — plus one genuinely new mechanism: `.csproj` is a **variable** filename, so discovery precedes the read. `os.ReadDir` returns entries sorted by filename [CITED: pkg.go.dev/os#ReadDir], which makes "first candidate" deterministic.
+**What:** The one genuinely new mechanism of the phase: `.csproj` is a **variable** filename, so discovery precedes the read. `os.ReadDir` returns entries sorted by filename [CITED: pkg.go.dev/os#ReadDir], which makes "first candidate" deterministic. The decode itself is INLINE in `detectCSharp` (`_ = xml.Unmarshal(content, &proj)` decode-error-ignored — Pattern 3): there is NO shared `readXMLManifest` helper. The `readJSONManifest` shape [VERIFIED: project_probe/json.go:11-17] informed the approach, but reproducing it as `xml.go` was dropped in revision — an unexported helper with no production caller sits at 0% file coverage and fails the `.testcoverage-quick.yml` file:70 gate (no project_probe override).
 
 ```go
-// readXMLManifest decodes <folder>/<name> as XML into v. Missing files,
-// oversized files, and malformed XML all return false — callers degrade to
-// a non-match or empty fields so the cascade continues (D-09). The BOM strip
-// inside readManifest keeps the decode clean (D-02); encoding/xml tolerates
-// a leading BOM anyway (verified Go 1.27), so the boundary is safe either way.
-func readXMLManifest(folder, name string, v any) bool {
-	content, ok := readManifest(folder, name)
-	if !ok {
-		return false
-	}
-	return xml.Unmarshal(content, v) == nil
-}
-
 // readFirstManifest returns the content of the first READABLE *.csproj entry
 // in folder (single level, root-scoped — D-04/ROBT-05). os.ReadDir sorts by
 // filename, so the choice is deterministic. Exact-case suffix matching per
@@ -326,7 +312,7 @@ Verified ecosystem facts this shape relies on:
 
 ### Pattern 4: `detectJavaKotlin` — pom.xml primary, settings.gradle fallback (DETC-08, D-05/D-06/D-07/D-09)
 
-**What:** pom.xml via `readXMLManifest`; `<parent><version>` read from the CHILD'S OWN file (the research question is settled: Maven requires the parent block — including version — in every child POM; the child's own `<version>` is what may be omitted and then inherits [CITED: maven.apache.org/pom.html + introduction-to-the-pom.html]). settings.gradle is consulted ONLY when pom.xml is absent (D-06) — a malformed pom.xml still matches on presence (D-09), so the gradle fallback does NOT fire for a present-but-garbage pom.
+**What:** pom.xml via the `readManifest` presence gate with INLINE decode-error-ignored `xml.Unmarshal` (same shape as detectCSharp, Pattern 3 — no `readXMLManifest` helper); `<parent><version>` read from the CHILD'S OWN file (the research question is settled: Maven requires the parent block — including version — in every child POM; the child's own `<version>` is what may be omitted and then inherits [CITED: maven.apache.org/pom.html + introduction-to-the-pom.html]). settings.gradle is consulted ONLY when pom.xml is absent (D-06) — a malformed pom.xml still matches on presence (D-09), so the gradle fallback does NOT fire for a present-but-garbage pom.
 
 ```go
 // pomManifest is the decode shape for a pom.xml. The root is the lowercase
@@ -464,14 +450,14 @@ var detectors = []detectorFunc{
 
 | # | Decision | Rationale |
 |---|----------|-----------|
-| D-disc-1 | **`xml.Unmarshal` whole-content** (via `readXMLManifest`) over `xml.Decoder` streaming | readManifest caps content at 1 MB; Unmarshal is the simple contract; Decoder adds a token loop for zero benefit |
+| D-disc-1 | **`xml.Unmarshal` whole-content inline** (decode-error-ignored in each detector) over `xml.Decoder` streaming | readManifest caps content at 1 MB; Unmarshal is the simple contract; Decoder adds a token loop for zero benefit |
 | D-disc-2 | **One decode struct per manifest, tags without namespace** | Pattern 1 verified: plain tags match any namespace for root AND children (probe rows B/I) — no per-namespace structs, no `,any` |
 | D-disc-3 | **settings.gradle: exact left-of-= match** (`rootProject.name` / `settings.rootProject.name`), first quoted literal, remainder-after-close-quote must be empty or a `//` comment | `// rootProject.name = 'x'` can never fabricate; `'a' + 'b'` concatenation expressions degrade (never partial — Phase 12 D-disc-6 precedent) |
 | D-disc-4 | **First match wins** in `parseRootProjectName` | parseGoMod precedent [VERIFIED: detect_go.go:43-68]; double assignments are pathological (Gradle would last-wins — one test row if ever needed) |
 | D-disc-5 | **`.csproj` discovery: first READABLE candidate in sorted ReadDir order**; exact-case `.csproj` suffix | os.ReadDir sorts (deterministic); Phase 11 D-08 exact-case precedent; FIFO candidate → readManifest gate rejects → next candidate (A9); REFN-04 defers the real multi-csproj rule |
 | D-disc-6 | **Collect-first-then-chain across PropertyGroups** (first non-empty per field, then the D-03 chain) | Multiple groups are the norm (probe J); "AssemblyName → RootNamespace" priority must not depend on group order |
 | D-disc-7 | **Inline fixtures** — `t.TempDir()` + `os.WriteFile` with Go raw-string XML literals | Repo convention (Phase 12 D-disc-7); XML never contains backticks so raw strings are safe; BOM rows via `"\xEF\xBB\xBF"` prefix (Phase 11 BOM row pattern) |
-| D-disc-8 | **No separate `xml_test.go`** — `readXMLManifest` is ~8 lines; all behavior tests live at detector level | The Phase 12 `toml_test.go` existed because the reader was 349 lines of real logic; here the interesting cases are probe-level (BOM/xmlns/multi-group/cascade) |
+| D-disc-8 | **No `xml_test.go` AND no `xml.go`** — the decode is a 3-line inline in each detector; a standalone helper file would be uncalled (0% file coverage → file:70 gate failure) and a helper test file would test nothing of its own; all behavior tests live at detector level | The Phase 12 `toml_test.go` existed because the reader was 349 lines of real logic; here the interesting cases are probe-level (BOM/xmlns/multi-group/cascade) |
 
 ### Anti-Patterns to Avoid
 
@@ -495,11 +481,11 @@ var detectors = []detectorFunc{
 | File-size caps / FIFO hang protection | Per-detector read loops / plain `os.Open` | `readManifest` (1 MB LimitReader + O_NONBLOCK + `Mode().IsRegular()` gate) [VERIFIED: project_probe/manifest.go:29-43] | The WR-01 FIFO DoS is already closed; `readFirstManifest` routes every .csproj candidate through it |
 | README description fallback | Re-extracting first paragraphs | `readmeDescription(folder)` [VERIFIED: project_probe/readme.go:29-48] | Phase 11 built it; both detectors call it when description is empty |
 | Folder-name fallback | Hand-rolled last-segment extraction | `filepath.Base` | Stdlib; Windows-safe (ROBT-04) |
-| JSON-helper shape | A bespoke read wrapper | `readXMLManifest` mirroring `readJSONManifest` [VERIFIED: project_probe/json.go:11-17] | Same never-fail contract; same call shape; reviewers recognize the analog |
+| JSON-helper shape | A bespoke `readXMLManifest` wrapper (uncalled → 0% file coverage) | Inline `_ = xml.Unmarshal(content, &v)` decode-error-ignored in each detector | The `readJSONManifest` analog [VERIFIED: project_probe/json.go:11-17] informed the shape, but a shared helper has no production caller and fails the file:70 coverage gate — the inline decode is 3 lines |
 | Panic containment | Trusting the parser not to panic | `callDetector` recover → non-match [VERIFIED: project_probe/registry.go:44-53] | encoding/xml returns errors, never panics, on malformed input; the net stays behind it regardless |
 | Test assertions | Hand-rolled compare helpers | `testify` `assert`/`require` | Repo mandate (AGENTS.md); `testifylint` enforced |
 
-**Key insight:** everything "hard" in this phase — BOM, caps, FIFO DoS, README heuristics, panic safety, cross-platform paths — was solved in Phases 10-12. The genuinely new code is one ~8-line decode helper, one ~15-line discovery helper, two ~10-line XML structs, two ~35-line detectors, and a ~20-line settings.gradle line parser. Every risk lives in (a) the XMLName local-name matching contract — now verified live — and (b) the .csproj discovery mechanism, the first time a detector reads a variable-named manifest.
+**Key insight:** everything "hard" in this phase — BOM, caps, FIFO DoS, README heuristics, panic safety, cross-platform paths — was solved in Phases 10-12. The genuinely new code is one ~15-line discovery helper, two ~10-line XML structs, two ~35-line detectors (each with a 3-line inline decode), and a ~20-line settings.gradle line parser. Every risk lives in (a) the XMLName local-name matching contract — now verified live — and (b) the .csproj discovery mechanism, the first time a detector reads a variable-named manifest.
 
 ## Common Pitfalls
 
@@ -559,7 +545,7 @@ var detectors = []detectorFunc{
 ### Pitfall 10: `make coverage-quick` red before the first commit (pre-existing)
 **What goes wrong:** The mandatory pre-commit gate fails on `release/update.go 68.9%` vs 70% — re-verified live this session.
 **Why it happens:** Pre-existing, unrelated to project_probe (deferred-items); CI uses the same thresholds.
-**How to avoid:** Run `make coverage-quick`; assert the **project_probe rows pass** (pkg ≥80% — new files `xml.go`/`detect_csharp.go`/`detect_java_kotlin.go` must each clear the 70% file threshold) and total ≥75%; treat the `release/update.go` row as the documented known-red. Do NOT fix release/update.go (scope boundary).
+**How to avoid:** Run `make coverage-quick`; assert the **project_probe rows pass** (pkg ≥80% — new files `detect_csharp.go`/`detect_java_kotlin.go` must each clear the 70% file threshold; there is NO `xml.go` — the decode is inline in both detectors, and a dropped helper would sit at 0% file coverage) and total ≥75%; treat the `release/update.go` row as the documented known-red. Do NOT fix release/update.go (scope boundary).
 **Warning signs:** A verification step fails with no remediation path — encode the known-red exception explicitly (Phase 12 Pitfall 7 pattern).
 
 ### Pitfall 11: Lint is not a gate (unchanged from Phase 12)
@@ -767,7 +753,7 @@ Directives the planner must honor (verbatim intent from `./AGENTS.md`):
 - [VERIFIED (in-repo): project_probe/project.go:45] — `LanguageJava Language = "Java"`
 - [VERIFIED (in-repo): project_probe/registry.go:14-22] — 7-slot literal with `nil` at indices 2 and 5 (to fill); nil-skip at 28-39; `callDetector` recover at 44-53
 - [VERIFIED (in-repo): project_probe/manifest.go:13,15,29-43,50] — `maxManifestSize = 1 << 20`, `utf8BOM`, O_NONBLOCK + `IsRegular()` WR-01 gate, `bytes.TrimPrefix` BOM strip
-- [VERIFIED (in-repo): project_probe/json.go:11-17] — `readJSONManifest` shape (the `readXMLManifest` analog)
+- [VERIFIED (in-repo): project_probe/json.go:11-17] — `readJSONManifest` shape (the analog considered for XML; NOT reproduced — the decode is inline in each detector: an uncalled `readXMLManifest` helper would fail the file:70 coverage gate)
 - [VERIFIED (in-repo): project_probe/detect_go.go:43-68] — `parseGoMod` line-parser precedent (first-wins, TrimSpace, comment handling)
 - [VERIFIED (in-repo): project_probe/readme.go:29-48] — `readmeDescription` fallback
 - [VERIFIED (in-repo): project_probe/probe.go:34,39-42] — `os.ReadDir` + `hasContent` gate
