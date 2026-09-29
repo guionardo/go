@@ -23,7 +23,7 @@ func detectGo(folder string) (ProjectData, bool) {
 	if data.Name == "" {
 		data.Name = filepath.Base(folder) // DATA-02: name chain fallback
 	}
-	data.Version = version // raw go directive or "" (D-02 — toolchain floor, never normalized)
+	data.Version = version                       // raw go directive or "" (D-02 — toolchain floor, never normalized)
 	data.Description = readmeDescription(folder) // go.mod has no description field (D-03)
 	return data, true
 }

@@ -109,7 +109,7 @@ func TestDetectGo(t *testing.T) { //nolint:funlen
 		name     string
 		mod      string
 		folder   func(t *testing.T) string // nil → t.TempDir()
-		wantName string                   // "" → filepath.Base(folder)
+		wantName string                    // "" → filepath.Base(folder)
 		wantVer  string
 	}{
 		{
