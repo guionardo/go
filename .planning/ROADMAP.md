@@ -44,7 +44,7 @@
 - [x] **Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback** - Go, JS/TS, PHP detectors with name/version/description chains and README first-paragraph fallback (completed 2026-09-29)
 - [x] **Phase 12: TOML Subset + Python/Rust Detectors** - Section-aware TOML-subset reader + Python (pyproject/poetry) and Rust (Cargo) detectors (completed 2026-09-29)
 - [x] **Phase 13: XML Detectors — C#/.NET + Java/Kotlin** - .csproj and pom.xml/settings.gradle XML detectors, namespace-agnostic and root-scoped (completed 2026-09-29)
-- [ ] **Phase 14: Semantics, Hardening, and Release Polish** - Version-semantics decisions, anti-feature audit, fuzz + fixtures, docs, coverage gate
+- [x] **Phase 14: Semantics, Hardening, and Release Polish** - Version-semantics decisions, anti-feature audit, fuzz + fixtures, docs, coverage gate (completed 2026-09-29)
 
 ## Phase Details
 
@@ -167,7 +167,7 @@ Plans:
   3. Fuzz targets seeded with real manifests run under normal `go test` — malformed JSON/XML/TOML inputs never panic and never crash the probe.
   4. The package ships complete: `make coverage-quick` passes, doc.go contract finalized, README package index row added, `go vet` and lint clean.
 
-**Plans**: 4/4 plans executed
+**Plans**: 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -197,4 +197,4 @@ Plans:
 | 11. Text/JSON Detectors | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete    | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 2/2 | Complete    | 2026-09-29 |
-| 14. Semantics, Hardening, Polish | v1.7 | 4/4 | In Progress|  |
+| 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete    | 2026-09-29 |
