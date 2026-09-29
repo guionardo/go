@@ -61,7 +61,7 @@
   4. A folder containing only vendored/build/IDE directories (node_modules/, vendor/, .git/, dist/, .idea/) is reported Unknown — ignore-list hygiene.
   5. Manifest reads are size-capped (1 MB) and BOM-stripped with no panics on pathological input; all path handling uses filepath — Windows-safe, no `path` imports.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -74,7 +74,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 10-03-PLAN.md — Shared readManifest helper: 1 MB cap + BOM strip, never-fail (ROBT-02)
+- [x] 10-03-PLAN.md — Shared readManifest helper: 1 MB cap + BOM strip, never-fail (ROBT-02)
 
 ### Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
 
@@ -146,7 +146,7 @@ Plans:
 | 7. Batch operations | v1.6 | 4/4 | Complete | 2026-08-08 |
 | 8. Benchmark suite | v1.6 | 3/3 | Complete | 2026-08-08 |
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
-| 10. Package Foundation | v1.7 | 2/3 | In Progress|  |
+| 10. Package Foundation | v1.7 | 3/3 | In Progress|  |
 | 11. Text/JSON Detectors | v1.7 | 0/TBD | Not started | - |
 | 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |

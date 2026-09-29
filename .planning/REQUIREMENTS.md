@@ -35,7 +35,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 ### Robustness
 
 - [x] **ROBT-01**: Ignore-list hygiene (vendored/build/IDE dirs) so they never masquerade as markers
-- [ ] **ROBT-02**: Shared `readManifest` helper — size cap + BOM strip
+- [x] **ROBT-02**: Shared `readManifest` helper — size cap + BOM strip
 - [ ] **ROBT-03**: Unexported section-aware TOML-subset reader (~80 lines) for pyproject/Cargo; strict degrade-to-empty
 - [x] **ROBT-04**: Stdlib-only imports; `path/filepath` not `path`; Windows-safe
 - [ ] **ROBT-05**: No build-tool execution, no network, no symlink following, no version normalization (anti-features enforced)
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-03 | Phase 14 | Pending |
 | DATA-04 | Phase 11 | Pending |
 | ROBT-01 | Phase 10 | Complete |
-| ROBT-02 | Phase 10 | Pending |
+| ROBT-02 | Phase 10 | Complete |
 | ROBT-03 | Phase 12 | Pending |
 | ROBT-04 | Phase 10 | Complete |
 | ROBT-05 | Phase 14 | Pending |
