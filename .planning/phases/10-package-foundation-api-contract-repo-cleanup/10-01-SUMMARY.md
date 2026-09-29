@@ -18,11 +18,11 @@ affects: [10-02, 10-03, CI, phases 11-14]
 actuals:
   tokens: 1100
   tasks: 1
-  commits: 1
+  commits: 2
 
 # Commit ledger (#3968) — measured, never narrated
 plan_head_before: ce7d370366fc694cfe5065e24ced15470133db4f
-plan_head_after: 8913357
+plan_head_after: e2faf65
 
 # Tech tracking
 tech-stack:
@@ -132,9 +132,9 @@ None - no external service configuration required.
 
 - FOUND: `.planning/phases/10-package-foundation-api-contract-repo-cleanup/10-01-SUMMARY.md`
 - FOUND: `project_detector/` absent from disk (deleted)
-- FOUND: commit `8913357` (docs commit, amended)
+- FOUND: commit `e2faf65` (docs commit)
 - PASS: `go build ./...` exits 0 (re-confirmed after commit)
 - PASS: `test ! -d project_detector` exits 0
 - PASS: `grep -rn "project_detector" --include="*.go" .` prints nothing
 - PASS: `git diff --stat -- go.mod go.sum` shows no changes
-- PASS: no empty commit created by Task 1 (`git log --oneline -1` = ce7d370 pre-plan, 8913357 docs post-plan)
+- PASS: no empty commit created by Task 1 (`git log --oneline -1` = ce7d370 pre-plan, e2faf65 docs post-plan)
