@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-28)
+See: .planning/PROJECT.md (updated 2026-09-29)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 10 — Package Foundation — API Contract + Repo Cleanup
+**Current focus:** Phase 11 — Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
 
 ## Current Position
 
@@ -65,8 +65,10 @@ Recent decisions affecting current work:
 - [Research]: go.mod `go` directive reported as Version with "toolchain floor, not release version" semantics — decision record lands in Phase 11
 - [Research]: Detector order Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP — confirm during Phase 13 planning
 - [Phase 10]: No empty git commit for FND-01: deleting untracked files produces no diff; the 'own commit' clause is satisfied by task isolation + go build verification (RESEARCH OQ-2); untracked reality documented for plan 10-02's first commit message — Repo forbids empty commits; git cannot represent deletion of untracked files
-- [Phase 10-package-foundation-api-contract-repo-cleanup]: RED verified-but-uncommitted per plan TDD adaptation (10-02 precedent): pre-commit go-test hook runs go test ./... and CI must stay green; failing boundary tests ship with the implementation; RED evidence recorded in the feat commit message
-- [Phase 10-package-foundation-api-contract-repo-cleanup]: readManifest boundary tests pin the cap via maxManifestSize (single source of truth) and use literal EF BB BF bytes for BOM rows — tests stay independent of the implementation var while pinning the ROBT-02 contract
+- [Phase 10]: RED verified-but-uncommitted per plan TDD adaptation (10-02 precedent): pre-commit go-test hook runs go test ./... and CI must stay green; failing boundary tests ship with the implementation; RED evidence recorded in the feat commit message
+- [Phase 10]: readManifest boundary tests pin the cap via maxManifestSize (single source of truth) and use literal EF BB BF bytes for BOM rows — tests stay independent of the implementation var while pinning the ROBT-02 contract
+- [Phase 10]: Probe("") returns ErrFolderNotFound (OQ-1 resolution) — never silently probes cwd
+- [Phase 10]: syscall errno mapping with EACCES **or EPERM** → ErrPermissionDenied (D-04 amended 2026-09-28 after code review) — Unix permission failures report either errno
 
 ### Pending Todos
 
@@ -75,6 +77,9 @@ None yet.
 ### Blockers/Concerns
 
 - [Planning]: REQUIREMENTS.md claimed 18 v1 requirements; actual count is 21 (3+9+4+5) — traceability updated
+- [Phase 10]: Code review CR-01 — D-04 errno mapping needs Windows verification (syscall.EACCES is an invented value on Windows; ENOTDIR aliases ERROR_PATH_NOT_FOUND; ERROR_DIRECTORY unmatched) — recorded advisory in 10-REVIEW-DISPOSITION.md, no failing test on darwin
+- [Phase 10]: Code review WR-01 — readManifest can block on a FIFO/special file; needs regular-file gate (phases 11-13 consume it)
+- [Phase 10]: Pre-existing `make coverage-quick` failure — release/update.go 68.9% vs 70% file threshold (unrelated to this phase, logged to deferred-items.md)
 - [Phase 12]: TOML strict-degrade-to-empty on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) — research flag, needs fixture-driven validation during planning
 - [Phase 13]: .NET marker precedence and root-scoped vs 1-level subdir scan — resolved in favor of root-scoped (2-of-3 consensus); confirm during planning
 
@@ -88,6 +93,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T02:29:24.509Z
+Last session: 2026-09-29
 Stopped at: Phase 10 complete, ready to plan Phase 11
 Resume file: None

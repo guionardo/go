@@ -37,12 +37,13 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ `BatchCache[K, V]` with MGet/MSet/MDel across all 5 providers — `cache/` — v1.6
 - ✓ Benchmark suite quantifying dedup and batching wins — `cache/` — v1.6
 - ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
+- ✓ `project_probe` package foundation — never-fail `Probe` contract, `ProjectData` model, `Language` type, error sentinels, ordered detector registry, ignore list, `readManifest` — `project_probe/` — v1.7 (Phase 10)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] `project_probe` package — folder content reader reporting language, name, version, description (v1.7)
+- [ ] `project_probe` language detectors — Go, JS/TS, PHP, Python, Rust, C#/.NET, Java/Kotlin (v1.7, phases 11-13)
 
 ## Current Milestone: v1.7 Project Probe
 
@@ -82,6 +83,10 @@ Eliminated duplicate setter work in cache misses and reduced round trips via sin
 **v1.7 — Project Probe** (in progress)
 
 New `project_probe` package replacing the `project_detector/` sample: reads folder contents, reports language, name, version, and description across 7 languages. Stdlib-only, best-effort detection (Unknown type, no error).
+
+**Phase 10 — Package Foundation** (completed 2026-09-28)
+
+Deleted the broken `project_detector/` sample and shipped the `projectprobe` package foundation: never-fail `Probe(folder) (ProjectData, error)` contract with 3 error sentinels (ErrFolderNotFound, ErrNotDirectory, ErrPermissionDenied) mapped from syscall errnos, `ProjectData{Folder, Language, Name, Version, Description}` model with typed `Language` constants, ordered detector registry with panic-recovery dispatch (empty — detectors land in phases 11-13), 13-entry exact-case ignore list, and `readManifest` (1 MB cap, BOM strip). 30 tests, 100% package coverage.
 
 **Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
@@ -125,6 +130,12 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | Two-phase SHA256 verification | go-digest at download + stdlib at swap protects against corruption mid-flight | ✓ Good (v1.5) |
 | singleflight wraps only the setter | Dedups concurrent misses without locking the fast-path Get | ✓ Validated (v1.6 spikes) |
 | Shared GetOrSet helper over per-provider bodies | Eliminates 5× duplicated miss→setter→Set code | ✓ Validated (v1.6 spikes) |
+| Never-fail Probe contract (error only for hard I/O) | Best-effort detection; content never fails | ✓ Good (v1.7, Phase 10) |
+| syscall errno → sentinel mapping (ENOENT/ENOTDIR/EACCES/EPERM) | Cross-platform error discrimination without string matching | ✓ Good (v1.7, Phase 10) |
+| Typed `Language` constants with display values | Discoverable API, switchable, extensible (v2 typescript) | ✓ Good (v1.7, Phase 10) |
+| `Folder` = filepath.Clean(as-given), never absolutized | Deterministic tests, Windows-safe, caller gets what they asked for | ✓ Good (v1.7, Phase 10) |
+| Panic-recovery at registry dispatch | A panicking detector is a non-match, never an error (cache callSetter precedent) | ✓ Good (v1.7, Phase 10) |
+| readManifest 1 MB cap + BOM strip, `([]byte, bool)` | Never-fail contract; no panic on pathological input | ✓ Good (v1.7, Phase 10) |
 
 ## Evolution
 
@@ -144,4 +155,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-28 after v1.7 Project Probe milestone started*
+*Last updated: 2026-09-29 after Phase 10 (v1.7 Package Foundation)*
