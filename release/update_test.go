@@ -244,6 +244,30 @@ func TestCheckForUpdate_APIError(t *testing.T) {
 	require.Contains(t, err.Error(), "unexpected status code: 403")
 }
 
+//nolint:paralleltest // global state mutation: githubAPIBase
+func TestCheckForUpdate_NoOptionsDerivesOwnerRepo(t *testing.T) {
+	t.Parallel()
+	mu.Lock()
+	defer mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Derived from the module path (getCurrentModule → url.Parse → words[1]/words[2]).
+		require.Equal(t, "/repos/guionardo/go/releases/latest", r.URL.Path)
+		_, _ = fmt.Fprint(w, `{"tag_name": "v2.0.0", "name": "v2.0.0", "assets": []}`)
+	}))
+	defer server.Close()
+
+	originalBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = originalBase }()
+
+	rel, newer, err := CheckForUpdate(context.Background(), "v1.0.0") // NO options → module derivation
+	require.NoError(t, err)
+	require.NotNil(t, rel)
+	require.True(t, newer)
+	require.Equal(t, "v2.0.0", rel.TagName)
+}
+
 func TestDownloadUpdate(t *testing.T) {
 	t.Parallel()
 	mu.Lock()
