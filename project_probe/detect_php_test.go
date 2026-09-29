@@ -111,3 +111,146 @@ func TestProbe_PHPMalformed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, LanguageUnknown, data.Language)
 }
+
+// TestProbe_PHPDuplicateKeys pins the verified encoding/json semantics for
+// the PHP mirror: duplicate keys are legal and LAST wins.
+func TestProbe_PHPDuplicateKeys(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "composer.json"),
+		[]byte(`{"name":"acme/a","name":"acme/b"}`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePHP, data.Language)
+	assert.Equal(t, "acme/b", data.Name)
+}
+
+// TestProbe_PHPTypeMismatch pins the verified encoding/json semantics for
+// the PHP mirror: a type mismatch ("name": 123) is a decode error →
+// detector returns false → LanguageUnknown (D-04 cascade continues).
+func TestProbe_PHPTypeMismatch(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "composer.json"),
+		[]byte(`{"name":123}`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageUnknown, data.Language)
+}
+
+// TestProbe_PHPVersionNull pins the verified encoding/json semantics:
+// "version": null decodes to "" — no error, no fabricated value.
+func TestProbe_PHPVersionNull(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "composer.json"),
+		[]byte(`{"name":"acme/logger","version":null}`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguagePHP, data.Language)
+	assert.Equal(t, "acme/logger", data.Name)
+	assert.Equal(t, "", data.Version)
+}
+
+// TestProbe_CascadePrecedence pins the DETC-01 first-match cascade across
+// the real ordered registry through Probe (Go@0 beats JS@3 beats PHP@6) and
+// the D-04 parse-success rule: a broken package.json at position 3 does NOT
+// match, so the cascade continues to a valid composer.json at position 6
+// (T-11-09 — the RESEARCH match-rule asymmetry locked behavior).
+func TestProbe_CascadePrecedence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T) string // returns the folder
+		want    Language
+		wantErr bool
+	}{
+		{
+			// D-04 parse-success asymmetry: broken JS manifest falls through
+			// to the valid PHP manifest — LanguagePHP wins.
+			"broken_package_json_valid_composer_json",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "package.json"),
+					[]byte("{invalid"),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "composer.json"),
+					[]byte(`{"name":"acme/logger"}`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguagePHP,
+			false,
+		},
+		{
+			// DETC-01 first-match: Go at index 0 beats JS at index 3.
+			"go_mod_and_package_json",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "go.mod"),
+					[]byte("module example.com/acme\n"),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "package.json"),
+					[]byte(`{"name":"acme-widget"}`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageGo,
+			false,
+		},
+		{
+			// DETC-01 first-match: JS at index 3 beats PHP at index 6.
+			"package_json_and_composer_json",
+			func(t *testing.T) string {
+				folder := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "package.json"),
+					[]byte(`{"name":"acme-widget"}`),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(folder, "composer.json"),
+					[]byte(`{"name":"acme/logger"}`),
+					0o600,
+				))
+
+				return folder
+			},
+			LanguageJavaScript,
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			folder := tt.setup(t)
+
+			data, err := Probe(folder)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, data.Language)
+		})
+	}
+}

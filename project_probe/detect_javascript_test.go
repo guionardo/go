@@ -154,3 +154,56 @@ func TestProbe_JSMalformed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, LanguageUnknown, data.Language)
 }
+
+// TestProbe_JSDuplicateKeys pins the verified encoding/json semantics:
+// duplicate keys are legal and LAST wins — no error, no first-wins
+// ambiguity (T-11-10 pinned as a test row).
+func TestProbe_JSDuplicateKeys(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "package.json"),
+		[]byte(`{"name":"a","name":"b"}`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageJavaScript, data.Language)
+	assert.Equal(t, "b", data.Name)
+}
+
+// TestProbe_JSUnknownFields pins the verified encoding/json semantics:
+// unknown fields (license, scripts, ...) are silently ignored — the decode
+// succeeds and the known fields populate (T-11-10).
+func TestProbe_JSUnknownFields(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "package.json"),
+		[]byte(`{"name":"x","license":"MIT","scripts":{"build":"make"}}`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageJavaScript, data.Language)
+	assert.Equal(t, "x", data.Name)
+}
+
+// TestProbe_JSTypeMismatch pins the verified encoding/json semantics: a type
+// mismatch ("name": 123) is a decode error → detector returns false →
+// LanguageUnknown (D-04 cascade continues).
+func TestProbe_JSTypeMismatch(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, "package.json"),
+		[]byte(`{"name":123}`),
+		0o600,
+	))
+
+	data, err := Probe(folder)
+	require.NoError(t, err)
+	assert.Equal(t, LanguageUnknown, data.Language)
+}
