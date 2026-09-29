@@ -61,7 +61,7 @@
   4. A folder containing only vendored/build/IDE directories (node_modules/, vendor/, .git/, dist/, .idea/) is reported Unknown — ignore-list hygiene.
   5. Manifest reads are size-capped (1 MB) and BOM-stripped with no panics on pathological input; all path handling uses filepath — Windows-safe, no `path` imports.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 **Wave 1**
@@ -70,7 +70,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 10-02-PLAN.md — Probe contract tracer: model, sentinels, entry point, ordered registry, ignore gate, never-fail docs (FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-04)
+- [x] 10-02-PLAN.md — Probe contract tracer: model, sentinels, entry point, ordered registry, ignore gate, never-fail docs (FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -146,7 +146,7 @@ Plans:
 | 7. Batch operations | v1.6 | 4/4 | Complete | 2026-08-08 |
 | 8. Benchmark suite | v1.6 | 3/3 | Complete | 2026-08-08 |
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
-| 10. Package Foundation | v1.7 | 1/3 | In Progress|  |
+| 10. Package Foundation | v1.7 | 2/3 | In Progress|  |
 | 11. Text/JSON Detectors | v1.7 | 0/TBD | Not started | - |
 | 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |

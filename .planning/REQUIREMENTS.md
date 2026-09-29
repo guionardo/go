@@ -10,12 +10,12 @@ Best-effort project detection: read a folder's contents and report language, nam
 ### Foundation
 
 - [x] **FND-01**: Delete deprecated `project_detector/` sample in its own commit — it fails `go build ./...` (missing gs-dev, BurntSushi go.sum)
-- [ ] **FND-02**: `project_probe/` package skeleton with `doc.go` documenting the never-fail contract (error reserved for hard I/O failures; Unknown = nil error)
-- [ ] **FND-03**: `Probe(folder) (ProjectData, error)` entry point backed by private ordered detector registry with `(ProjectData, bool)` contract
+- [x] **FND-02**: `project_probe/` package skeleton with `doc.go` documenting the never-fail contract (error reserved for hard I/O failures; Unknown = nil error)
+- [x] **FND-03**: `Probe(folder) (ProjectData, error)` entry point backed by private ordered detector registry with `(ProjectData, bool)` contract
 
 ### Detection
 
-- [ ] **DETC-01**: Ordered manifest-first cascade, first match wins, root-scoped only (no subdir probing)
+- [x] **DETC-01**: Ordered manifest-first cascade, first match wins, root-scoped only (no subdir probing)
 - [ ] **DETC-02**: Go detector — go.mod module → name, `go` directive → Version (documented as toolchain floor)
 - [ ] **DETC-03**: JS/TS detector — package.json name/version/description
 - [ ] **DETC-04**: PHP detector — composer.json name/version/description
@@ -23,21 +23,21 @@ Best-effort project detection: read a folder's contents and report language, nam
 - [ ] **DETC-06**: Rust detector — Cargo.toml `[package]` fields
 - [ ] **DETC-07**: C#/.NET detector — .csproj XML (namespace-agnostic, XMLName pattern)
 - [ ] **DETC-08**: Java/Kotlin detector — pom.xml (parent version inheritance), settings.gradle `rootProject.name` fallback
-- [ ] **DETC-09**: Unknown folders → `LanguageUnknown` value, nil error
+- [x] **DETC-09**: Unknown folders → `LanguageUnknown` value, nil error
 
 ### Data Model
 
-- [ ] **DATA-01**: `ProjectData{Folder, Language, Name, Version, Description}` with independent per-field fallbacks
+- [x] **DATA-01**: `ProjectData{Folder, Language, Name, Version, Description}` with independent per-field fallbacks
 - [ ] **DATA-02**: Name chain: manifest name → folder base
 - [ ] **DATA-03**: Version: raw manifest string, empty when absent/dynamic, never fabricated
 - [ ] **DATA-04**: Description: manifest → README first-paragraph → empty
 
 ### Robustness
 
-- [ ] **ROBT-01**: Ignore-list hygiene (vendored/build/IDE dirs) so they never masquerade as markers
+- [x] **ROBT-01**: Ignore-list hygiene (vendored/build/IDE dirs) so they never masquerade as markers
 - [ ] **ROBT-02**: Shared `readManifest` helper — size cap + BOM strip
 - [ ] **ROBT-03**: Unexported section-aware TOML-subset reader (~80 lines) for pyproject/Cargo; strict degrade-to-empty
-- [ ] **ROBT-04**: Stdlib-only imports; `path/filepath` not `path`; Windows-safe
+- [x] **ROBT-04**: Stdlib-only imports; `path/filepath` not `path`; Windows-safe
 - [ ] **ROBT-05**: No build-tool execution, no network, no symlink following, no version normalization (anti-features enforced)
 
 ## v2 Requirements
@@ -78,9 +78,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FND-01 | Phase 10 | Complete |
-| FND-02 | Phase 10 | Pending |
-| FND-03 | Phase 10 | Pending |
-| DETC-01 | Phase 10 | Pending |
+| FND-02 | Phase 10 | Complete |
+| FND-03 | Phase 10 | Complete |
+| DETC-01 | Phase 10 | Complete |
 | DETC-02 | Phase 11 | Pending |
 | DETC-03 | Phase 11 | Pending |
 | DETC-04 | Phase 11 | Pending |
@@ -88,15 +88,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DETC-06 | Phase 12 | Pending |
 | DETC-07 | Phase 13 | Pending |
 | DETC-08 | Phase 13 | Pending |
-| DETC-09 | Phase 10 | Pending |
-| DATA-01 | Phase 10 | Pending |
+| DETC-09 | Phase 10 | Complete |
+| DATA-01 | Phase 10 | Complete |
 | DATA-02 | Phase 11 | Pending |
 | DATA-03 | Phase 14 | Pending |
 | DATA-04 | Phase 11 | Pending |
-| ROBT-01 | Phase 10 | Pending |
+| ROBT-01 | Phase 10 | Complete |
 | ROBT-02 | Phase 10 | Pending |
 | ROBT-03 | Phase 12 | Pending |
-| ROBT-04 | Phase 10 | Pending |
+| ROBT-04 | Phase 10 | Complete |
 | ROBT-05 | Phase 14 | Pending |
 
 **Coverage:**
