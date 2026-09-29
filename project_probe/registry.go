@@ -7,18 +7,18 @@ type detectorFunc func(folder string) (ProjectData, bool)
 
 // detectors is the ordered cascade. Order is the contract (DETC-01, D-11):
 // first match wins; the 7 positions are permanent — Go → Python → C#/.NET →
-// JS/TS → Rust → Java/Kotlin → PHP. Live entries sit at their research-locked
-// slots; empty slots stay nil until their phase fills them (Phase 11 fills
-// Go at 0, JS/TS at 3, PHP at 6; Python/Rust in Phase 12, C#/.NET/Java in
-// Phase 13). nil entries are skipped by runDetectors.
+// JS/TS → Rust → Java/Kotlin → PHP — and ALL SEVEN SLOTS ARE LIVE (D-08):
+// Go at 0 (Phase 11), Python at 1 (Phase 12), C#/.NET at 2 (Phase 13),
+// JS/TS at 3 (Phase 11), Rust at 4 (Phase 12), Java/Kotlin at 5 (Phase 13),
+// PHP at 6 (Phase 11). A future phase edits slots in place, never reorders.
 var detectors = []detectorFunc{
-	detectGo,       // index 0 — Go (Phase 11)
-	detectPython,   // index 1 — Python (Phase 12)
-	detectCSharp,   // index 2 — C#/.NET (Phase 13)
-	detectJS,       // index 3 — JavaScript/TypeScript (Phase 11)
-	detectRust,     // index 4 — Rust (Phase 12)
-	nil,            // index 5 — Java/Kotlin (Phase 13)
-	detectPHP,      // index 6 — PHP (Phase 11)
+	detectGo,         // index 0 — Go (Phase 11)
+	detectPython,     // index 1 — Python (Phase 12)
+	detectCSharp,     // index 2 — C#/.NET (Phase 13)
+	detectJS,         // index 3 — JavaScript/TypeScript (Phase 11)
+	detectRust,       // index 4 — Rust (Phase 12)
+	detectJavaKotlin, // index 5 — Java/Kotlin (Phase 13)
+	detectPHP,        // index 6 — PHP (Phase 11)
 }
 
 // runDetectors dispatches folder to the ordered cascade and returns the

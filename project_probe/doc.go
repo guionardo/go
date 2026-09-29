@@ -32,19 +32,23 @@
 //	var ErrNotDirectory     = errors.New("probe: not a directory")
 //	var ErrPermissionDenied = errors.New("probe: permission denied")
 //
-// Detector implementations land across phases 11-13: the ordered registry
-// (Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP) currently holds
-// live detectors at positions 0 (Go), 1 (Python), 3 (JS/TS), 4 (Rust), and 6
-// (PHP); slots 2 (C#/.NET) and 5 (Java/Kotlin) fill in Phase 13. A folder with
-// go.mod reports LanguageGo, with Name from the module line (folder-base
-// fallback), Version from the go directive (toolchain floor, never
-// normalized), and Description from the README first real paragraph via the
-// readmeDescription fallback; a folder with a parseable package.json reports
-// LanguageJavaScript with Name/Version/Description from the manifest
-// (DETC-03); a folder with a parseable composer.json reports LanguagePHP
-// with the full vendor/package name (DETC-04); a folder with a pyproject.toml
-// reports LanguagePython with [project] (or legacy [tool.poetry]) fields; a
-// folder with a Cargo.toml reports LanguageRust with [package] fields,
-// workspace-inherited versions degrading to empty. Content-bearing folders
-// without a matching manifest still yield LanguageUnknown.
+// Detector implementations landed across phases 11-13: the ordered registry
+// (Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP) now holds live
+// detectors at all seven positions. A folder with go.mod reports LanguageGo,
+// with Name from the module line (folder-base fallback), Version from the go
+// directive (toolchain floor, never normalized), and Description from the
+// README first real paragraph via the readmeDescription fallback; a folder
+// with a parseable package.json reports LanguageJavaScript with
+// Name/Version/Description from the manifest (DETC-03); a folder with a
+// parseable composer.json reports LanguagePHP with the full vendor/package
+// name (DETC-04); a folder with a pyproject.toml reports LanguagePython with
+// [project] (or legacy [tool.poetry]) fields; a folder with a Cargo.toml
+// reports LanguageRust with [package] fields, workspace-inherited versions
+// degrading to empty; a folder with a .csproj reports LanguageCSharp with
+// AssemblyName→RootNamespace→folder-base Name and Version→VersionPrefix→
+// empty (DETC-07); a folder with a pom.xml reports LanguageJava with
+// <name>/<artifactId> and single-level <parent><version> inheritance, and a
+// settings.gradle rootProject.name fallback fires only when no pom.xml
+// exists (DETC-08). Content-bearing folders without a matching manifest
+// still yield LanguageUnknown.
 package projectprobe
