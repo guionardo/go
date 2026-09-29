@@ -1,21 +1,21 @@
 ---
-gsd_state_version: "1.0"
+gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Project Probe
 current_phase: 12
 current_phase_name: TOML Subset + Python/Rust Detectors
 status: executing
-stopped_at: Phase 12 context gathered
-last_updated: "2026-09-29T05:32:41.089Z"
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-09-29T05:44:47.200Z"
 last_activity: 2026-09-29
-last_activity_desc: Phase 11 complete, transitioned to Phase 12
-state_head: 5262098c37fa6704d55ed6f0c7f15680e413b346
+last_activity_desc: Phase 12 execution started
 progress:
   total_phases: 5
-  completed_phases: 9
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 6
-  percent: 67
+  completed_plans: 7
+  percent: 40
+state_head: e928a98cce6ea35edc1797358e0d1e8a9568bea3
 ---
 
 # Project State
@@ -29,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 ## Current Position
 
-Phase: 12 (TOML Subset + Python/Rust Detectors) — READY TO EXECUTE
-Plan: Not started
+Phase: 12 (TOML Subset + Python/Rust Detectors) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-09-29 — Phase 11 complete, transitioned to Phase 12
+Last activity: 2026-09-29 — Phase 12 execution started
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [███████░░░] 67%
 | Phase 11 P01 | 19min | 3 tasks | 6 files |
 | Phase 11 P02 | 8min | 2 tasks | 5 files |
 | Phase 11-text-json-detectors-go-js-ts-php-readme-fallback P03 | 15min | 3 tasks | 8 files |
+| Phase 12-toml-subset-python-rust-detectors P01 | 7min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 11]: D-06 executed as zero-value behavior: no Private field in the JS decode struct; private:true without version yields Version "" pinned by TestProbe_JSPrivateNoVersion — D-06 executed as zero-value behavior: no Private field in the JS decode struct; private:true without version yields Version "" pinned by TestProbe_JSPrivateNoVersion
 - [Phase 11]: Parse-success match rule (D-04) proven by integration: broken package.json at position 3 falls through to a valid composer.json at position 6 (TestProbe_CascadePrecedence); Go@0 > JS@3 > PHP@6 first-match pinned — Parse-success match rule (D-04) proven by integration: broken package.json at position 3 falls through to a valid composer.json at position 6 (TestProbe_CascadePrecedence); Go@0 > JS@3 > PHP@6 first-match pinned
 - [Phase 11]: Verified json semantics shipped as test rows (T-11-10 accept): duplicate keys last-wins, unknown fields ignored, type mismatch -> decode error -> false -> cascade; "version": null -> "" — Verified json semantics shipped as test rows (T-11-10 accept): duplicate keys last-wins, unknown fields ignored, type mismatch -> decode error -> false -> cascade; "version": null -> ""
+- [Phase 12-toml-subset-python-rust-detectors]: Global skip states (multi-line string/array/inline table) are entered from keyval lines in ANY section, not just the target section — the RESEARCH skeleton's section-gated parse order applies to storage only, never to skip detection (D-disc-4/A7; pinned by TestReadTOMLSection_CrossSectionSkip)
+- [Phase 12-toml-subset-python-rust-detectors]: Skip-state entry is independent of the key being a target name: authors = [ enters the array skip state even though authors is never stored (P4)
+- [Phase 12-toml-subset-python-rust-detectors]: BOM tolerance in the reader reuses manifest.go's utf8BOM via bytes.TrimPrefix — single source of truth, Phase 10 precedent; reader stays tolerant even though readManifest strips upstream
 
 ### Pending Todos
 
@@ -98,7 +102,7 @@ None yet.
 - [Phase 11]: Code review WR-01 — isBadgeLine misses plain `![alt](url)` badge form (raw badge becomes Description on common READMEs) — open advisory in 11-REVIEW-DISPOSITION.md
 - [Phase 11]: Code review WR-02 — multi-line HTML comment preambles leak into Description — open advisory in 11-REVIEW-DISPOSITION.md
 - [Phase 11]: Verification debt — 11-03-SUMMARY.md references go/build.MatchFile (not a disk file) — tracked warning
-- [Phase 12]: TOML strict-degrade-to-empty on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) — research flag, needs fixture-driven validation during planning
+- [Phase 12]: TOML strict-degrade-to-empty on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) — **DISCHARGED 2026-09-29 by plan 12-01**: fixture-driven validation shipped as the 29-test pure-content matrix in project_probe/toml_test.go (strict-degrade + global skip-state rows, incl. TestReadTOMLSection_CrossSectionSkip)
 - [Phase 13]: .NET marker precedence and root-scoped vs 1-level subdir scan — resolved in favor of root-scoped (2-of-3 consensus); confirm during planning
 
 ## Deferred Items
@@ -111,6 +115,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T05:01:58.015Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-toml-subset-python-rust-detectors/12-CONTEXT.md
+Last session: 2026-09-29T05:44:47.195Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: None
