@@ -22,7 +22,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 - [x] **DETC-05**: Python detector — pyproject.toml `[project]` + legacy `[tool.poetry]`, PEP 621 fields
 - [x] **DETC-06**: Rust detector — Cargo.toml `[package]` fields
 - [x] **DETC-07**: C#/.NET detector — .csproj XML (namespace-agnostic, XMLName pattern)
-- [ ] **DETC-08**: Java/Kotlin detector — pom.xml (parent version inheritance), settings.gradle `rootProject.name` fallback
+- [x] **DETC-08**: Java/Kotlin detector — pom.xml (parent version inheritance), settings.gradle `rootProject.name` fallback
 - [x] **DETC-09**: Unknown folders → `LanguageUnknown` value, nil error
 
 ### Data Model
@@ -87,7 +87,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DETC-05 | Phase 12 | Complete |
 | DETC-06 | Phase 12 | Complete |
 | DETC-07 | Phase 13 | Complete |
-| DETC-08 | Phase 13 | Pending |
+| DETC-08 | Phase 13 | Complete |
 | DETC-09 | Phase 10 | Complete |
 | DATA-01 | Phase 10 | Complete |
 | DATA-02 | Phase 11 | Complete |
