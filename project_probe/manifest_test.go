@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,6 +106,25 @@ func TestReadManifest(t *testing.T) { //nolint:funlen
 			func(t *testing.T) (string, []byte) {
 				folder := t.TempDir()
 				require.NoError(t, os.Mkdir(filepath.Join(folder, manifestName), 0o700))
+
+				return folder, nil
+			},
+			false,
+		},
+		{
+			// WR-01: a FIFO at the manifest path must yield (nil, false)
+			// promptly — pre-gate, os.Open on a named pipe blocks forever
+			// (hang DoS on the never-fail contract). syscall.Mkfifo is
+			// Unix-only; the row is skipped on Windows and the helper lives
+			// behind a build tag so this file compiles there.
+			"fifo_blocks",
+			manifestName,
+			func(t *testing.T) (string, []byte) {
+				folder := t.TempDir()
+				if runtime.GOOS == "windows" {
+					t.Skip("syscall.Mkfifo is Unix-only")
+				}
+				makeFIFO(t, filepath.Join(folder, manifestName))
 
 				return folder, nil
 			},

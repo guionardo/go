@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // maxManifestSize caps manifest reads at 1 MB (ROBT-02). Pathological inputs
@@ -20,11 +21,26 @@ func readManifest(folder, name string) (content []byte, ok bool) {
 	// #nosec G304 -- name is always a compile-time constant at call sites
 	// (phases 11-13: "go.mod", "package.json", ...), never user input;
 	// root-scoped by construction (DETC-01).
-	f, err := os.Open(filepath.Join(folder, name))
+	//
+	// O_NONBLOCK is load-bearing: plain os.Open on a FIFO named
+	// go.mod/README.md blocks at open time until a writer appears — the
+	// WR-01 hang DoS. With O_NONBLOCK the open returns immediately and the
+	// regular-file gate below rejects the FIFO.
+	f, err := os.OpenFile(filepath.Join(folder, name), os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil, false
 	}
 	defer f.Close() //nolint: errcheck
+
+	// WR-01: reject anything that is not a regular file before reading —
+	// a FIFO or device must yield (nil, false) promptly, never a hang.
+	// f.Stat follows symlinks: a symlink to a regular file passes, a
+	// symlink to a FIFO is rejected (ROBT-05 bans symlink *discovery*,
+	// not the read path).
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, false
+	}
 
 	content, err = io.ReadAll(io.LimitReader(f, maxManifestSize+1))
 	if err != nil || len(content) > maxManifestSize {
