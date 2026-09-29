@@ -116,7 +116,20 @@ Plans:
   3. User probes a folder with Cargo.toml `[package]` and gets Language=Rust with name/version/description; `version.workspace = true` yields an empty Version — never fabricated.
   4. Malformed or unsupported TOML (dotted keys, multiline strings, inline tables) degrades strictly to empty fields — Unknown or partial data, nil error, no panic.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 12-01-PLAN.md — TOML-subset reader readTOMLSection + strict-degrade matrix, global skip states (ROBT-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 12-02-PLAN.md — Python detector [project]/[tool.poetry] + registry slot 1, interim position flip (DETC-05)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 12-03-PLAN.md — Rust detector [package] + registry slot 4, final 5-of-7 state, doc.go refresh, cascade rows (DETC-06)
 
 ### Phase 13: XML Detectors — C#/.NET + Java/Kotlin
 
@@ -161,6 +174,6 @@ Plans:
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
 | 10. Package Foundation | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 11. Text/JSON Detectors | v1.7 | 3/3 | Complete    | 2026-09-29 |
-| 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
+| 12. TOML Subset + Python/Rust | v1.7 | 0/3 | Planned | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |
 | 14. Semantics, Hardening, Polish | v1.7 | 0/TBD | Not started | - |
