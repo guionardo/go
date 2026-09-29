@@ -49,6 +49,7 @@
 ## Phase Details
 
 ### Phase 10: Package Foundation — API Contract + Repo Cleanup
+
 **Goal**: The `project_probe` package exists with a documented never-fail contract, deterministic ordered registry, and shared safe-manifest helpers — and the broken `project_detector/` sample is gone.
 **Depends on**: Nothing (v1.7 start; follows Phase 9)
 **Requirements**: FND-01, FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-02, ROBT-04
@@ -58,14 +59,21 @@
   3. Probing the same folder repeatedly returns identical results — the detector cascade is deterministic, ordered, first-match-wins, and root-scoped only (no subdir probing).
   4. A folder containing only vendored/build/IDE directories (node_modules/, vendor/, .git/, dist/, .idea/) is reported Unknown — ignore-list hygiene.
   5. Manifest reads are size-capped (1 MB) and BOM-stripped with no panics on pathological input; all path handling uses filepath — Windows-safe, no `path` imports.
+
 **Plans**: 3 plans
 
 Plans:
+**Wave 1**
 - [ ] 10-01-PLAN.md — Delete deprecated project_detector sample so the module builds (FND-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 10-02-PLAN.md — Probe contract tracer: model, sentinels, entry point, ordered registry, ignore gate, never-fail docs (FND-02, FND-03, DETC-01, DETC-09, DATA-01, ROBT-01, ROBT-04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 10-03-PLAN.md — Shared readManifest helper: 1 MB cap + BOM strip, never-fail (ROBT-02)
 
 ### Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
+
 **Goal**: Go, JavaScript/TypeScript, and PHP projects are detected end-to-end, with name/version/description chains and README first-paragraph fallback.
 **Depends on**: Phase 10
 **Requirements**: DETC-02, DETC-03, DETC-04, DATA-02, DATA-04
@@ -75,9 +83,11 @@ Plans:
   3. User probes a folder with composer.json and gets Language=PHP with Name/Version/Description from the manifest.
   4. Name falls back to the folder base when the manifest has no name; Description falls back to the README's first paragraph when the manifest has none, and is empty when no README exists.
   5. README fallback skips badges, tables of contents, and rst-style underline headings, extracting the first real paragraph.
+
 **Plans**: TBD
 
 ### Phase 12: TOML Subset + Python/Rust Detectors
+
 **Goal**: Python and Rust projects are detected via the unexported section-aware TOML-subset reader.
 **Depends on**: Phase 11
 **Requirements**: DETC-05, DETC-06, ROBT-03
@@ -86,9 +96,11 @@ Plans:
   2. User probes a Poetry-managed folder (`[tool.poetry]`) and gets Language=Python with poetry name/version/description.
   3. User probes a folder with Cargo.toml `[package]` and gets Language=Rust with name/version/description; `version.workspace = true` yields an empty Version — never fabricated.
   4. Malformed or unsupported TOML (dotted keys, multiline strings, inline tables) degrades strictly to empty fields — Unknown or partial data, nil error, no panic.
+
 **Plans**: TBD
 
 ### Phase 13: XML Detectors — C#/.NET + Java/Kotlin
+
 **Goal**: C#/.NET and Java/Kotlin projects are detected through XML manifests — namespace-agnostic and root-scoped.
 **Depends on**: Phase 12
 **Requirements**: DETC-07, DETC-08
@@ -97,9 +109,11 @@ Plans:
   2. User probes a folder with pom.xml and gets Language=Java with name/version; child modules inherit `<parent><version>` from the parent POM.
   3. User probes a folder with settings.gradle (rootProject.name) and no pom.xml and gets Java/Kotlin with name from the gradle file.
   4. A .csproj or pom.xml in a subdirectory never triggers detection for the parent folder — root-scoped markers only.
+
 **Plans**: TBD
 
 ### Phase 14: Semantics, Hardening, and Release Polish
+
 **Goal**: Version semantics are resolved across all 7 detectors; the package is hardened (fuzz, fixtures), documented, and meets coverage thresholds.
 **Depends on**: Phase 13
 **Requirements**: DATA-03, ROBT-05
@@ -108,6 +122,7 @@ Plans:
   2. Package-wide audit confirms anti-features are absent: no build-tool execution, no network calls, no symlink following, no version normalization in any code path.
   3. Fuzz targets seeded with real manifests run under normal `go test` — malformed JSON/XML/TOML inputs never panic and never crash the probe.
   4. The package ships complete: `make coverage-quick` passes, doc.go contract finalized, README package index row added, `go vet` and lint clean.
+
 **Plans**: TBD
 
 ## Progress
