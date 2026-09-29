@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>com.acme</groupId>\n  <artifactId>demo</artifactId>\n  <version>3.2.1</version>\n  <name>Demo</name>\n  <description>Demo project</description>\n</project>\n")

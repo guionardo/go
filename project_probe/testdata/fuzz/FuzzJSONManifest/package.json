@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte(`{"name":"acme","version":"1.2.3","description":"The acme package","license":"MIT"}`)
