@@ -46,9 +46,9 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] Version-semantics decisions, anti-feature audit, fuzz + fixtures, docs, coverage gate (v1.7, Phase 14 — final phase)
+- ✓ **`project_probe` v1.7 SHIPPED** — all 7 detectors live, fuzz-hardened, documented, coverage gate green (80.7% total) — completed 2026-09-29 (Phases 10-14)
 
-## Current Milestone: v1.7 Project Probe
+## Current Milestone: v1.7 Project Probe — **COMPLETE**
 
 **Goal:** A stdlib-only `project_probe` package that reads a folder's contents and reports the project's language, name, version, and description — best-effort, never failing.
 
@@ -102,6 +102,10 @@ Wired the first three detectors into the Phase 10 registry: `detectGo` (go.mod �
 **Phase 13 — XML Detectors — C#/.NET + Java/Kotlin** (completed 2026-09-29)
 
 Completed the 7-detector registry: `detectCSharp` (.csproj via readFirstManifest discovery + inline XMLName namespace-agnostic decode, PropertyGroup collect-first-then-chain) and `detectJavaKotlin` (pom.xml presence gate + `<parent><version>` single-level inheritance, settings.gradle rootProject.name fallback only-when-no-pom with never-panic parse). Registry 7-of-7 live (Go@0, Python@1, C#/.NET@2, JS@3, Rust@4, Java/Kotlin@5, PHP@6). 236 tests, 93.6% package coverage.
+
+**Phase 14 — Semantics, Hardening, and Release Polish** (completed 2026-09-29 — milestone complete)
+
+Version semantics contract documented in doc.go (raw strings, toolchain floor, workspace/dynamic → empty); 3 fuzz targets with 20-file real-manifest corpus (no-panic under plain go test); correctness fold-ins from all review ledgers (README badges/HTML comments, XML trim, exact-name guard, registry test hygiene); anti-feature audit zero-match (14-AUDIT.md, one disclosed badge-stripping exception); coverage gate closed (release/update.go tests → 95.9%, make coverage-quick PASS 80.7%); README package index row. 820 tests across 25 packages. **v1.7 Project Probe complete.**
 
 **Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
@@ -177,4 +181,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-29 after Phase 13 (v1.7 XML Detectors — all 7 detectors live)*
+*Last updated: 2026-09-29 after Phase 14 (v1.7 Project Probe COMPLETE)*

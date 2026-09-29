@@ -132,17 +132,13 @@ None yet.
 ### Blockers/Concerns
 
 - [Planning]: REQUIREMENTS.md claimed 18 v1 requirements; actual count is 21 (3+9+4+5) — traceability updated
-- [Phase 10]: Code review CR-01 — D-04 errno mapping needs Windows verification (syscall.EACCES is an invented value on Windows; ENOTDIR aliases ERROR_PATH_NOT_FOUND; ERROR_DIRECTORY unmatched) — recorded advisory in 10-REVIEW-DISPOSITION.md, no failing test on darwin
-- [Phase 10]: Pre-existing `make coverage-quick` failure — release/update.go 68.9% vs 70% file threshold (unrelated, logged to deferred-items.md)
-- [Phase 11]: Code review WR-01 — isBadgeLine misses plain `![alt](url)` badge form (raw badge becomes Description on common READMEs) — open advisory in 11-REVIEW-DISPOSITION.md
-- [Phase 11]: Code review WR-02 — multi-line HTML comment preambles leak into Description — open advisory in 11-REVIEW-DISPOSITION.md
-- [Phase 11]: Verification debt — 11-03-SUMMARY.md references go/build.MatchFile (not a disk file) — tracked warning
-- [Phase 12]: TOML strict-degrade-to-empty on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) — **DISCHARGED 2026-09-29 by plan 12-01**: fixture-driven validation shipped as the 29-test pure-content matrix in project_probe/toml_test.go (strict-degrade + global skip-state rows, incl. TestReadTOMLSection_CrossSectionSkip)
-- [Phase 13]: .NET marker precedence and root-scoped vs 1-level subdir scan — resolved in favor of root-scoped (2-of-3 consensus); confirm during planning — **CONFIRMED 2026-09-29 (Phase 13 planning)**: root-scoped only, single-level ReadDir
-- [Phase 13]: Code review WR-01 — encoding/xml does not trim element text; padded values block D-03/D-05 fallback chains — open advisory in 13-REVIEW-DISPOSITION.md
-- [Phase 13]: Code review WR-02 — TestRunDetectors_EmptyRegistry runs production 7-detector registry (12-REVIEW WR-01 carry-over) — open advisory
-- [Phase 13]: Verification debt — 13-01-SUMMARY.md references xml.go (dropped in planning); 13-02-SUMMARY.md references a grep command — tracked warnings
-- [Phase 14]: Version semantics across all 7 detectors (DATA-03), anti-feature audit (ROBT-05), fuzz + fixtures, docs, README package index row, coverage gate — the final v1.7 phase; also natural home for the open review dispositions (readme.go badge/HTML-comment fixes, XML trim, registry test hygiene)
+- [Deferred — tracked]: Phase 10 CR-01 — D-04 errno mapping needs Windows verification (syscall.EACCES invented on Windows) — deferred with rationale in 14-AUDIT.md (needs Windows CI evidence)
+- [Deferred — tracked]: Phase 10 WR-02 — panic logging at registry dispatch — deferred with rationale in 14-AUDIT.md (dev-experience nicety, not correctness)
+- [Resolved]: Phase 10/11/13 code review advisories — ALL fold-in fixed in Phase 14 (badge multi-line, HTML comments, XML trim, exact-name guard, registry test hygiene) or disclosed with override (badge-stripping grep exception in 14-AUDIT.md)
+- [Resolved]: `make coverage-quick` pre-existing failure — CLOSED 2026-09-29 by Phase 14 (release/update.go 95.9%, total 80.7% PASS)
+- [Resolved]: Phase 12 TOML strict-degrade — DISCHARGED by plan 12-01 matrix
+- [Resolved]: Phase 13 root-scoped marker decision — CONFIRMED at Phase 13 planning
+- [Non-blocking]: verification-debt SUMMARY metadata warnings (files not on disk) — tracked in /gsd-progress /gsd-audit-uat
 
 ## Deferred Items
 
