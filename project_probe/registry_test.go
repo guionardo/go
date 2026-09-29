@@ -13,8 +13,11 @@ import (
 // package-level detectors slice; parallel tests on global state race
 // (AGENTS.md mid/collectFuncs precedent, RESEARCH Pitfall 4).
 
-// TestRunDetectors_EmptyRegistry pins the Phase-10 default state: the
-// registry is empty, so no folder ever matches.
+// TestRunDetectors_EmptyRegistry pins the empty-cascade behavior: with no
+// detector matching (the injected slice below never matches the "" folder),
+// runDetectors yields no match. The production registry now holds real
+// detectors, but this test replaces the slice wholesale, so it still passes
+// (Pitfall 4 — the comment, not the test, was stale).
 func TestRunDetectors_EmptyRegistry(t *testing.T) { //nolint:paralleltest // global-state mutation: detectors slice
 	original := detectors
 	defer func() { detectors = original }()
@@ -57,6 +60,22 @@ func TestRunDetectors_PanicRecovery(t *testing.T) { //nolint:paralleltest // glo
 	pd, ok := runDetectors("x")
 	assert.True(t, ok)
 	assert.Equal(t, LanguageGo, pd.Language)
+}
+
+// TestDetectorPositions pins the D-11 order contract: the registry literal
+// has exactly 7 positions, Go is live at index 0, and the future-phase slots
+// (Python, C#/.NET, Rust, Java) plus the in-phase JS/TS and PHP slots are nil
+// until their plans land. A future phase edits slots in place, never
+// reorders — this test guards the cascade precedence (T-11-07).
+func TestDetectorPositions(t *testing.T) { //nolint:paralleltest // reads global detectors
+	assert.Len(t, detectors, 7)
+	assert.NotNil(t, detectors[0]) // Go
+	assert.Nil(t, detectors[1])    // Python — Phase 12
+	assert.Nil(t, detectors[2])    // C#/.NET — Phase 13
+	assert.Nil(t, detectors[3])    // JS/TS — plan 11-03
+	assert.Nil(t, detectors[4])    // Rust — Phase 12
+	assert.Nil(t, detectors[5])    // Java/Kotlin — Phase 13
+	assert.Nil(t, detectors[6])    // PHP — plan 11-03
 }
 
 // TestProbe_MergeRule verifies the A7 merge rule: when a detector matches,

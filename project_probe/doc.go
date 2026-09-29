@@ -32,7 +32,13 @@
 //	var ErrNotDirectory     = errors.New("probe: not a directory")
 //	var ErrPermissionDenied = errors.New("probe: permission denied")
 //
-// Detector implementations land in phases 11-13: the ordered registry
-// (Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP) is empty in this
-// phase, so every content-bearing folder currently yields LanguageUnknown.
+// Detector implementations land across phases 11-13: the ordered registry
+// (Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP) currently holds
+// the live Go detector at position 0 — a folder with go.mod reports
+// LanguageGo, with Name from the module line (folder-base fallback), Version
+// from the go directive (toolchain floor, never normalized), and Description
+// from the README first real paragraph via the readmeDescription fallback.
+// JS/TS and PHP join later in this phase; the remaining slots fill in phases
+// 12-13. Content-bearing folders without a matching manifest still yield
+// LanguageUnknown.
 package projectprobe
