@@ -5,15 +5,15 @@ milestone_name: Project Probe
 current_phase: 12
 current_phase_name: TOML Subset + Python/Rust Detectors
 status: executing
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-09-29T05:44:47.200Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-09-29T05:55:54.168Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 12 execution started
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 40
 state_head: e928a98cce6ea35edc1797358e0d1e8a9568bea3
 ---
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 ## Current Position
 
 Phase: 12 (TOML Subset + Python/Rust Detectors) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-29 — Phase 12 execution started
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [████████░░] 78%
 | Phase 11 P02 | 8min | 2 tasks | 5 files |
 | Phase 11-text-json-detectors-go-js-ts-php-readme-fallback P03 | 15min | 3 tasks | 8 files |
 | Phase 12-toml-subset-python-rust-detectors P01 | 7min | 2 tasks | 2 files |
+| Phase 12-toml-subset-python-rust-detectors P02 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,10 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 12-toml-subset-python-rust-detectors]: Global skip states (multi-line string/array/inline table) are entered from keyval lines in ANY section, not just the target section — the RESEARCH skeleton's section-gated parse order applies to storage only, never to skip detection (D-disc-4/A7; pinned by TestReadTOMLSection_CrossSectionSkip)
 - [Phase 12-toml-subset-python-rust-detectors]: Skip-state entry is independent of the key being a target name: authors = [ enters the array skip state even though authors is never stored (P4)
 - [Phase 12-toml-subset-python-rust-detectors]: BOM tolerance in the reader reuses manifest.go's utf8BOM via bytes.TrimPrefix — single source of truth, Phase 10 precedent; reader stays tolerant even though readManifest strips upstream
+- [Phase 12-toml-subset-python-rust-detectors]: Whole-section precedence executed per D-disc-3 (flagged): [project] non-empty map wins; [tool.poetry] read ONLY when len(fields)==0 — no per-field mixing across sections; pinned by TestProbe_PythonProjectWins + TestProbe_PythonEmptyProjectFallsToPoetry — D-04's 'when [project] absent' is the contract; per-field mixing would fabricate hybrid metadata in migrated Poetry 2.x files
+- [Phase 12-toml-subset-python-rust-detectors]: Presence-match asymmetry (D-09) shipped: garbage pyproject.toml claims Python at index 1 while JS needs parse success at index 3; cascade consequence pinned in plan 12-03's TestProbe_CascadePrecedence — The manifest file IS the ecosystem marker; fields degrade to empty with fallbacks, never fabricated (T-12-04 accept)
+- [Phase 12-toml-subset-python-rust-detectors]: dynamic = ["version"] has NO code branch in the detector — the reader degrades the array to an absent key, Version reads "" (DATA-03 never-fabricated); pinned by TestProbe_PythonDynamicVersion — A dynamic-field special case is the anti-pattern RESEARCH calls out; strict degrade is structural
+- [Phase 12-toml-subset-python-rust-detectors]: Interim registry flip only (Pitfall 9): TestDetectorPositions changes exactly one assertion (detectors[1] NotNil); detectors[4] stays Nil for plan 12-03's RED step; the flip is the ONLY registry_test.go change per the plan prohibition — Flipping both in 12-02 breaks plan 12-03's RED step; the 7-position order contract is guarded at every commit
 
 ### Pending Todos
 
@@ -115,6 +120,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T05:44:47.195Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-09-29T05:55:40.729Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None

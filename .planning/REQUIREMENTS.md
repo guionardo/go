@@ -19,7 +19,7 @@ Best-effort project detection: read a folder's contents and report language, nam
 - [x] **DETC-02**: Go detector — go.mod module → name, `go` directive → Version (documented as toolchain floor)
 - [x] **DETC-03**: JS/TS detector — package.json name/version/description
 - [x] **DETC-04**: PHP detector — composer.json name/version/description
-- [ ] **DETC-05**: Python detector — pyproject.toml `[project]` + legacy `[tool.poetry]`, PEP 621 fields
+- [x] **DETC-05**: Python detector — pyproject.toml `[project]` + legacy `[tool.poetry]`, PEP 621 fields
 - [ ] **DETC-06**: Rust detector — Cargo.toml `[package]` fields
 - [ ] **DETC-07**: C#/.NET detector — .csproj XML (namespace-agnostic, XMLName pattern)
 - [ ] **DETC-08**: Java/Kotlin detector — pom.xml (parent version inheritance), settings.gradle `rootProject.name` fallback
@@ -84,7 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DETC-02 | Phase 11 | Complete |
 | DETC-03 | Phase 11 | Complete |
 | DETC-04 | Phase 11 | Complete |
-| DETC-05 | Phase 12 | Pending |
+| DETC-05 | Phase 12 | Complete |
 | DETC-06 | Phase 12 | Pending |
 | DETC-07 | Phase 13 | Pending |
 | DETC-08 | Phase 13 | Pending |
