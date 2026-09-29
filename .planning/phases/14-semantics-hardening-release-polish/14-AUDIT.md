@@ -16,11 +16,11 @@ Grep-verified audit across `project_probe/` — all families return **zero match
 | 2 | Network (no HTTP client/server) | `grep -rnE 'net/http\|http\.' project_probe/` | **zero matches** |
 | 3 | Symlink following (no resolution/lstat/symlink calls) | `grep -rnE 'EvalSymlinks\|os\.Readlink\|os\.Lstat\|os\.Symlink' project_probe/` | **zero matches** |
 | 4 | Recursive discovery (no directory walking) | `grep -rnE 'WalkDir\|filepath\.Walk' project_probe/` | **zero matches** |
-| 5a | Version normalization (no parsing/comparison/stripping) | `grep -rnE 'ParseVersion\|semver\|version\.Compare\|strings\.(Replace\|TrimPrefix\|TrimSuffix)' project_probe/` | **zero matches** |
+| 5a | Version normalization (no parsing/comparison/stripping) | `grep -rnE 'ParseVersion\|semver\|version\.Compare\|strings\.(Replace\|TrimPrefix\|TrimSuffix)' project_probe/` | **zero matches — except `strings.ReplaceAll` badge stripping in `isBadgeLine` (readme.go:157, the 11-WR-01 fix, land ed after this audit was first written)** |
 | 5b | Pattern-regex machinery (version-normalization adjacen t) | `grep -rn 'regexp' project_probe/` | **zero matches** |
 | 6 | XML-entity family (no custom entity wiring / charset readers) | `grep -rnE 'Entity\|CharsetReader' project_probe/'` | **zero matches** |
 
-All seven commands recorded above printed **zero matches** (empty output) against the final audited tree — the same tree the verifier consumes.
+All seven commands recorded above printed **zero matches** (empty output) against the final audited tree — the same tree the verifier consumes — with ONE exception, disclosed here: family 5a matches `strings.ReplaceAll(line, "!", "")` at `readme.go:157`, the badge-line stripping introduced by the 11-WR-01 fix (commit 7f16193). This is NOT version normalization — it operates on README content lines in `isBadgeLine` (badge detection), never on Version values, which never flow through that function. The 14-REVIEW-DISPOSITION.md ledger and the verifier's gap record document this as an accepted, evidence-refreshed override (2026-09-29).
 
 ### Nuances (stated explicitly — the audit is proof, not noise)
 
