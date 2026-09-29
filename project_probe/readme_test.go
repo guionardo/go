@@ -145,6 +145,8 @@ func TestFirstRealParagraph(t *testing.T) { //nolint:funlen
 		{"multi_line_join", "line1\nline2\n", "line1 line2"},
 		{"html_comment", "<!-- TOC -->\npara\n", "para"},
 		{"plain_image_badge", "![logo](x)\npara\n", "para"},
+		{"two_plain_badges", "![ci](a) ![cov](b)\npara\n", "para"},
+		{"plain_plus_wrapped", "![a](b) [![c](d)](e)\npara\n", "para"},
 		{"multi_line_html_comment", "<!--\nBanner\n-->\npara\n", "para"},
 		{"shields_image_badge", "[![Go Version](https://img.shields.io/badge/Go-1.26-blue)](https://go.dev/)\npara\n", "para"},
 		{"empty", "", ""},

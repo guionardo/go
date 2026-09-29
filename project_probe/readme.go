@@ -144,9 +144,10 @@ func isBadgeLine(line string) bool {
 	}
 
 	// The `![`-presence guard above keeps prose like "!!!" or "!important"
-	// out (they lack "!["); a stripped plain badge leaves exactly "!" —
-	// so a remainder of only "!" characters is still a badge line (11 WR-01).
-	return strings.TrimSpace(line) == "" || strings.Trim(line, "!") == ""
+	// out (they lack "!["); each stripped plain badge leaves one "!" — so a
+	// remainder of only "!" characters and whitespace is still a badge line,
+	// including multiple plain badges on one line (11 WR-01, 14 WR-01).
+	return strings.TrimSpace(line) == "" || strings.TrimSpace(strings.ReplaceAll(line, "!", "")) == ""
 }
 
 // isTOCLine reports whether line is a markdown TOC link: a bullet link
