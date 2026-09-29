@@ -122,7 +122,7 @@ Plans:
 **Wave 1**
 
 - [x] 12-01-PLAN.md — TOML-subset reader readTOMLSection + strict-degrade matrix, global skip states (ROBT-03)
-- [ ] 12-04-PLAN.md — gap closure: quote-aware skip-state scanning (CR-01), restores SC4 / 12-01 truth 4 / 12-02 truth 5
+- [x] 12-04-PLAN.md — gap closure: quote-aware skip-state scanning (CR-01), restores SC4 / 12-01 truth 4 / 12-02 truth 5
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

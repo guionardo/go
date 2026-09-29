@@ -5,15 +5,15 @@ milestone_name: Project Probe
 current_phase: 12
 current_phase_name: TOML Subset + Python/Rust Detectors
 status: verifying
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-09-29T06:08:33.462Z"
+stopped_at: "Completed 12-04-PLAN.md (gap closure: quote-aware skip-state scanning)"
+last_updated: "2026-09-29T06:58:57.627Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 12 execution started
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 10
+  completed_plans: 10
   percent: 60
 state_head: e928a98cce6ea35edc1797358e0d1e8a9568bea3
 ---
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 ## Current Position
 
 Phase: 12 (TOML Subset + Python/Rust Detectors) — EXECUTING
-Plan: 3 of 3
+Plan: 4 of 4 (12-01..12-03 + 12-04 gap closure)
 Status: Phase complete — ready for verification
-Last activity: 2026-09-29 — Phase 12 execution started
+Last activity: 2026-09-29 — Phase 12 execution started (gap closure landed)
 
 Progress: [██████████] 100%
 
@@ -57,6 +57,7 @@ Progress: [██████████] 100%
 | Phase 12-toml-subset-python-rust-detectors P01 | 7min | 2 tasks | 2 files |
 | Phase 12-toml-subset-python-rust-detectors P02 | 6min | 2 tasks | 4 files |
 | Phase 12-toml-subset-python-rust-detectors P03 | 8min | 2 tasks | 6 files |
+| Phase 12-toml-subset-python-rust-detectors P04 | 37min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log -
 - [Phase 12-toml-subset-python-rust-detectors]: Virtual manifest (OQ-2 flagged): [workspace]-only Cargo.toml matches on presence (D-09) with folder-base Name and "" Version — natural consequence of the locked decisions; pinned by TestProbe_RustVirtualManifest
 - [Phase 12-toml-subset-python-rust-detectors]: Presence-match asymmetry shipped at cascade level: a garbage pyproject.toml claims Python at index 1 over a valid Cargo.toml at index 4 (T-12-08 accept — the manifest file IS the ecosystem marker); pinned by the pyproject_toml_and_cargo_toml cascade row
 - [Phase 12-toml-subset-python-rust-detectors]: registry_test.go final flip ONLY (plan prohibition): exactly one assertion changed (detectors[4] Nil→NotNil) plus gofmt alignment of the 7-slot literal in registry.go (the literal was already non-gofmt at HEAD from prior edits; formatting the file I modified is the clean end state); no parallel marker added
+- [Phase 12-toml-subset-python-rust-detectors]: Skip-state clearing is quote-aware (CR-01 fix): closesMultiLine (run of 3 closes, run > 3 closes+reopens → state persists), clearsBracket (]/} inside quoted strings honoring escapes never clear; [/{ depth tracking), opensMultiLine + cross-line pendingMLS for multi-line strings opened inside bracket bodies
+- [Phase 12-toml-subset-python-rust-detectors]: enterSkip uses the same quote-aware scans: 4-quote opening lines ("""a"""") and bracket-in-string opening lines (["A ] B",) now ENTER the skip state — closing both CR-01 missed-entry fabrication paths
 
 ### Pending Todos
 
@@ -125,6 +128,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T06:08:25.437Z
-Stopped at: Completed 12-03-PLAN.md
+Last session: 2026-09-29T06:58:57.622Z
+Stopped at: Completed 12-04-PLAN.md (gap closure: quote-aware skip-state scanning)
 Resume file: None
