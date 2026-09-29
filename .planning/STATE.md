@@ -1,21 +1,21 @@
 ---
-gsd_state_version: "1.0"
+gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Project Probe
 current_phase: 11
 current_phase_name: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
 status: executing
-stopped_at: Phase 11 context gathered
-last_updated: "2026-09-29T03:46:52.482Z"
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-09-29T04:10:55.946Z"
 last_activity: 2026-09-29
-last_activity_desc: Phase 10 complete, transitioned to Phase 11
-state_head: 279b8c2d8e7e0165859ae26e096c402cd9e03835
+last_activity_desc: Phase 11 execution started
 progress:
   total_phases: 5
-  completed_phases: 8
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 3
-  percent: 50
+  completed_plans: 4
+  percent: 20
+state_head: e9a3369736e1ecffc42a289f64abc275d3649de3
 ---
 
 # Project State
@@ -29,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 ## Current Position
 
-Phase: 11 (Text/JSON Detectors — Go, JS/TS, PHP + README Fallback) — READY TO EXECUTE
-Plan: Not started
+Phase: 11 (Text/JSON Detectors — Go, JS/TS, PHP + README Fallback) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-09-29 — Phase 10 complete, transitioned to Phase 11
+Last activity: 2026-09-29 — Phase 11 execution started
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [█████░░░░░] 50%
 | Phase 10 P01 | 1 min | 1 tasks | 12 files |
 | Phase 10 P02 | 15 min | 3 tasks | 10 files |
 | Phase 10-package-foundation-api-contract-repo-cleanup P03 | 5min | 2 tasks | 2 files |
+| Phase 11 P01 | 19min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,11 @@ Recent decisions affecting current work:
 - [Phase 10]: readManifest boundary tests pin the cap via maxManifestSize (single source of truth) and use literal EF BB BF bytes for BOM rows — tests stay independent of the implementation var while pinning the ROBT-02 contract
 - [Phase 10]: Probe("") returns ErrFolderNotFound (OQ-1 resolution) — never silently probes cwd
 - [Phase 10]: syscall errno mapping with EACCES **or EPERM** → ErrPermissionDenied (D-04 amended 2026-09-28 after code review) — Unix permission failures report either errno
+- [Phase 11]: WR-01 fix shape amended: plain os.Open + f.Stat is insufficient — open() itself blocks on a FIFO; O_NONBLOCK open required before the regular-file gate can run
+
+D-08 exact-case enforced against real directory entries (os.ReadDir): os.Open alone resolves case-insensitively on macOS/Windows volumes
+isBadgeLine strips innermost [..](..) segments via the first '](' + nearest prior '[' so wrapped [![..](..)](..) badges strip to empty
+Commit scope (11) per Phase 10 precedent and plan acceptance criteria (git log --oneline -1 checks)
 
 ### Pending Todos
 
@@ -93,6 +99,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T03:23:30.887Z
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-text-json-detectors-go-js-ts-php-readme-fallback/11-CONTEXT.md
+Last session: 2026-09-29T04:10:40.608Z
+Stopped at: Completed 11-01-PLAN.md
+Resume file: None
