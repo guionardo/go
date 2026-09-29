@@ -40,12 +40,13 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ `project_probe` package foundation — never-fail `Probe` contract, `ProjectData` model, `Language` type, error sentinels, ordered detector registry, ignore list, `readManifest` — `project_probe/` — v1.7 (Phase 10)
 - ✓ Go, JavaScript/TypeScript, and PHP detectors — go.mod/package.json/composer.json parsing, README first-paragraph fallback, name/description chains — `project_probe/` — v1.7 (Phase 11)
 - ✓ TOML-subset reader + Python/Rust detectors — `readTOMLSection` with quote-aware skip states (strict degrade, never fabricates), pyproject.toml [project]/[tool.poetry], Cargo.toml [package] — `project_probe/` — v1.7 (Phase 12)
+- ✓ All 7 detectors live — Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP; C#/.NET via .csproj (XMLName namespace-agnostic), Java/Kotlin via pom.xml (parent version inheritance) + settings.gradle fallback — `project_probe/` — v1.7 (Phase 13)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] `project_probe` remaining detectors — C#/.NET, Java/Kotlin (v1.7, Phase 13)
+- [ ] Version-semantics decisions, anti-feature audit, fuzz + fixtures, docs, coverage gate (v1.7, Phase 14 — final phase)
 
 ## Current Milestone: v1.7 Project Probe
 
@@ -53,7 +54,7 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 **Target features:**
 - `ProjectData{Folder, Language, Name, Version, Description}` — description from manifest, fallback README first paragraph
-- 7 language detectors: Go, Python, JavaScript/TypeScript, C#/.NET, Rust, Java/Kotlin, PHP
+- 7 language detectors: Go, Python, JavaScript/TypeScript, C#/.NET, Rust, Java/Kotlin, PHP — **ALL SHIPPED (Phase 13)**
 - Name from manifest (go.mod module, package.json name...), fallback folder name
 - Version = manifest version (go.mod go directive, package.json version, Cargo.toml version...)
 - Unknown folders → `Unknown` type, no error
@@ -97,6 +98,10 @@ Wired the first three detectors into the Phase 10 registry: `detectGo` (go.mod �
 **Phase 12 — TOML Subset + Python/Rust Detectors** (completed 2026-09-29)
 
 `readTOMLSection` (section-aware, stdlib-only, three global skip states, strict degrade-to-empty) plus `detectPython` (pyproject `[project]` PEP 621 primary, `[tool.poetry]` whole-section fallback) and `detectRust` (Cargo `[package]`, `version.workspace` → empty). Registry 5-of-7 live (Go@0, Python@1, JS@3, Rust@4, PHP@6). Code review found a fabrication gap (whole-line skip-state clearing) — closed via gap plan 12-04 with quote-aware scanning (closesMultiLine/clearsBracket/opensMultiLine + pendingMLS); verifier's 9-row adversarial probe confirms no fabrication. 185 tests, 93.1% package coverage.
+
+**Phase 13 — XML Detectors — C#/.NET + Java/Kotlin** (completed 2026-09-29)
+
+Completed the 7-detector registry: `detectCSharp` (.csproj via readFirstManifest discovery + inline XMLName namespace-agnostic decode, PropertyGroup collect-first-then-chain) and `detectJavaKotlin` (pom.xml presence gate + `<parent><version>` single-level inheritance, settings.gradle rootProject.name fallback only-when-no-pom with never-panic parse). Registry 7-of-7 live (Go@0, Python@1, C#/.NET@2, JS@3, Rust@4, Java/Kotlin@5, PHP@6). 236 tests, 93.6% package coverage.
 
 **Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
@@ -172,4 +177,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-29 after Phase 12 (v1.7 TOML Subset + Python/Rust Detectors)*
+*Last updated: 2026-09-29 after Phase 13 (v1.7 XML Detectors — all 7 detectors live)*
