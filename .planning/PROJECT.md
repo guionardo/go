@@ -38,12 +38,13 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ Benchmark suite quantifying dedup and batching wins — `cache/` — v1.6
 - ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
 - ✓ `project_probe` package foundation — never-fail `Probe` contract, `ProjectData` model, `Language` type, error sentinels, ordered detector registry, ignore list, `readManifest` — `project_probe/` — v1.7 (Phase 10)
+- ✓ Go, JavaScript/TypeScript, and PHP detectors — go.mod/package.json/composer.json parsing, README first-paragraph fallback, name/description chains — `project_probe/` — v1.7 (Phase 11)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] `project_probe` language detectors — Go, JS/TS, PHP, Python, Rust, C#/.NET, Java/Kotlin (v1.7, phases 11-13)
+- [ ] `project_probe` remaining detectors — Python, Rust, C#/.NET, Java/Kotlin (v1.7, phases 12-13)
 
 ## Current Milestone: v1.7 Project Probe
 
@@ -87,6 +88,10 @@ New `project_probe` package replacing the `project_detector/` sample: reads fold
 **Phase 10 — Package Foundation** (completed 2026-09-28)
 
 Deleted the broken `project_detector/` sample and shipped the `projectprobe` package foundation: never-fail `Probe(folder) (ProjectData, error)` contract with 3 error sentinels (ErrFolderNotFound, ErrNotDirectory, ErrPermissionDenied) mapped from syscall errnos, `ProjectData{Folder, Language, Name, Version, Description}` model with typed `Language` constants, ordered detector registry with panic-recovery dispatch (empty — detectors land in phases 11-13), 13-entry exact-case ignore list, and `readManifest` (1 MB cap, BOM strip). 30 tests, 100% package coverage.
+
+**Phase 11 — Text/JSON Detectors** (completed 2026-09-29)
+
+Wired the first three detectors into the Phase 10 registry: `detectGo` (go.mod — module path verbatim, `go` directive as toolchain-floor Version), `detectJS` (package.json — always LanguageJavaScript), `detectPHP` (composer.json — full vendor/package name, absent version → empty). Shared `readJSONManifest` never-fail helper, `readmeDescription` first-real-paragraph fallback (README.md → README.rst → README, skipping badges/TOC/headings/comments), WR-01 FIFO regular-file gate on readManifest. Registry at 7-slot literal with 3 live entries (Go@0, JS@3, PHP@6). 96 tests, 96.4% package coverage.
 
 **Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
@@ -136,6 +141,11 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | `Folder` = filepath.Clean(as-given), never absolutized | Deterministic tests, Windows-safe, caller gets what they asked for | ✓ Good (v1.7, Phase 10) |
 | Panic-recovery at registry dispatch | A panicking detector is a non-match, never an error (cache callSetter precedent) | ✓ Good (v1.7, Phase 10) |
 | readManifest 1 MB cap + BOM strip, `([]byte, bool)` | Never-fail contract; no panic on pathological input | ✓ Good (v1.7, Phase 10) |
+| go.mod `go` directive as Version (toolchain floor, raw) | Never fabricated or normalized; documented semantics | ✓ Good (v1.7, Phase 11) |
+| Always-JavaScript for package.json | Distinct `typescript` value deferred to v2 (REFN-01) | ✓ Good (v1.7, Phase 11) |
+| README first-real-paragraph fallback (README.md → README.rst → README) | Description chain when manifest lacks one; skips badges/TOC/headings | ✓ Good (v1.7, Phase 11) |
+| README extraction skip predicates | Badges, TOC lists, rst/setext underline headings, ATX, HTML comments | ✓ Good (v1.7, Phase 11) |
+| `_javascript` filename over `_js` | `_js` suffix is a legacy GOARCH build constraint (silently excludes from non-js builds) | ✓ Good (v1.7, Phase 11) |
 
 ## Evolution
 
@@ -155,4 +165,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-29 after Phase 10 (v1.7 Package Foundation)*
+*Last updated: 2026-09-29 after Phase 11 (v1.7 Text/JSON Detectors)*

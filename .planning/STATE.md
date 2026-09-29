@@ -6,10 +6,10 @@ current_phase: 12
 current_phase_name: TOML Subset + Python/Rust Detectors
 status: planning
 stopped_at: Phase 11 complete, ready to plan Phase 12
-last_updated: "2026-09-29T04:55:31.597Z"
+last_updated: "2026-09-29T04:55:47.735Z"
 last_activity: 2026-09-29
 last_activity_desc: Phase 11 complete, transitioned to Phase 12
-state_head: fe875ce2bd5848d75983c9c406aaebb55b7aabaf
+state_head: 3cacf1e819674bbb9e3b759b8b176dcfe0efe7a3
 progress:
   total_phases: 5
   completed_phases: 9
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-29)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 11 — Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
+**Current focus:** Phase 12 — TOML Subset + Python/Rust Detectors
 
 ## Current Position
 
@@ -94,8 +94,10 @@ None yet.
 
 - [Planning]: REQUIREMENTS.md claimed 18 v1 requirements; actual count is 21 (3+9+4+5) — traceability updated
 - [Phase 10]: Code review CR-01 — D-04 errno mapping needs Windows verification (syscall.EACCES is an invented value on Windows; ENOTDIR aliases ERROR_PATH_NOT_FOUND; ERROR_DIRECTORY unmatched) — recorded advisory in 10-REVIEW-DISPOSITION.md, no failing test on darwin
-- [Phase 10]: Code review WR-01 — readManifest can block on a FIFO/special file; needs regular-file gate (phases 11-13 consume it)
-- [Phase 10]: Pre-existing `make coverage-quick` failure — release/update.go 68.9% vs 70% file threshold (unrelated to this phase, logged to deferred-items.md)
+- [Phase 10]: Pre-existing `make coverage-quick` failure — release/update.go 68.9% vs 70% file threshold (unrelated, logged to deferred-items.md)
+- [Phase 11]: Code review WR-01 — isBadgeLine misses plain `![alt](url)` badge form (raw badge becomes Description on common READMEs) — open advisory in 11-REVIEW-DISPOSITION.md
+- [Phase 11]: Code review WR-02 — multi-line HTML comment preambles leak into Description — open advisory in 11-REVIEW-DISPOSITION.md
+- [Phase 11]: Verification debt — 11-03-SUMMARY.md references go/build.MatchFile (not a disk file) — tracked warning
 - [Phase 12]: TOML strict-degrade-to-empty on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) — research flag, needs fixture-driven validation during planning
 - [Phase 13]: .NET marker precedence and root-scoped vs 1-level subdir scan — resolved in favor of root-scoped (2-of-3 consensus); confirm during planning
 
@@ -109,6 +111,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-29T04:42:55.346Z
+Last session: 2026-09-29
 Stopped at: Phase 11 complete, ready to plan Phase 12
 Resume file: None
