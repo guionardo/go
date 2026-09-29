@@ -41,7 +41,7 @@
 **Milestone Goal:** A stdlib-only `project_probe` package that reads a folder's contents and reports the project's language, name, version, and description — best-effort, never failing.
 
 - [x] **Phase 10: Package Foundation — API Contract + Repo Cleanup** - Never-fail Probe contract, ProjectData model, ordered detector registry, ignore list, shared readManifest; delete project_detector/ (completed 2026-09-29)
-- [ ] **Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback** - Go, JS/TS, PHP detectors with name/version/description chains and README first-paragraph fallback
+- [x] **Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback** - Go, JS/TS, PHP detectors with name/version/description chains and README first-paragraph fallback (completed 2026-09-29)
 - [ ] **Phase 12: TOML Subset + Python/Rust Detectors** - Section-aware TOML-subset reader + Python (pyproject/poetry) and Rust (Cargo) detectors
 - [ ] **Phase 13: XML Detectors — C#/.NET + Java/Kotlin** - .csproj and pom.xml/settings.gradle XML detectors, namespace-agnostic and root-scoped
 - [ ] **Phase 14: Semantics, Hardening, and Release Polish** - Version-semantics decisions, anti-feature audit, fuzz + fixtures, docs, coverage gate
@@ -89,7 +89,7 @@ Plans:
   4. Name falls back to the folder base when the manifest has no name; Description falls back to the README's first paragraph when the manifest has none, and is empty when no README exists.
   5. README fallback skips badges, tables of contents, and rst-style underline headings, extracting the first real paragraph.
 
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 plans complete
 
 Plans:
 **Wave 1**
@@ -160,7 +160,7 @@ Plans:
 | 8. Benchmark suite | v1.6 | 3/3 | Complete | 2026-08-08 |
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
 | 10. Package Foundation | v1.7 | 3/3 | Complete    | 2026-09-29 |
-| 11. Text/JSON Detectors | v1.7 | 3/3 | In Progress|  |
+| 11. Text/JSON Detectors | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 12. TOML Subset + Python/Rust | v1.7 | 0/TBD | Not started | - |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |
 | 14. Semantics, Hardening, Polish | v1.7 | 0/TBD | Not started | - |
