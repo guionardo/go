@@ -42,7 +42,7 @@
 
 - [x] **Phase 10: Package Foundation — API Contract + Repo Cleanup** - Never-fail Probe contract, ProjectData model, ordered detector registry, ignore list, shared readManifest; delete project_detector/ (completed 2026-09-29)
 - [x] **Phase 11: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback** - Go, JS/TS, PHP detectors with name/version/description chains and README first-paragraph fallback (completed 2026-09-29)
-- [ ] **Phase 12: TOML Subset + Python/Rust Detectors** - Section-aware TOML-subset reader + Python (pyproject/poetry) and Rust (Cargo) detectors
+- [x] **Phase 12: TOML Subset + Python/Rust Detectors** - Section-aware TOML-subset reader + Python (pyproject/poetry) and Rust (Cargo) detectors (completed 2026-09-29)
 - [ ] **Phase 13: XML Detectors — C#/.NET + Java/Kotlin** - .csproj and pom.xml/settings.gradle XML detectors, namespace-agnostic and root-scoped
 - [ ] **Phase 14: Semantics, Hardening, and Release Polish** - Version-semantics decisions, anti-feature audit, fuzz + fixtures, docs, coverage gate
 
@@ -116,7 +116,7 @@ Plans:
   3. User probes a folder with Cargo.toml `[package]` and gets Language=Rust with name/version/description; `version.workspace = true` yields an empty Version — never fabricated.
   4. Malformed or unsupported TOML (dotted keys, multiline strings, inline tables) degrades strictly to empty fields — Unknown or partial data, nil error, no panic.
 
-**Plans**: 3/3 plans executed + 1 gap-closure plan
+**Plans**: 4/4 plans complete + 1 gap-closure plan
 
 Plans:
 **Wave 1**
@@ -175,6 +175,6 @@ Plans:
 | 9. Post-v1.6 cleanup | v1.6 | 1/1 | Complete | 2026-08-08 |
 | 10. Package Foundation | v1.7 | 3/3 | Complete    | 2026-09-29 |
 | 11. Text/JSON Detectors | v1.7 | 3/3 | Complete    | 2026-09-29 |
-| 12. TOML Subset + Python/Rust | v1.7 | 3/3 | In Progress|  |
+| 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete    | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 0/TBD | Not started | - |
 | 14. Semantics, Hardening, Polish | v1.7 | 0/TBD | Not started | - |
