@@ -395,6 +395,36 @@ func TestDetectCSharp(t *testing.T) { //nolint:funlen
 			"2.0.0",
 			"",
 		},
+		{
+			// 13 WR-01: padded XML element text is decode-hygiene-trimmed —
+			// values report trimmed, never verbatim with surrounding spaces.
+			"padded_values",
+			`<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>  MyApp  </AssemblyName><Version> 1.2.3 </Version></PropertyGroup></Project>`,
+			nil,
+			"MyApp",
+			"1.2.3",
+			"",
+		},
+		{
+			// 13 WR-01: a whitespace-only <Version> no longer counts as
+			// present — the Version→VersionPrefix chain fires (DATA-03).
+			"whitespace_only_version_falls_to_prefix",
+			`<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><Version> </Version><VersionPrefix>2.0.0</VersionPrefix></PropertyGroup></Project>`,
+			nil,
+			"",
+			"2.0.0",
+			"",
+		},
+		{
+			// 13 WR-01: a whitespace-only <AssemblyName> no longer counts as
+			// present — the folder-base Name fallback fires (DATA-02).
+			"whitespace_only_assembly_name",
+			`<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName> </AssemblyName></PropertyGroup></Project>`,
+			nil,
+			"",
+			"",
+			"",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -417,4 +447,23 @@ func TestDetectCSharp(t *testing.T) { //nolint:funlen
 			assert.Equal(t, tt.wantDesc, pd.Description)
 		})
 	}
+}
+
+// TestDetectCSharp_ExactNameGuard pins 13 IN-03: a file literally named
+// ".csproj" (no project name) can never match the suffix filter — the
+// exact-name guard len(e.Name()) <= len(suffix) precedes the HasSuffix
+// check, so the folder falls through to the next detector (DATA-03 flagged
+// adjacency assumption: exactly-equal names separate, never match).
+func TestDetectCSharp_ExactNameGuard(t *testing.T) {
+	t.Parallel()
+	folder := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(folder, ".csproj"),
+		[]byte(`<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>X</AssemblyName></PropertyGroup></Project>`),
+		0o600,
+	))
+
+	pd, ok := detectCSharp(folder)
+	assert.False(t, ok)
+	assert.Equal(t, ProjectData{}, pd)
 }

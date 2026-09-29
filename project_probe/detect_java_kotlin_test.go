@@ -332,3 +332,75 @@ func TestProbe_JavaPlaceholderRaw(t *testing.T) {
 	assert.Equal(t, LanguageJava, data.Language)
 	assert.Equal(t, "${revision}", data.Version)
 }
+
+// TestDetectJavaKotlin pins the detector-level edges (detect_csharp_test.go
+// table shape): 13 WR-01 decode-hygiene trimming — padded values report
+// trimmed, whitespace-only <version> falls through to <parent><version>
+// (D-05), whitespace-only <name> falls through to <artifactId> (D-05,
+// DATA-02). A wantName of "" means the row expects the filepath.Base(folder)
+// fallback.
+func TestDetectJavaKotlin(t *testing.T) { //nolint:funlen
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		folder   func(t *testing.T) string // nil → t.TempDir()
+		wantName string                    // "" → filepath.Base(folder)
+		wantVer  string
+		wantDesc string
+	}{
+		{
+			// 13 WR-01: padded XML element text is trimmed at decode time —
+			// values report trimmed, never verbatim with surrounding spaces.
+			"padded_values",
+			`<project xmlns="http://maven.apache.org/POM/4.0.0"><name>  Acme  </name><version> 1.2.3 </version><description>  Desc  </description></project>`,
+			nil,
+			"Acme",
+			"1.2.3",
+			"Desc",
+		},
+		{
+			// 13 WR-01: a whitespace-only <version> no longer counts as
+			// present — the <parent><version> single-level inheritance fires
+			// (D-05, DATA-03).
+			"whitespace_only_version_inherits_parent",
+			`<project xmlns="http://maven.apache.org/POM/4.0.0"><parent><groupId>com.acme</groupId><artifactId>acme-parent</artifactId><version>1.2.3</version></parent><artifactId>acme-child</artifactId><version> </version></project>`,
+			nil,
+			"acme-child",
+			"1.2.3",
+			"",
+		},
+		{
+			// 13 WR-01: a whitespace-only <name> no longer counts as present —
+			// the <artifactId> coordinate fires (D-05, DATA-02).
+			"whitespace_only_name_falls_to_artifact_id",
+			`<project xmlns="http://maven.apache.org/POM/4.0.0"><name> </name><artifactId>acme-artifact</artifactId></project>`,
+			nil,
+			"acme-artifact",
+			"",
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			folder := t.TempDir()
+			if tt.folder != nil {
+				folder = tt.folder(t)
+			}
+			require.NoError(t, os.WriteFile(filepath.Join(folder, "pom.xml"), []byte(tt.content), 0o600))
+
+			pd, ok := detectJavaKotlin(folder)
+			require.True(t, ok)
+			assert.Equal(t, LanguageJava, pd.Language)
+			wantName := tt.wantName
+			if wantName == "" {
+				wantName = filepath.Base(folder)
+			}
+			assert.Equal(t, wantName, pd.Name)
+			assert.Equal(t, tt.wantVer, pd.Version)
+			assert.Equal(t, tt.wantDesc, pd.Description)
+		})
+	}
+}

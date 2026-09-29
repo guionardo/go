@@ -22,7 +22,10 @@ func readFirstManifest(folder, suffix string) (content []byte, ok bool) {
 		return nil, false
 	}
 	for _, e := range entries { // sorted by filename
-		if e.IsDir() || !strings.HasSuffix(e.Name(), suffix) {
+		// 13 IN-03 exact-name guard: a file literally named ".csproj" (no
+		// project name) can never match — the length check precedes the
+		// suffix check.
+		if e.IsDir() || len(e.Name()) <= len(suffix) || !strings.HasSuffix(e.Name(), suffix) {
 			continue
 		}
 		if content, ok := readManifest(folder, e.Name()); ok { // FIFO/regular gate applies per candidate
@@ -68,27 +71,31 @@ func detectCSharp(folder string) (ProjectData, bool) {
 		return ProjectData{}, false // D-09: never-fail degrade
 	}
 	var proj csprojManifest
-	_ = xml.Unmarshal(content, &proj) // decode error → zero struct → presence-match degrade
+	_ = xml.Unmarshal(content, &proj) // decode error → whatever decoded before the error point survives; the rest degrades to empty (IN-01)
 
 	// Collect-first-then-chain (D-disc-6): first non-empty per field across
 	// ALL PropertyGroups in document order — AssemblyName priority must not
-	// depend on which group holds it (probe row J).
+	// depend on which group holds it (probe row J). Every decoded field is
+	// whitespace-trimmed at decode time (13 WR-01 — decode hygiene, NOT
+	// version normalization): padded values report trimmed and
+	// whitespace-only elements no longer count as present, so the chains
+	// below resolve to their fallbacks (DATA-03).
 	var assemblyName, rootNamespace, version, versionPrefix, description string
 	for _, pg := range proj.PropertyGroups {
 		if assemblyName == "" {
-			assemblyName = pg.AssemblyName
+			assemblyName = strings.TrimSpace(pg.AssemblyName)
 		}
 		if rootNamespace == "" {
-			rootNamespace = pg.RootNamespace
+			rootNamespace = strings.TrimSpace(pg.RootNamespace)
 		}
 		if version == "" {
-			version = pg.Version
+			version = strings.TrimSpace(pg.Version)
 		}
 		if versionPrefix == "" {
-			versionPrefix = pg.VersionPrefix
+			versionPrefix = strings.TrimSpace(pg.VersionPrefix)
 		}
 		if description == "" {
-			description = pg.Description
+			description = strings.TrimSpace(pg.Description)
 		}
 	}
 

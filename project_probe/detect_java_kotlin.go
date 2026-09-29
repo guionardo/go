@@ -92,20 +92,24 @@ func detectJavaKotlin(folder string) (ProjectData, bool) {
 
 	if content, ok := readManifest(folder, "pom.xml"); ok { // D-09 presence gate
 		var pom pomManifest
-		_ = xml.Unmarshal(content, &pom) // decode error → zero struct → presence-match degrade
+		_ = xml.Unmarshal(content, &pom) // decode error → whatever decoded before the error point survives; the rest degrades to empty (IN-01)
 
-		data.Name = pom.Name // <name> — Maven's optional display name
+		// 13 WR-01: every decoded field is whitespace-trimmed BEFORE chain
+		// resolution (decode hygiene, NOT version normalization) — padded
+		// values report trimmed and whitespace-only elements no longer count
+		// as present, so the D-05/DATA-02/DATA-03 fallbacks fire.
+		data.Name = strings.TrimSpace(pom.Name) // <name> — Maven's optional display name
 		if data.Name == "" {
-			data.Name = pom.ArtifactID // <artifactId> — the required coordinate
+			data.Name = strings.TrimSpace(pom.ArtifactID) // <artifactId> — the required coordinate
 		}
 		if data.Name == "" {
 			data.Name = filepath.Base(folder) // DATA-02
 		}
-		data.Version = pom.Version
+		data.Version = strings.TrimSpace(pom.Version)
 		if data.Version == "" && pom.Parent != nil {
-			data.Version = pom.Parent.Version // D-05: single-level parent inheritance (same file)
+			data.Version = strings.TrimSpace(pom.Parent.Version) // D-05: single-level parent inheritance (same file)
 		}
-		data.Description = pom.Description
+		data.Description = strings.TrimSpace(pom.Description)
 		if data.Description == "" {
 			data.Description = readmeDescription(folder) // DATA-04
 		}
