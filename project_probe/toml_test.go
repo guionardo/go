@@ -1,6 +1,8 @@
 package projectprobe
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -140,6 +142,201 @@ func TestReadTOMLSection_EmptyVariants(t *testing.T) {
 			t.Parallel()
 
 			assert.Equal(t, map[string]string{}, readTOMLSection([]byte(tt.content), "project"))
+		})
+	}
+}
+
+// TestReadTOMLSection_SubtableIsolation pins P2: keys in
+// [project.optional-dependencies] never leak into the [project] read — ANY
+// [ leading line switches the section.
+func TestReadTOMLSection_SubtableIsolation(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\nname = \"acme\"\n[project.optional-dependencies]\nname = \"evil\"\ntest = [\"pytest\"]\nversion = \"9.9.9\"\n")
+	assert.Equal(t, map[string]string{"name": "acme"}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_PoetryDepsIsolation pins P2 for the legacy fallback:
+// [tool.poetry.dependencies] entries never leak into the [tool.poetry] read.
+func TestReadTOMLSection_PoetryDepsIsolation(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[tool.poetry]\nname = \"poet\"\nversion = \"2.0.0\"\n[tool.poetry.dependencies]\nrequests = \"^2.13.0\"\nname = \"evil\"\n")
+	assert.Equal(t, map[string]string{"name": "poet", "version": "2.0.0"}, readTOMLSection(content, "tool.poetry"))
+}
+
+// TestReadTOMLSection_ArrayOfTables pins P2: a [[array-of-tables]] header
+// switches the section and never matches the parent "tool.poetry" read.
+func TestReadTOMLSection_ArrayOfTables(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[tool.poetry]\nname = \"poet\"\n[[tool.poetry.source]]\nname = \"evil\"\nversion = \"9.9.9\"\n")
+	assert.Equal(t, map[string]string{"name": "poet"}, readTOMLSection(content, "tool.poetry"))
+}
+
+// TestReadTOMLSection_HeaderForms pins D-disc-8/A2/A3: a trailing comment and
+// inner padding match; quoted header segments and inner-dot whitespace are
+// documented non-matches (A3) and degrade to empty reads.
+func TestReadTOMLSection_HeaderForms(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		section string
+		want    map[string]string
+	}{
+		{"trailing_comment", "[project] # comment\nname = \"x\"\n", "project", map[string]string{"name": "x"}},
+		{"padded", "[ project ]\nname = \"x\"\n", "project", map[string]string{"name": "x"}},
+		{"quoted_segment", "[tool.\"poetry\"]\nname = \"x\"\n", "tool.poetry", map[string]string{}},
+		{"inner_dot_space", "[tool . poetry]\nname = \"x\"\n", "tool.poetry", map[string]string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, readTOMLSection([]byte(tt.content), tt.section))
+		})
+	}
+}
+
+// TestReadTOMLSection_HashInValue pins P1: "#" inside a quoted value is
+// content, never a comment (the spec's "except when inside a string" rule).
+func TestReadTOMLSection_HashInValue(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\ndescription = \"hello # world\"\n")
+	assert.Equal(t, map[string]string{"description": "hello # world"}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_EqualsInValue pins that "=" inside a quoted value is
+// content: the first-= split is safe because the key side is validated first.
+func TestReadTOMLSection_EqualsInValue(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\nname = \"a=b\"\n")
+	assert.Equal(t, map[string]string{"name": "a=b"}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_EscapesRaw pins D-disc-5/A4: basic-string escapes are
+// kept verbatim — outer quotes stripped, interior never unescaped.
+func TestReadTOMLSection_EscapesRaw(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\ndescription = \"a \\\"b\\\" c\"\n")
+	assert.Equal(t, map[string]string{"description": `a \"b\" c`}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_GarbageRemainder pins D-disc-6: a non-whitespace,
+// non-comment remainder after the closing quote means the key is not stored —
+// never partial data.
+func TestReadTOMLSection_GarbageRemainder(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\nname = \"foo\" garbage\n")
+	assert.Equal(t, map[string]string{}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_QuotedKey pins quoted keys (D-01): "name" stores the
+// same value as name.
+func TestReadTOMLSection_QuotedKey(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\n\"name\" = \"x\"\n")
+	assert.Equal(t, map[string]string{"name": "x"}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_NonTargetKeysIgnored pins that only the exact target
+// names name/version/description are stored — all other keys are ignored.
+func TestReadTOMLSection_NonTargetKeysIgnored(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\nname = \"acme\"\nversion = \"1.0.0\"\ndescription = \"d\"\nauthors = [\"a\"]\nkeywords = [\"k\"]\nhomepage = \"https://example.com\"\nreadme = \"README.md\"\n")
+	want := map[string]string{"name": "acme", "version": "1.0.0", "description": "d"}
+	assert.Equal(t, want, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_UnspecifiedValue pins that "key =" (no value) is
+// invalid per spec and never stored.
+func TestReadTOMLSection_UnspecifiedValue(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\nname =\n")
+	assert.Equal(t, map[string]string{}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_DuplicateKeys pins A5: duplicate keys are invalid TOML
+// but harmless — the last occurrence wins (mirrors encoding/json).
+func TestReadTOMLSection_DuplicateKeys(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\nname = \"first\"\nname = \"second\"\n")
+	assert.Equal(t, map[string]string{"name": "second"}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_CRLF pins P5: \r\n line endings parse identically to
+// \n (TrimSpace per line).
+func TestReadTOMLSection_CRLF(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[project]\r\nname = \"acme\"\r\nversion = \"1.2.3\"\r\n")
+	want := map[string]string{"name": "acme", "version": "1.2.3"}
+	assert.Equal(t, want, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_BOM pins P5: a UTF-8 BOM prefix is tolerated even
+// though readManifest strips it upstream (mirrors the Phase 11 BOM rows).
+func TestReadTOMLSection_BOM(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("\xEF\xBB\xBF[project]\nname = \"acme\"\n")
+	assert.Equal(t, map[string]string{"name": "acme"}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_ManyKeys pins that a 200-key section returns all stored
+// target keys — no arbitrary limit.
+func TestReadTOMLSection_ManyKeys(t *testing.T) {
+	t.Parallel()
+
+	var b strings.Builder
+	b.WriteString("[project]\nname = \"acme\"\nversion = \"1.0.0\"\ndescription = \"d\"\n")
+	for i := 0; i < 197; i++ {
+		fmt.Fprintf(&b, "key%d = \"v%d\"\n", i, i)
+	}
+	want := map[string]string{"name": "acme", "version": "1.0.0", "description": "d"}
+	assert.Equal(t, want, readTOMLSection([]byte(b.String()), "project"))
+}
+
+// TestReadTOMLSection_CrossSectionSkip pins D-disc-4 globally (the strongest
+// SC4 guard): a multi-line string opened in [build-system] suppresses header
+// AND keyval parsing everywhere — a fake [project] header and name = "evil"
+// inside its body are never parsed.
+func TestReadTOMLSection_CrossSectionSkip(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("[build-system]\nrequires = [\"setuptools\"]\ndescription = \"\"\"\n[project]\nname = \"evil\"\n\"\"\"\n")
+	assert.Equal(t, map[string]string{}, readTOMLSection(content, "project"))
+}
+
+// TestReadTOMLSection_Adversarial pins T-12-01: pathological inputs
+// (bracket floods, unterminated quotes, a 1 MB jumble) complete without
+// panicking — the rows assert only that the call returns a map.
+func TestReadTOMLSection_Adversarial(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{"bracket_flood", "[project]\n" + strings.Repeat("[", 10000) + "\n"},
+		{"unterminated_quote", "[project]\nname = \"abc\n"},
+		{"one_mb_jumble", "[project]\n" + strings.Repeat("\"[]=#", 250000) + "\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.NotNil(t, readTOMLSection([]byte(tt.content), "project"))
 		})
 	}
 }
