@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("[package]\nname = \"crate\"\nversion = \"0.1.0\"\ndescription = \"A crate\"\n")

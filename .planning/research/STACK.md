@@ -1,202 +1,230 @@
-# Technology Stack
+# Stack Research: project_probe — Best-Effort Project Detection
 
-**Project:** `github.com/guionardo/go` — Go Utility Collection
-**Researched:** 2026-07-21
-**Overall Stack Confidence:** HIGH
+**Domain:** Best-effort project detection library (folder → language/name/version/description) inside a stdlib-first Go utility monorepo
+**Project:** `github.com/guionardo/go` — milestone v1.7 `project_probe`
+**Researched:** 2026-09-28
+**Confidence:** HIGH
+
+> This document is the milestone-scoped stack research for v1.7. It supersedes the repo-level
+> STACK.md (2026-07-21, kept in git history) whose general guidance (Go 1.26 stdlib-first,
+> minimal deps, testify, coverage gates) remains valid and is assumed here.
 
 ## Executive Summary
 
-This project is a Go 1.26 monorepo of independent utility packages with minimal external dependencies. The stack philosophy — **stdlib-first, minimal deps, generics where natural** — is correct for 2025-2026. Go's rapid evolution across 1.24→1.26 has eliminated several common reasons for third-party utility packages. This document recommends keeping the existing dependency strategy while selectively adding one test-only dependency (`go-cmp` for structural comparison) and ruthlessly avoiding kitchen-sink libraries like `samber/lo`.
+`project_probe` needs **zero new runtime dependencies**. Every manifest format in scope
+(go.mod, package.json, composer.json, pyproject.toml, Cargo.toml, .csproj/.slnx/pom.xml, .sln,
+build.gradle) is parseable with Go 1.26 stdlib — `os`, `bufio`, `strings`, `encoding/json`,
+`encoding/xml`, `path/filepath`, and a small `regexp` usage — **plus one unexported
+hand-rolled TOML-subset reader** (~80 lines) for `pyproject.toml` and `Cargo.toml`.
+
+Two verified facts drive the key decisions:
+
+1. **Go stdlib has no TOML parser** — verified locally against Go 1.27.0 (`go doc encoding/toml`
+   fails; nothing added in 1.24/1.25/1.26). `pyproject.toml`/`Cargo.toml` are **TOML, not YAML** —
+   so the already-present `gopkg.in/yaml.v3` (used by `config/`) is useless here; the "is a YAML
+   dep justified?" question is a category error. The choice is: external TOML dep vs. hand-rolled
+   subset. For exactly 3 string fields (`name`, `version`, `description`) under 3 known tables
+   (`[project]`, `[tool.poetry]`, `[package]`), a subset reader is correct; a full TOML
+   dependency becomes justified only at the deferred framework-detection milestone (dependencies
+   parsing) — defer the dep, not the field extraction.
+2. **The mature Go ecosystem pattern is manifest-first ordered cascades, not content-based
+   language detection.** GitHub Linguist's strategy cascade (Modeline→Filename→Shebang→Extension→
+   XML→Manpage→Heuristics→Classifier, first strategy to yield exactly one candidate wins) and
+   Snyk's ordered `DETECTABLE_FILES` basename list (first existing manifest wins) both converge on
+   the same design: ordered, deterministic, first-match, unknown = typed fallback value **never
+   an error**. `go-enry` (the Go linguist port) is per-file content classification and knows
+   nothing about manifests — explicitly not the right abstraction.
+
+The deprecated `project_detector/` sample (ordered per-language detectors, first-match wins,
+`Unknown` fallback) is structurally the right pattern but depends on the unavailable `gs-dev`
+module and BurntSushi/toml, and **does not compile** (verified: 3 build errors). It must be
+removed in this milestone to restore `go build ./...` / lint / coverage CI cleanliness — its
+detector logic is the design reference, its dependencies are not.
 
 ## Recommended Stack
 
-### Core Language
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Go | 1.26.4 | Source language, compiler, runtime | Green Tea GC is now default (10-40% less GC overhead). Swiss Tables in stdlib map. `errors.AsType[T]()` available. `sync.WaitGroup.Go()` convenience. All code should target go 1.26 in go.mod. |
-| Standard library | Go 1.26 | All core functionality | The gap between stdlib and popular third-party packages continues to narrow. `sync.Map` is now hash-trie based. `strings.Lines/SplitSeq` provide iterator-based string splitting. `os.Root` provides chroot-style filesystem access. `weak` package enables canonicalization maps. |
-| Go modules | Go 1.26 | Dependency management | `go.mod` `tool` directive for tracking build tools. `go fix` now includes modernizers for automated stdlib migration. |
+### Core Technologies
 
-### Existing Dependencies (Keep)
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Go | 1.26.4 (go.mod) | Language + toolchain | Repo constraint; local toolchain 1.27.0. All stdlib features used are ≥1.24 (`strings.SplitSeq`), safe on both. |
+| `os` | stdlib | `ReadDir`, `ReadFile`, `Stat` | Folder listing, manifest reads, folder-existence check for the error path. No `ioutil`. |
+| `bufio` | stdlib | `Scanner` for line-oriented reads | go.mod (`module`/`go` lines), README first-paragraph extraction, .sln `Project(...)` lines. Bounded token size via `Scanner.Buffer`. |
+| `strings` | stdlib | `CutPrefix`, `Fields`, `TrimSpace`, `TrimSuffix`, `SplitSeq` | go.mod directives, .sln parsing, gradle `version = 'x'`, README normalization. `SplitSeq` iterator form is the Go 1.24+ idiom (already used in repo). |
+| `encoding/json` | stdlib | `package.json`, `composer.json` | Typed struct decode for `name`/`version`/`description`. Both files are strict JSON — no JSONC concern. |
+| `encoding/xml` | stdlib | `.csproj`, `.slnx`, `pom.xml` | Struct decode by local element names; tolerant of the `xmlns` namespaces found in real `.csproj`/`pom.xml` files (namespace-agnostic local-name matching). |
+| `path/filepath` | stdlib | `Base`, `Glob`, `WalkDir`, `Join` | Manifest discovery (`*.csproj`, `*.sln`), folder-name fallback for Name, bounded 1-level subdir scan for .NET projects (skip `.git`, `node_modules`, `vendor`, …). |
+| `regexp` | stdlib | Minimal, compiled-once patterns | TOML value extraction edge cases (single-quoted strings, inline comments after values), gradle version lines. Prefer `strings` first; use regexp only where line-splitting is insufficient. |
+| `errors` | stdlib | Sentinel errors | `ErrNotDir`-style sentinel for the only real error path (folder missing/unreadable). Unknown detection is **not** an error. |
 
-| Dependency | Version | Purpose | Confidence | Why Keep |
-|------------|---------|---------|------------|----------|
-| `github.com/stretchr/testify` | v1.11.1 | Test assertions | HIGH | De-facto standard, stable v1 API. |
-| `github.com/go-playground/validator/v10` | v10.30.3 | Struct validation | HIGH | Best-in-class, used by `config/`. |
-| `gopkg.in/yaml.v3` | v3.0.1 | YAML marshaling | HIGH | Still the de-facto YAML library. |
-| `golang.org/x/sync` | v0.22.0+ | Errgroup, Semaphore, Singleflight | HIGH | Officially maintained by Go team. |
-| `github.com/opencontainers/go-digest` | v1.0.0 | Content digest verification | MEDIUM | Only used by `release/`. Consider replacing with stdlib `crypto/sha256`. Keep for now. |
+### Supporting Libraries (runtime: NONE)
 
-### New Test-Only Dependency (Add)
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| *(none)* | — | — | All manifest parsing is stdlib + unexported TOML subset reader. Zero new entries in `go.mod`. |
 
-| Dependency | Version | Purpose | Confidence | Why Add |
-|------------|---------|---------|------------|---------|
-| `github.com/google/go-cmp` | v0.7.0+ | Structural comparison in tests | HIGH | Significantly better than `reflect.DeepEqual`. Provides readable diff output, custom comparers (float tolerance), unexported field options. v0.7.0 released Feb 2025 (4.7k ★). **Test-only dependency** — no impact on library consumers. |
+The only new code-level "library" is an **unexported `toml.go` subset reader** (package-private,
+~80 lines, table tracked + `key = "value"` string extraction). It is deliberately NOT a public
+API and NOT a full TOML parser. See "Stack Patterns by Variant" for its exact contract.
 
-### Tooling (Keep & Upgrade)
+### Development Tools
 
-| Tool | Version | Purpose | Why |
-|------|---------|---------|-----|
-| `golangci-lint` | latest (v1.64+) | Comprehensive linting | Enable `copylock` for Go 1.25+ 3-clause loop mutex checks. |
-| `go-test-coverage` | v2 | Coverage enforcement | Works well with Go 1.26. |
-| `pre-commit` | latest | Git hooks | Fix Linux-only install in Makefile (macOS compat). |
-| `commitlint` | latest | Conventional commits | Keep. |
-| `govulncheck` | Go 1.24+ | Vulnerability scanning | Now integrated with `go` toolchain. |
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| `make coverage-quick` | Coverage gate before every commit | Runs `go test ./...` + `go-test-coverage` — new package is included automatically. Thresholds (`.testcoverage-quick.yml`): package ≥80, file ≥70, total ≥75. |
+| `.testcoverage-quick.yml` | Per-package threshold config | **No override needed** — best-effort detection is highly testable via table-driven tests + `testdata/` fixture folders (`testdata` is excluded from coverage automatically). |
+| `golangci-lint` (gosec) | Security linting | Manifest files are opened via dynamic paths (`os.Open` of discovered files) → gosec `G304` fires. Repo precedent exists: `#nosec G304 -- path comes from local discovery in the inspected folder.` annotations in the sample; replicate. |
+| `doc.go` convention | Package docs | Every repo package has `doc.go` with `// Package project_probe provides ...` + feature list + example. Required for lint + README consistency. |
+| Go doc comments | All exported symbols | Repo rule ("Go doc comments for all exported symbols"); enforced by lint. |
+| README.md package index | Public surface | v1.5 restructured README with a package index table — add `project_probe` row in this milestone. |
+| `commitlint` | Conventional commits | `feat(project_probe): ...` scope. |
 
-## Libraries to NOT Add (And Why)
+## Installation
 
-### `samber/lo` (21.4k ★)
-**Assessment:** DO NOT ADD
-**Rationale:** Adding it would: (1) contradict the minimal-dependency constraint, (2) overlap with existing `flow/` package (`lo.Ternary` ≈ `flow.If`, `lo.Coalesce` ≈ `flow.Default`), (3) pull in 930+ commits for functionality easily written as small generics. **Alternative:** implement specific helpers as small standalone generics when a genuine need arises — same pattern used for `Set[T]` and `flow/` helpers.
+```bash
+# No new runtime dependencies.
+# Verify the module stays clean after implementation:
+go mod tidy && git diff --stat go.mod go.sum   # expect: no changes
 
-### `hashicorp/go-multierror`
-**Assessment:** DO NOT ADD
-**Rationale:** `errors.Join` (Go 1.20+) provides error aggregation natively. Go 1.26 adds `errors.AsType[T]()` for type-safe error unwrapping. The project already uses `errors.Join`.
-
-### `uber-go/zap` or `rs/zerolog`
-**Assessment:** DO NOT ADD
-**Rationale:** The project already uses `log/slog` (Go 1.21+). For a library, `slog` is the correct choice — it forces no logging dependency on consumers. `slog.DiscardHandler` (Go 1.24) covers disabling output. `slog.NewMultiHandler` (Go 1.26) covers fan-out. Always use `slog` for libraries.
-
-### `uber-go/dig` / `samber/do` / `google/wire`
-**Assessment:** DO NOT ADD
-**Rationale:** DI is an application-level concern. This is a library/utility module with no application runtime.
-
-### `spf13/cobra` / `spf13/viper`
-**Assessment:** DO NOT ADD
-**Rationale:** CLI and application configuration. The `config/` package already provides typed configuration.
-
-### `golang.org/x/exp`
-**Assessment:** DO NOT USE
-**Rationale:** `x/exp` packages are unstable. Target Go 1.26 stable. Key `x/exp/slices` functions are now in stdlib `slices` since Go 1.21.
-
-## New Package Patterns
-
-For any NEW packages, follow these 2025-2026 Go idioms:
-
-### Pattern: Generic utility with `iter.Seq`
-Provide `iter.Seq` methods for iteration on collection/container types:
-
-```go
-func (s Set[T]) All() iter.Seq[T] {
-    return func(yield func(T) bool) {
-        for k := range s.items {
-            if !yield(k) { return }
-        }
-    }
-}
+# Quality gates (existing targets, no changes needed):
+make lint
+make coverage-quick
 ```
 
-Apply this to the existing `set` package and any future containers.
+## The TOML Decision (explicit)
 
-### Pattern: `errors.AsType[T]()` for Go 1.26+
-Go 1.26's `errors.AsType[T any]() bool` replaces the clunky `errors.As(err, &target)` pattern:
+`pyproject.toml` (Python, PEP 621) and `Cargo.toml` (Rust) are **TOML**. Go stdlib has no TOML
+(verified on Go 1.27.0). The candidates:
 
-```go
-if myErr, ok := errors.AsType[*MyError](err); ok {
-    // use myErr directly, no extra variable needed
-}
-```
+| Option | Verdict | Rationale |
+|--------|---------|-----------|
+| **Hand-rolled subset reader** (unexported) | **RECOMMENDED for v1.7** | Only 3 string fields under 3 known tables. Best-effort semantics make a miss acceptable (falls back to folder name / empty). ~80 lines, fully testable, zero deps, zero supply-chain surface. |
+| `BurntSushi/toml` v1.6.0 | Defer | Reflection API like `encoding/json`, TOML v1.1.0, ~5k★, 38k importers; what Trivy/go-dep-parser use for `pyproject.toml`. **Add it at the framework-detection milestone** when `[project.dependencies]` / `[tool.poetry.dependencies]` / `[package.dependencies]` parsing makes a full parser genuinely valuable. |
+| `pelletier/go-toml/v2` v2.4.x | Defer | TOML v1.1.0, stdlib-like API, 5-8× faster unmarshal than BurntSushi; the modern alternative if the dep is ever added — same deferral boundary. |
+| `gopkg.in/yaml.v3` | **Never for this** | Already a direct dep (via `config/`) but YAML ≠ TOML — cannot parse `pyproject.toml`/`Cargo.toml`. Category error; no amount of "it's already in go.mod" makes it work. |
 
-### Pattern: `sync.WaitGroup.Go()` for goroutines
-Go 1.25's `wg.Go(func())` eliminates the `wg.Add(1); defer wg.Done()` boilerplate.
+**Deferral boundary (write it in the code):** the day `project_probe` needs dependency lists
+(framework detection), add `pelletier/go-toml/v2` (or BurntSushi) and delete `toml.go`. Until
+then the subset reader is the smaller, cheaper, testable truth.
 
-### Pattern: `testing.B.Loop()` for benchmarks
-Use `for b.Loop()` instead of `for range b.N`. Setup runs once, not b.N times.
+## The go.mod Parsing Decision (explicit)
 
-### Pattern: `testing.T.Context()` for test timeouts
-Go 1.24's `t.Context()` returns a context canceled when the test completes.
+| Option | Verdict | Rationale |
+|--------|---------|-----------|
+| **Line-scan with `bufio` + `strings.CutPrefix`** | **RECOMMENDED for v1.7** | `module <path>` (optionally quoted) and `go <version>` are simple, stable line formats. 10 lines total, trivially tested (quote + comment cases). Matches "minimal external dependencies" and the repo's own `config/` philosophy. |
+| `golang.org/x/mod/modfile` (v0.38.0 already indirect in module graph) | Documented upgrade path | The Go team's canonical go.mod parser, used by the toolchain itself; 1,706 importers. `modfile.ModulePath(data)` is a tolerant extractor (returns `""` if absent) — a perfect best-effort primitive. **Cost:** promotes an indirect dep to direct. Revisit if go.work handling or toolchain-exact semantics are ever needed (not in v1.7 scope). |
 
-### Pattern: `slog` with `slog.DiscardHandler` for library logging
-Any new package that needs logging must use `slog.Logger` passed as parameter. Never create package-level loggers. Use `slog.New(slog.DiscardHandler)` in tests.
+## Per-Language Manifest → Reader Mapping (v1.7)
 
-### Pattern: `go-cmp` for struct comparison in tests
-Use `cmp.Diff(want, got)` instead of `reflect.DeepEqual(want, got)` for readable diff output:
+| Language | Manifest(s) | Reader | Name | Version | Description |
+|----------|-------------|--------|------|---------|-------------|
+| Go | `go.mod` | `bufio` + `strings` (line scan) | `module` line | `go` directive | none → README fallback |
+| Python | `pyproject.toml` | TOML subset reader | `[project].name` → `[tool.poetry].name` | `[project].version` → `[tool.poetry].version` | `[project].description` → README fallback |
+| JS/TS | `package.json` | `encoding/json` (struct) | `name` | `version` | `description` → README fallback |
+| C#/.NET | `*.sln` / `*.slnx` / `*.csproj` (1-level subdir scan) | `strings` (.sln `Project("...") = "Name", ...`), `encoding/xml` (.slnx `<Project Path=.../>`, .csproj `<Version>`/`<Description>`) | sln first project name, else csproj basename | csproj `<Version>` (empty if absent) | csproj `<Description>` → README fallback |
+| Rust | `Cargo.toml` | TOML subset reader | `[package].name` | `[package].version` | `[package].description` → README fallback |
+| Java/Kotlin | `pom.xml`, `build.gradle(.kts)` | `encoding/xml` (pom), line scan (gradle `version = 'x'` / `version = "x"`) | pom `<name>` → gradle `rootProject.name`/archiveBaseName → folder | pom direct-child `<version>` (skip `<parent><version>`) → gradle `version =` | pom `<description>` → README fallback |
+| PHP | `composer.json` | `encoding/json` (struct) | `name` | `version` (usually absent — empty is correct) | `description` → README fallback |
+| *any* | README fallback (cross-cutting) | `os.ReadFile` + `bufio`/`strings` | `path/filepath.Base(folder)` when manifest lacks name | empty when manifest lacks version | First non-empty paragraph of `README.md` (also `README`, `readme.md`), trimmed; capped length |
 
-```go
-import "github.com/google/go-cmp/cmp"
-if diff := cmp.Diff(want, got); diff != "" {
-    t.Errorf("mismatch (-want +got):\n%s", diff)
-}
-```
+**Detection precedence (documented, deterministic):** ordered cascade Go → Python → C#/.NET →
+JS/TS → Rust → Java/Kotlin → PHP (same relative order as the sample; Go first because `go.mod`
+is unambiguous and this is a Go monorepo). First manifest match wins; unknown folder →
+`Language: Unknown`, `Name: folder base`, no error. Framework detection (dependencies-based) is
+explicitly out of scope.
 
-## Go Version Feature Matrix
+## Mature API Shape (reference for ARCHITECTURE.md)
 
-| Feature | Go Version | Relevance |
-|---------|------------|-----------|
-| Generic type parameters | 1.18 | Foundation — used by `Set[T]`, `Provider[T]`, `flow.If` |
-| `any` alias | 1.18 | Used throughout |
-| `encoding/json` `omitempty` | 1.20 | Already in use |
-| `errors.Join` | 1.20 | Error aggregation |
-| `log/slog` | 1.21 | Logging (used in config, httptest_mock) |
-| `slices` package | 1.21 | Slice operations |
-| `maps` package | 1.21 | Map operations |
-| `iter.Seq` / range-over-func | 1.23 | Container iteration (adopt in `set`) |
-| Swiss Tables map | 1.24 | Default — affects all map-backed packages |
-| `testing.B.Loop()` | 1.24 | Benchmark pattern |
-| `slog.DiscardHandler` | 1.24 | Silence logs in tests |
-| `testing.T.Context()` | 1.24 | Test-scoped context |
-| `weak` package | 1.24 | Weak pointers |
-| `os.Root` | 1.24 | Directory-scoped fs ops |
-| `strings.Lines/SplitSeq` | 1.24 | Iterator-based string splitting |
-| `errors.AsType[T]()` | 1.25 | Type-safe error unwrapping |
-| `sync.WaitGroup.Go()` | 1.25 | Concurrent goroutine launching |
-| `testing/synctest` | 1.25 | Concurrent code testing |
-| `go fix` modernizers | 1.26 | Automated code migration |
-| `slog.NewMultiHandler` | 1.26 | Log routing to multiple handlers |
-| `reflect.Type.Fields()` iterators | 1.26 | Reflection without index loops |
-
-## Implementation Guidance
-
-### For Existing Package Updates
-1. **`set` package**: Add `All() iter.Seq[T]` method for range-over-func compatibility
-2. **`config` package**: Use `errors.AsType[T]()` for validation error handling; fix the silent-error swallowing (CONCERNS.md)
-3. **`time_tools`**: Consider copy-on-write pattern instead of mutex promotion for layout list
-4. **`release` package**: Fix critical bugs (unused request, missing body close, no timeout)
-5. **Testing across all packages**: Use `t.Context()` instead of `context.Background()` in tests
-6. **Benchmarks**: Convert to `for b.Loop()` pattern where applicable
-7. **General**: Run `go fix` (Go 1.26 modernizers) to auto-migrate patterns
-
-### For New Package Decision Flow
-When considering a new package, ask:
-1. **Can stdlib (Go 1.26) do it?** → If yes, don't write a package. Document the pattern instead.
-2. **Is it generically reusable across 3+ projects?** → If yes, consider adding.
-3. **Does it require external dependencies?** → If yes, strongly reconsider.
-4. **Is it a wrapper around an external API?** → If yes, design as thin adapter (like `release/`).
-5. **Does it duplicate `samber/lo` functionality?** → If yes, implement as single function, not package.
-
-### Version Pinning Strategy
-- All dependencies pinned in `go.sum`
-- `golang.org/x/sync` — keep updated (minor versions)
-- `yaml.v3` — stable, no upgrade concerns
-- `testify` — keep within v1.x (no v2 exists)
-- `go-playground/validator` v10 — stable, upgrade only for security fixes
+| Ecosystem reference | API pattern | What to copy |
+|---------------------|-------------|--------------|
+| GitHub Linguist (source-verified) | `STRATEGIES = [Modeline, Filename, Shebang, Extension, XML, Manpage, Heuristics, Classifier]` — cascade narrows candidates; first strategy yielding exactly one wins; `nil` if unresolved | Ordered cascade with first-match termination; unknown is a value, never an error |
+| Snyk detector | Ordered `DETECTABLE_FILES` basename list, first existing file wins | Manifest basename → language mapping table |
+| `aquasecurity/go-dep-parser` (→ Trivy) | One `Parse(r io.Reader)` per manifest format, keyed by filename | Per-manifest parse funcs; do NOT take the dependency (absorbed into Trivy, standalone archived) |
+| `go-enry` | `GetLanguage(filename, content) string` — returns `""` for unknown, never errors; `IsVendor`/`IsBinary` helpers | The "return a fallback value, not an error" contract; the vendor-dir skip hygiene (`.git`, `node_modules`, `vendor`) |
+| `x/mod/modfile` | `ModulePath(mod []byte) string` — tolerant, `""` if absent | Same tolerant-extraction contract inside our line readers |
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| **Test comparisons** | `gotest.tools/v3/assert` + `go-cmp` | `testify/assert` (existing) | Keep `testify`. Add `go-cmp` alongside, don't replace. |
-| **Logging** | `log/slog` (stdlib) | `uber-go/zap` | Library must not force logging on consumers. |
-| **Error aggregation** | `errors.Join` (stdlib) | `hashicorp/go-multierror` | `errors.Join` + `errors.AsType[T]()` covers all needs. |
-| **Generic utilities** | In-house generics | `samber/lo` | Contradicts minimal-dependency philosophy. |
-| **Configuration** | Current `config/` package | `spf13/viper` | Viper is application-focused, not library-friendly. |
-| **HTTP testing** | Current `httptest_mock/` | `jarcoal/httpmock` | In-house package is a project differentiator. |
-| **DI container** | None | `google/wire`, `uber-go/dig` | Not applicable to a utility library. |
-| **SQL driver helpers** | None | `jmoiron/sqlx` | Out of scope. Let downstream decide. |
-| **Time parsing** | Current `time_tools/` | `lotus` / `dateparse` | Existing solution follows project pattern. |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| Hand-rolled TOML subset (unexported) | `BurntSushi/toml` v1.6.0 | Framework-detection milestone (dependency parsing) — full parser needed |
+| Hand-rolled TOML subset (unexported) | `pelletier/go-toml/v2` v2.4.x | Same deferral boundary; prefer this over BurntSushi if/when added (speed, maintained API) |
+| Line-scan go.mod | `golang.org/x/mod/modfile` | If go.work parsing or toolchain-exact semantics are required later |
+| Manifest-first ordered cascade | `go-enry` v2 | If per-file language classification (byte-weighted language stats) ever becomes a feature — it is not |
+| Manifest-first ordered cascade | GitHub Linguist (Ruby) | Never — wrong language, and content-based, not manifest-based |
+| stdlib `encoding/xml` | `antchfx/xmlquery` / `etree` | If XPath-style queries were needed — they are not; local-name struct decode suffices for csproj/slnx/pom |
+| stdlib `path/filepath` | `gobwas/glob` / `doublestar` | `filepath.Glob` covers `*.csproj`/`*.sln`; `**` semantics not needed |
+
+## What NOT to Use
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `gopkg.in/yaml.v3` for pyproject.toml/Cargo.toml | YAML cannot parse TOML — wrong format entirely, regardless of it already being a dep | TOML subset reader |
+| `BurntSushi/toml` / `pelletier/go-toml/v2` in v1.7 | 2 fields × 2 files; violates minimal-deps for no robustness gain under best-effort semantics | Hand-rolled subset; add the dep at framework milestone |
+| `go-enry` | Content/extension-based per-file classification with an embedded data package (~MBs, generated from linguist YAML); knows nothing about manifest metadata; some heuristics need oniguruma | Ordered manifest cascade + README fallback |
+| `aquasecurity/go-dep-parser` | Absorbed into Trivy ("Moved to the dependency package in Trivy"); dependency/lockfile parsing is out of v1.7 scope | Its architecture (per-format parser keyed by filename) as a design reference |
+| `golang.org/x/mod/modfile` in v1.7 | Promotes indirect dep to direct for two trivial line formats | bufio line-scan; documented upgrade path |
+| Framework-detection libs (e.g. parsing `dependencies` blocks) | Explicitly deferred to a later milestone per PROJECT.md | Dependencies-based detection later, on top of the same manifest readers |
+| `fsnotify`, glob libs, `samber/lo`, any kitchen-sink | No watch/recursive-glob/lo-utility need; contradicts repo constraint | stdlib only |
+
+## Stack Patterns by Variant
+
+**If a manifest is line-oriented (go.mod, .sln, build.gradle):**
+- Use `bufio.Scanner` (bounded) + `strings.CutPrefix`/`Fields`; reserve `regexp` for quoted-value
+  extraction only. Skip blank lines and `//`/`#` comments.
+
+**If a manifest is TOML (pyproject.toml, Cargo.toml):**
+- Use the unexported subset reader: track current table header (`[project]`, `[tool.poetry]`,
+  `[package]`); extract `name`/`version`/`description` string values in double **or** single
+  quotes; ignore `#` comments and multiline `"""` values (miss → fallback, acceptable).
+- Poetry fallback (`[tool.poetry]`) matters: many real pyproject.toml files predate PEP 621.
+
+**If a manifest is JSON (package.json, composer.json):**
+- Decode into a small struct (`Name`, `Version`, `Description string`) with `json.Unmarshal`;
+  tolerate unknown fields (default behavior) and absent fields (zero values).
+
+**If a manifest is XML (.csproj, .slnx, pom.xml):**
+- Decode into a struct with `xml:"..."` tags matching local names; do NOT match namespaces —
+  `encoding/xml` matches local names when tags omit namespace, which handles real-world `xmlns`
+  attributes. For pom.xml, read only the direct-child `<version>` (skip `<parent><version>`).
+
+**If the folder has no manifest or manifest lacks the field:**
+- Language → `Unknown` (no error); Name → `filepath.Base(folder)`; Version → `""`;
+  Description → README first-paragraph fallback (shared helper, all languages).
+
+**If the folder does not exist / cannot be listed:**
+- Return an error (the ONE error path), per `os.ReadDir`/`os.Stat` failure — this matches the
+  sample's `AssertDirectory` behavior without the "could not detect" error.
+
+**If scanning subdirectories (C#/.NET only):**
+- Bound depth to 1 and skip the standard ignore set (`.git`, `node_modules`, `vendor`, `.venv`,
+  `__pycache__`, `dist`, `build`, `target`, `bin`, `obj`, `.tox`, `.idea`, `.vscode`) — linguist
+  vendor-hygiene pattern, prevents false positives in nested toolchains.
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| go.mod `go 1.26.4` | local Go 1.27.0 | Both fine; used stdlib features are ≥1.24 (`strings.SplitSeq`, `os.ReadDir`) |
+| `strings.CutPrefix` | Go 1.20+ | go.mod directive parsing |
+| `strings.SplitSeq` | Go 1.24+ | .sln/README iteration (already used in repo sample) |
+| `bufio.Scanner.Buffer` | Go 1.1+ | Cap token size for README paragraphs (e.g. 64KB) |
+| `encoding/xml` local-name matching | stdlib | No namespace-tag matching → robust to `xmlns` in csproj/pom |
+| New package + `make coverage-quick` | `.testcoverage-quick.yml` | Package ≥80 / file ≥70 / total ≥75 — no override entry needed; `testdata/` fixtures are auto-excluded |
+| **Deprecated `project_detector/`** | **BREAKS the module** | Verified: 3 build errors (missing `gs-dev`, `BurntSushi/toml` go.sum entry). `go build ./...`, `go vet`, lint, and coverage all trip on it. **Delete the folder in this milestone** (its logic is superseded by `project_probe`); this is a stack-level prerequisite, not an option. |
 
 ## Sources
 
-- Go 1.24 Release Notes (Feb 2025) — `tip.golang.org/doc/go1.24` (HIGH confidence, official source)
-- Go 1.25 Release Notes (Aug 2025) — `tip.golang.org/doc/go1.25` (HIGH confidence, official source)
-- Go 1.26 Release Notes (Feb 2026) — `go.dev/doc/go1.26` (HIGH confidence, official source)
-- `golang.org/x/sync` v0.22.0 — `pkg.go.dev/golang.org/x/sync` (HIGH confidence, official source)
-- `samber/lo` v1.53.0 — `github.com/samber/lo` (HIGH confidence, official repo)
-- `google/go-cmp` v0.7.0 — `github.com/google/go-cmp` (HIGH confidence, official repo)
-- `samber/do` v2.1.0 — `github.com/samber/do` (HIGH confidence, official repo)
-- Project stack — `.planning/codebase/STACK.md` (HIGH confidence, project source)
-- Project concerns — `.planning/codebase/CONCERNS.md` (HIGH confidence, project source)
+- `pkg.go.dev/golang.org/x/mod/modfile` (v0.41.0) — modfile API surface; MEDIUM (official docs, cross-checked with module graph)
+- Local toolchain Go 1.27.0 — `go doc encoding/toml` fails ⇒ no stdlib TOML; **HIGH** (primary verification)
+- `pkg.go.dev/github.com/BurntSushi/toml` v1.5.0/v1.6.0 + repo — TOML 1.1, reflection API, 38k importers; MEDIUM
+- `pkg.go.dev/github.com/pelletier/go-toml/v2` v2.4.1 + repo — TOML 1.1, stdlib-like API, benchmark table; MEDIUM
+- `github.com/aquasecurity/go-dep-parser` + `pkg.go.dev` directory listing — per-format parser inventory, "Moved to the dependency package in Trivy"; MEDIUM
+- `github.com/github-linguist/linguist` `lib/linguist.rb` (source) — STRATEGIES cascade, `detect` returns nil on unresolved; MEDIUM (source-verified)
+- `pkg.go.dev/github.com/go-enry/go-enry/v2` + repo — `GetLanguage(filename, content)`, Is* helpers, data generation; MEDIUM
+- Repo evidence — `project_detector/` build failure (3 errors), `go.mod` (yaml.v3 direct, x/mod indirect v0.38.0), `.testcoverage-quick.yml`, Makefile, `flow/doc.go` convention; **HIGH** (primary)
+- Prior research cache — Snyk `DETECTABLE_FILES` ordered-basename pattern, mise/asdf tree-walk version-file discovery; MEDIUM
 
 ---
-
-*Stack research conducted: 2026-07-21. Review after Q1 2027 or when Go 1.27 is released.*
+*Stack research for: v1.7 project_probe milestone*
+*Researched: 2026-09-28*

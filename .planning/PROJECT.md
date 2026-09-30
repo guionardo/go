@@ -37,13 +37,28 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ `BatchCache[K, V]` with MGet/MSet/MDel across all 5 providers — `cache/` — v1.6
 - ✓ Benchmark suite quantifying dedup and batching wins — `cache/` — v1.6
 - ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
+- ✓ `project_probe` package foundation — never-fail `Probe` contract, `ProjectData` model, `Language` type, error sentinels, ordered detector registry, ignore list, `readManifest` — `project_probe/` — v1.7 (Phase 10)
+- ✓ Go, JavaScript/TypeScript, and PHP detectors — go.mod/package.json/composer.json parsing, README first-paragraph fallback, name/description chains — `project_probe/` — v1.7 (Phase 11)
+- ✓ TOML-subset reader + Python/Rust detectors — `readTOMLSection` with quote-aware skip states (strict degrade, never fabricates), pyproject.toml [project]/[tool.poetry], Cargo.toml [package] — `project_probe/` — v1.7 (Phase 12)
+- ✓ All 7 detectors live — Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP; C#/.NET via .csproj (XMLName namespace-agnostic), Java/Kotlin via pom.xml (parent version inheritance) + settings.gradle fallback — `project_probe/` — v1.7 (Phase 13)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] String utilities package (truncation, padding, join/split)
-- [ ] Retry package with backoff strategies and jitter support
+- [ ] String utilities package (v2 backlog — truncation, padding, join/split)
+- [ ] Retry package with backoff strategies and jitter support (v2 backlog)
+- [ ] Framework detection for project_probe (v2 — dependencies-based)
+
+## Current State
+
+**v1.7 Project Probe — SHIPPED 2026-09-30**
+
+The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP) with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states — SC4 fabrication gap closed), fuzz-hardened (3 targets, 20-seed corpus), doc.go Version-semantics contract, and the anti-feature audit. 820+ tests across 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
+
+**Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
+
+**Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
 
 ## Completed Milestones
 
@@ -66,7 +81,11 @@ Eliminated duplicate setter work in cache misses and reduced round trips via sin
 
 ## Current State
 
-**v1.6 — Cache Dedup** (shipped 2026-08-08)
+**v1.7 — Project Probe** (SHIPPED 2026-09-30)
+
+The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states), fuzz-hardened, doc.go Version-semantics contract, anti-feature audit. 820+ tests / 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
+
+**Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
 All five cache providers now share a common `cacher` / `concreteCache` architecture with singleflight-wrapped `GetOrSet`, `BatchCache[K,V]` interface with MGet/MSet/MDel using provider-optimal strategies, and a benchmark suite proving the dedup and batching wins. Built on 9 validated spikes from 2026-08-06.
 
@@ -108,6 +127,19 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | Two-phase SHA256 verification | go-digest at download + stdlib at swap protects against corruption mid-flight | ✓ Good (v1.5) |
 | singleflight wraps only the setter | Dedups concurrent misses without locking the fast-path Get | ✓ Validated (v1.6 spikes) |
 | Shared GetOrSet helper over per-provider bodies | Eliminates 5× duplicated miss→setter→Set code | ✓ Validated (v1.6 spikes) |
+| Never-fail Probe contract (error only for hard I/O) | Best-effort detection; content never fails | ✓ Good (v1.7, Phase 10) |
+| syscall errno → sentinel mapping (ENOENT/ENOTDIR/EACCES/EPERM) | Cross-platform error discrimination without string matching | ✓ Good (v1.7, Phase 10) |
+| Typed `Language` constants with display values | Discoverable API, switchable, extensible (v2 typescript) | ✓ Good (v1.7, Phase 10) |
+| `Folder` = filepath.Clean(as-given), never absolutized | Deterministic tests, Windows-safe, caller gets what they asked for | ✓ Good (v1.7, Phase 10) |
+| Panic-recovery at registry dispatch | A panicking detector is a non-match, never an error (cache callSetter precedent) | ✓ Good (v1.7, Phase 10) |
+| readManifest 1 MB cap + BOM strip, `([]byte, bool)` | Never-fail contract; no panic on pathological input | ✓ Good (v1.7, Phase 10) |
+| go.mod `go` directive as Version (toolchain floor, raw) | Never fabricated or normalized; documented semantics | ✓ Good (v1.7, Phase 11) |
+| Always-JavaScript for package.json | Distinct `typescript` value deferred to v2 (REFN-01) | ✓ Good (v1.7, Phase 11) |
+| README first-real-paragraph fallback (README.md → README.rst → README) | Description chain when manifest lacks one; skips badges/TOC/headings | ✓ Good (v1.7, Phase 11) |
+| README extraction skip predicates | Badges, TOC lists, rst/setext underline headings, ATX, HTML comments | ✓ Good (v1.7, Phase 11) |
+| `_javascript` filename over `_js` | `_js` suffix is a legacy GOARCH build constraint (silently excludes from non-js builds) | ✓ Good (v1.7, Phase 11) |
+| Quote-aware skip-state scanning in TOML reader | Whole-line delimiter detection fabricated data from malformed TOML (SC4); closesMultiLine/clearsBracket/opensMultiLine + pendingMLS fix it | ✓ Good (v1.7, Phase 12, gap closure) |
+| `version.workspace = true` → empty Version (no resolution) | Dotted-key classification degrades naturally; never fabricated, never resolved | ✓ Good (v1.7, Phase 12) |
 
 ## Evolution
 
@@ -127,4 +159,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-06 after v1.6 Cache Dedup milestone started*
+*Last updated: 2026-09-30 after v1.7 Project Probe milestone*

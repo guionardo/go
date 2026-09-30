@@ -29,6 +29,7 @@ Golang tools, examples, and packages
 | [httptestmock](#package-httptest_mock) | `httptest_mock` | HTTP mock server framework for tests |
 | [mid](#package-mid) | `mid` | Cross-platform machine ID retrieval |
 | [pathtools](#package-path_tools) | `path_tools` | File and directory path utilities |
+| [projectprobe](#package-project_probe) | `project_probe` | Best-effort project detection across 7 languages (manifest-first, stdlib-only, never fails) |
 | [reflecttools](#package-reflect_tools) | `reflect_tools` | Reflection utilities (zero-value check) |
 | [release](#package-release) | `release` | Self-update mechanism via GitHub Releases |
 | [set](#package-set) | `set` | Generic set with algebra, JSON, SQL support |
@@ -306,6 +307,22 @@ func CreatePath(path string) error
 func FileExists(fileName string) bool
 func FindFileInPath(filename string) (string, error)
 func GetRootFolder(base string) (string, error)
+```
+
+### Package project_probe
+
+Import `github.com/guionardo/go/project_probe`
+
+Best-effort project detection across 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP). `Probe` never fails on content: unknown folders return `LanguageUnknown` with a nil error — errors are reserved for hard folder-level I/O failures. Detection runs a manifest-first cascade (go.mod → pyproject.toml → .csproj → package.json → Cargo.toml → pom.xml → composer.json) with first-match-wins ordering, stdlib-only parsing, and a never-fail read path.
+
+```go
+import "github.com/guionardo/go/project_probe"
+
+data, err := projectprobe.Probe("/path/to/project")
+if err != nil {
+    // hard folder-level I/O failure (missing, not a directory, permission)
+}
+// data.Language is LanguageUnknown when the content is unrecognized
 ```
 
 ### Package reflect_tools
