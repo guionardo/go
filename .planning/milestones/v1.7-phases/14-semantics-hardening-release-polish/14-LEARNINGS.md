@@ -1,15 +1,14 @@
 ---
 phase: 14
 phase_name: "Semantics, Hardening, and Release Polish"
-project: "go"
-generated: "2026-09-29"
+project: "github.com/guionardo/go"
+generated: "2026-09-30"
 counts:
   decisions: 8
-  lessons: 6
+  lessons: 7
   patterns: 5
-  surprises: 4
-missing_artifacts:
-  - "*-UAT.md"
+  surprises: 5
+missing_artifacts: []
 ---
 
 # Phase 14 Learnings: Semantics, Hardening, and Release Polish
@@ -90,7 +89,7 @@ release/update.go at 68.9% (51/74 statements) needed just 52 — one no-options 
 The `new`-filter's diff-base resolution behaves differently on a dirty working tree (~300 matches, whole v1.7 branch debt) vs clean committed state (0 issues).
 
 **Context:** delta-zero must be measured on the clean committed state — what CI and the verifier consume — and the artifact documented explicitly.
-**Source:** 14-04-SUMMARY.md, 14-04-SUMMARY.md Issues Encountered
+**Source:** 14-04-SUMMARY.md
 
 ### Multi-badge lines need ReplaceAll, not a single-strip
 isBadgeLine's first fix only handled one plain badge per line; `![CI](a) ![Coverage](b)` left remainder "! !" and leaked raw markdown.
@@ -103,6 +102,12 @@ FailNow/Goexit on a non-test goroutine produces a confusing network error instea
 
 **Context:** pre-existing pattern at update_test.go:195 replicated by the new no-options row; fixed with t.Errorf in handler + non-2xx response.
 **Source:** 14-REVIEW.md
+
+### UAT ran fully automated with zero manual steps
+All 12 UAT items passed with source "automated" — every acceptance criterion was auto-routable via coverage blocks; no human judgment was required for any test.
+
+**Context:** 14-UAT.md completed 2026-09-29 with total 12 / passed 12 / issues 0 / pending 0 — the coverage-mode UAT gate (api-coverage declaration) made the milestone closeout mechanical.
+**Source:** 14-UAT.md
 
 ---
 
@@ -165,3 +170,9 @@ The intended Probe()-based fuzz path was slower and hid per-manifest targets beh
 
 **Impact:** fuzz targets reach each manifest type's parse path directly, making the no-panic invariant more targeted.
 **Source:** 14-01-SUMMARY.md
+
+### UAT closed the milestone with a perfect score and zero pending items
+12/12 passed with 0 issues, 0 pending, 0 skipped, 0 blocked — no gaps were found at the acceptance gate after the deferred-items ledger was discharged.
+
+**Impact:** the milestone's final gate was mechanical; the user confirmed completion without corrections, and the UAT artifacts became the closeout record (COVERAGE.md declaration, SECURITY.md 16/16).
+**Source:** 14-UAT.md
