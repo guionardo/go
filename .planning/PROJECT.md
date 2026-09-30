@@ -46,19 +46,17 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 <!-- Current scope. Building toward these. -->
 
-- ✓ **`project_probe` v1.7 SHIPPED** — all 7 detectors live, fuzz-hardened, documented, coverage gate green (80.7% total) — completed 2026-09-29 (Phases 10-14)
+- [ ] String utilities package (v2 backlog — truncation, padding, join/split)
+- [ ] Retry package with backoff strategies and jitter support (v2 backlog)
+- [ ] Framework detection for project_probe (v2 — dependencies-based)
 
-## Current Milestone: v1.7 Project Probe — **COMPLETE**
+## Current State
 
-**Goal:** A stdlib-only `project_probe` package that reads a folder's contents and reports the project's language, name, version, and description — best-effort, never failing.
+**v1.7 Project Probe — SHIPPED 2026-09-30**
 
-**Target features:**
-- `ProjectData{Folder, Language, Name, Version, Description}` — description from manifest, fallback README first paragraph
-- 7 language detectors: Go, Python, JavaScript/TypeScript, C#/.NET, Rust, Java/Kotlin, PHP — **ALL SHIPPED (Phase 13)**
-- Name from manifest (go.mod module, package.json name...), fallback folder name
-- Version = manifest version (go.mod go directive, package.json version, Cargo.toml version...)
-- Unknown folders → `Unknown` type, no error
-- Framework detection deferred (dependencies-based, later milestone)
+The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP) with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states — SC4 fabrication gap closed), fuzz-hardened (3 targets, 20-seed corpus), doc.go Version-semantics contract, and the anti-feature audit. 820+ tests across 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
+
+**Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
 
 **Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
 
@@ -83,29 +81,9 @@ Eliminated duplicate setter work in cache misses and reduced round trips via sin
 
 ## Current State
 
-**v1.7 — Project Probe** (in progress)
+**v1.7 — Project Probe** (SHIPPED 2026-09-30)
 
-New `project_probe` package replacing the `project_detector/` sample: reads folder contents, reports language, name, version, and description across 7 languages. Stdlib-only, best-effort detection (Unknown type, no error).
-
-**Phase 10 — Package Foundation** (completed 2026-09-28)
-
-Deleted the broken `project_detector/` sample and shipped the `projectprobe` package foundation: never-fail `Probe(folder) (ProjectData, error)` contract with 3 error sentinels (ErrFolderNotFound, ErrNotDirectory, ErrPermissionDenied) mapped from syscall errnos, `ProjectData{Folder, Language, Name, Version, Description}` model with typed `Language` constants, ordered detector registry with panic-recovery dispatch (empty — detectors land in phases 11-13), 13-entry exact-case ignore list, and `readManifest` (1 MB cap, BOM strip). 30 tests, 100% package coverage.
-
-**Phase 11 — Text/JSON Detectors** (completed 2026-09-29)
-
-Wired the first three detectors into the Phase 10 registry: `detectGo` (go.mod — module path verbatim, `go` directive as toolchain-floor Version), `detectJS` (package.json — always LanguageJavaScript), `detectPHP` (composer.json — full vendor/package name, absent version → empty). Shared `readJSONManifest` never-fail helper, `readmeDescription` first-real-paragraph fallback (README.md → README.rst → README, skipping badges/TOC/headings/comments), WR-01 FIFO regular-file gate on readManifest. Registry at 7-slot literal with 3 live entries (Go@0, JS@3, PHP@6). 96 tests, 96.4% package coverage.
-
-**Phase 12 — TOML Subset + Python/Rust Detectors** (completed 2026-09-29)
-
-`readTOMLSection` (section-aware, stdlib-only, three global skip states, strict degrade-to-empty) plus `detectPython` (pyproject `[project]` PEP 621 primary, `[tool.poetry]` whole-section fallback) and `detectRust` (Cargo `[package]`, `version.workspace` → empty). Registry 5-of-7 live (Go@0, Python@1, JS@3, Rust@4, PHP@6). Code review found a fabrication gap (whole-line skip-state clearing) — closed via gap plan 12-04 with quote-aware scanning (closesMultiLine/clearsBracket/opensMultiLine + pendingMLS); verifier's 9-row adversarial probe confirms no fabrication. 185 tests, 93.1% package coverage.
-
-**Phase 13 — XML Detectors — C#/.NET + Java/Kotlin** (completed 2026-09-29)
-
-Completed the 7-detector registry: `detectCSharp` (.csproj via readFirstManifest discovery + inline XMLName namespace-agnostic decode, PropertyGroup collect-first-then-chain) and `detectJavaKotlin` (pom.xml presence gate + `<parent><version>` single-level inheritance, settings.gradle rootProject.name fallback only-when-no-pom with never-panic parse). Registry 7-of-7 live (Go@0, Python@1, C#/.NET@2, JS@3, Rust@4, Java/Kotlin@5, PHP@6). 236 tests, 93.6% package coverage.
-
-**Phase 14 — Semantics, Hardening, and Release Polish** (completed 2026-09-29 — milestone complete)
-
-Version semantics contract documented in doc.go (raw strings, toolchain floor, workspace/dynamic → empty); 3 fuzz targets with 20-file real-manifest corpus (no-panic under plain go test); correctness fold-ins from all review ledgers (README badges/HTML comments, XML trim, exact-name guard, registry test hygiene); anti-feature audit zero-match (14-AUDIT.md, one disclosed badge-stripping exception); coverage gate closed (release/update.go tests → 95.9%, make coverage-quick PASS 80.7%); README package index row. 820 tests across 25 packages. **v1.7 Project Probe complete.**
+The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states), fuzz-hardened, doc.go Version-semantics contract, anti-feature audit. 820+ tests / 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
 
 **Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
 
@@ -181,4 +159,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-29 after Phase 14 (v1.7 Project Probe COMPLETE)*
+*Last updated: 2026-09-30 after v1.7 Project Probe milestone*
