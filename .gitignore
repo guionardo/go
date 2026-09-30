@@ -35,3 +35,4 @@ cover*.out
 # Swapper build artifacts
 release/swapper/swapper_*
 release/swapper/*.exe
+.DS_Store

@@ -169,4 +169,3 @@ None - no external service configuration required. (Redis/valkey/memcache/postgr
 - All 13 modified files verified present on disk
 - All 3 task commits verified in git log: `6ade60f` (feat), `2ac849c` (test), `3c76ed6` (docs)
 - SUMMARY.md verified present at `.planning/phases/05-shared-singleflight-helper/05-03-SUMMARY.md`
-

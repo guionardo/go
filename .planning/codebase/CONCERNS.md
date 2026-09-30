@@ -123,7 +123,7 @@ return p.updateConfiguration(configuration)  // configuration may be zero-value
 
 **Files:** `httptest_mock/request.go` (lines 113-140, 143-158)
 
-**Why fragile:** 
+**Why fragile:**
 - `matchPath` mutates `readData` as a side effect
 - `matchPathParams` also looks up `readData` as fallback
 - The path parameter parsing logic is ad-hoc (string splitting, `HasPrefix`/`HasSuffix` with `{}`)
