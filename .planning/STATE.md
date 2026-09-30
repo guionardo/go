@@ -2,18 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.7
 milestone_name: Project Probe
-current_phase: 14
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 14 complete — all phases complete
-last_updated: "2026-09-29T12:16:03.728Z"
-last_activity: 2026-09-29
-state_head: 96c180941b683c4246fdd9ddd12896b2e8d8014c
+last_updated: "2026-09-30T23:19:07.437Z"
+last_activity: 2026-09-30
+last_activity_desc: Milestone v1.7 completed and archived
+state_head: 2b8b56b1dd9efa9a858cb0ded60d9a1773d994f2
 progress:
   total_phases: 5
   completed_phases: 12
   total_plans: 16
   completed_plans: 16
   percent: 100
+current_phase: 14
 ---
 
 # Project State
@@ -27,12 +28,10 @@ See: .planning/PROJECT.md (updated 2026-09-29)
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-09-29
-
-Progress: [██████████] 100%
+Phase: Milestone v1.7 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-30 — Milestone v1.7 completed and archived
 
 ## Performance Metrics
 
@@ -152,3 +151,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 Last session: 2026-09-29T11:19:32.049Z
 Stopped at: Phase 14 complete — all phases complete
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
