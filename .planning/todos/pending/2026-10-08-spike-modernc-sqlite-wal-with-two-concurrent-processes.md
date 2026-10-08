@@ -3,6 +3,7 @@ created: 2026-10-08T11:46:07Z
 title: Spike modernc SQLite WAL with two concurrent processes
 area: database
 severity: minor
+resolves_phase: 16
 files:
   - cache/ (future cache/sqlite provider)
 ---
