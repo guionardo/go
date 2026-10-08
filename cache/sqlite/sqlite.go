@@ -95,7 +95,21 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 		return err
 	}
 
+	if !memory {
+		c.verifyJournalMode(ctx)
+	}
+
 	return nil
+}
+
+// verifyJournalMode reads back the effective journal mode on the pinned
+// connection. A mismatch only logs a warning — construction never fails on the
+// read-back (WAL silently degrades on filesystems without shared memory).
+func (c *sqliteCache[K, V]) verifyJournalMode(ctx context.Context) {
+	var mode string
+	if err := c.db.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&mode); err != nil || mode != "wal" {
+		logger().Warn("cache/sqlite: journal_mode is not wal", "mode", mode, "error", err)
+	}
 }
 
 // bootstrap creates the fixed schema inside one transaction. Because the DSN

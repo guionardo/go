@@ -1,6 +1,7 @@
 package sqlite_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/guionardo/go/cache"
@@ -49,4 +50,33 @@ func TestBatchPlaceholderSmoke(t *testing.T) {
 
 	got = c.MGet(t.Context(), "a", "b")
 	assert.Equal(t, map[string]string{"b": "2"}, got)
+}
+
+func TestFileCRUD(t *testing.T) {
+	c := sqlite.New[string, string](sqlite.WithPath(filepath.Join(t.TempDir(), "cache.db")))
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "file-key", "file-value"))
+
+	got, err := c.Get(t.Context(), "file-key")
+	require.NoError(t, err)
+	assert.Equal(t, "file-value", got)
+
+	require.NoError(t, c.Delete(t.Context(), "file-key"))
+
+	_, err = c.Get(t.Context(), "file-key")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, cache.ErrMiss)
+}
+
+func TestFilePathWithSpaces(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "cache dir with spaces")
+	c := sqlite.New[string, string](sqlite.WithPath(filepath.Join(dir, "cache.db")))
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "k", "v"))
+
+	got, err := c.Get(t.Context(), "k")
+	require.NoError(t, err)
+	assert.Equal(t, "v", got)
 }
