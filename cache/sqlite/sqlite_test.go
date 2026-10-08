@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"io/fs"
 	"os"
@@ -483,4 +484,83 @@ func TestOptimizableMemory(t *testing.T) {
 
 	// Memory mode has no WAL: the checkpoint is a valid busy=0 no-op.
 	require.NoError(t, opt.Checkpoint(t.Context()))
+}
+
+func TestCheckpointBlocked(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "blocked.db")
+
+	c := sqlite.New[string, string](sqlite.WithPath(path))
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "k", "v"))
+
+	// A second connection holding an open read transaction blocks the
+	// TRUNCATE checkpoint: after the busy timeout the PRAGMA reports busy != 0,
+	// which Checkpoint must surface as an error — never a silent nil.
+	db2, err := sql.Open("sqlite", path)
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = db2.Close() })
+
+	tx, err := db2.BeginTx(t.Context(), &sql.TxOptions{ReadOnly: true})
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = tx.Rollback() })
+
+	rows, err := tx.QueryContext(t.Context(), "SELECT COUNT(*) FROM cache_entries")
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = rows.Close() })
+
+	var count int
+
+	require.True(t, rows.Next())
+	require.NoError(t, rows.Scan(&count))
+
+	opt, ok := c.(sqlite.Optimizable)
+	require.True(t, ok)
+
+	err = opt.Checkpoint(t.Context())
+	require.Error(t, err, "blocked checkpoint must never be a silent nil")
+	require.ErrorContains(t, err, "busy")
+}
+
+func TestOptimizableClosed(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+	require.NoError(t, c.Close())
+
+	opt, ok := c.(sqlite.Optimizable)
+	require.True(t, ok)
+
+	err := opt.Checkpoint(t.Context())
+	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorContains(t, err, "cache/sqlite:")
+
+	err = opt.Vacuum(t.Context())
+	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorContains(t, err, "cache/sqlite:")
+}
+
+func TestOptimizableDeferredErr(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithPath("bad?path"))
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	opt, ok := c.(sqlite.Optimizable)
+	require.True(t, ok)
+
+	err := opt.Checkpoint(t.Context())
+	require.ErrorIs(t, err, sqlite.ErrInvalidPath)
+	require.ErrorContains(t, err, "cache/sqlite:")
+
+	err = opt.Vacuum(t.Context())
+	require.ErrorIs(t, err, sqlite.ErrInvalidPath)
+	require.ErrorContains(t, err, "cache/sqlite:")
 }

@@ -330,6 +330,39 @@ func readAutoCheckpoint(t *testing.T, c *sqliteCache[string, string]) int {
 	return pages
 }
 
+// TestCheckpointColumns proves the PRAGMA wal_checkpoint(TRUNCATE) three-column
+// scan (Pitfall 16): a healthy checkpoint succeeds — a one-value scan would
+// fail with an argument-count error — and driver-level failures come back
+// wrapped with the cache/sqlite: prefix.
+func TestCheckpointColumns(t *testing.T) {
+	t.Parallel()
+
+	t.Run("healthy_file_checkpoint_scans_three_columns", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "columns.db")))
+		require.NoError(t, c.initErr)
+
+		require.NoError(t, c.checkpoint(t.Context()))
+	})
+
+	t.Run("driver_error_is_wrapped_with_prefix", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "broken.db")))
+		require.NoError(t, c.initErr)
+		require.NoError(t, c.db.Close())
+
+		err := c.checkpoint(t.Context())
+		require.Error(t, err)
+		require.ErrorContains(t, err, "cache/sqlite:")
+
+		err = c.vacuum(t.Context())
+		require.Error(t, err)
+		require.ErrorContains(t, err, "cache/sqlite:")
+	})
+}
+
 // countCacheTables returns the number of sqlite_master entries named
 // cache_entries on the provider's pinned connection.
 func countCacheTables(t *testing.T, c *sqliteCache[string, string]) int {
