@@ -66,7 +66,11 @@
   3. Data survives restarts: reopening an existing cache file preserves unexpired entries; `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`, fixed three-column schema).
   4. Expiry behaves with TTL parity: per-call TTL wins, zero/absent falls back to the provider default, none means no expiry — stored as an absolute UnixNano timestamp that survives restarts; expired entries are never returned and reads never delete rows; a best-effort sweep runs on open, and an optional periodic sweep interval (mem/postgres parity) reclaims entries in long-running processes.
   5. Every pooled connection carries the DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock — verified by read-back (`journal_mode` is `wal` for file databases); callers can tune `wal_autocheckpoint` and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 15-01-PLAN.md — Provider foundation: pinned dependency, constructor + location modes, primitive CRUD contracts, error taxonomy (tracer-led; batch placeholders with Phase 16 TODO)
+- [ ] 15-02-PLAN.md — TTL expiry, filter-only reads, sweep-on-open + opt-in periodic sweeper, durability lifecycle (sidecar removal, reopen persistence)
+- [ ] 15-03-PLAN.md — Storage controls (`Optimizable` checkpoint/vacuum, `WithAutoCheckpoint`), docs, example, README rows, repo-wide coverage gate
 
 ### Phase 16: Batch Surface + Multi-Process Hardening
 **Goal**: The `BatchCache` surface is complete with v1.6 semantics, and the milestone's headline promise is proven — two OS processes share one cache file under WAL without corruption, with contention bounded by `busy_timeout`.
@@ -109,6 +113,6 @@
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
-| 15. Provider Foundation + Core Semantics | v1.8 | 0/— | Not started | - |
+| 15. Provider Foundation + Core Semantics | v1.8 | 0/3 | Not started | - |
 | 16. Batch + Multi-Process Hardening | v1.8 | 0/— | Not started | - |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |
