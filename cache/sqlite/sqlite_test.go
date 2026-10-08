@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -124,6 +125,195 @@ func TestBatchMDel(t *testing.T) {
 
 	// Idempotent: deleting missing keys is a nil no-op.
 	require.NoError(t, c.MDel(t.Context(), keys...))
+}
+
+// TestBatchSemantics owns the black-box batch contract (replaces the Phase 15
+// placeholder smoke test): MSet -> MGet roundtrip with a missing key absent,
+// MDel idempotency, MGet after MDel, empty-input no-ops, and one TTL expiring
+// every key of the batch — semantics aligned with the mem provider it mirrors.
+func TestBatchSemantics(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mset_mget_roundtrip_with_missing_key_absent", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithMemory())
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		require.NoError(t, c.MSet(t.Context(), map[string]string{"a": "1", "b": "2"}))
+
+		got := c.MGet(t.Context(), "a", "b", "missing")
+		assert.Equal(t, map[string]string{"a": "1", "b": "2"}, got)
+	})
+
+	t.Run("mdel_idempotent_and_mget_reflects_deletes", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithMemory())
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		require.NoError(t, c.MSet(t.Context(), map[string]string{"a": "1", "b": "2"}))
+
+		require.NoError(t, c.MDel(t.Context(), "a"))
+		assert.Equal(t, map[string]string{"b": "2"}, c.MGet(t.Context(), "a", "b"))
+
+		// Deleting already-deleted keys is a nil no-op (idempotency).
+		require.NoError(t, c.MDel(t.Context(), "a"))
+	})
+
+	t.Run("empty_inputs_are_no_ops", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithMemory())
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		// MSet with an empty map stores nothing and returns nil; MDel with no
+		// keys is nil; MGet with no keys returns an empty (non-nil) map.
+		require.NoError(t, c.MSet(t.Context(), map[string]string{}))
+		require.NoError(t, c.MDel(t.Context()))
+
+		got := c.MGet(t.Context())
+		require.NotNil(t, got)
+		assert.Empty(t, got)
+	})
+
+	t.Run("one_ttl_expires_every_key_of_the_batch", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithMemory())
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		keys := map[string]string{"k1": "1", "k2": "2", "k3": "3"}
+		require.NoError(t, c.MSet(t.Context(), keys, 40*time.Millisecond))
+		require.Len(t, c.MGet(t.Context(), "k1", "k2", "k3"), 3)
+
+		require.Eventually(t, func() bool {
+			return len(c.MGet(t.Context(), "k1", "k2", "k3")) == 0
+		}, time.Second, 5*time.Millisecond)
+	})
+}
+
+// TestConcurrentBatchOpsRace is the CONC-03 evidence: 8 goroutines mixing
+// point and batch operations on one provider — file mode and :memory: —
+// must complete without a data race on the pinned single-connection pool.
+func TestConcurrentBatchOpsRace(t *testing.T) {
+	t.Parallel()
+
+	t.Run("file_mode", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](
+			sqlite.WithPath(filepath.Join(t.TempDir(), "race.db")), sqlite.WithDefaultTTL(time.Hour))
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		runBatchWorkers(t, c)
+	})
+
+	t.Run("memory_mode", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithMemory(), sqlite.WithDefaultTTL(time.Hour))
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		runBatchWorkers(t, c)
+	})
+}
+
+// runBatchWorkers drives 8 goroutines through a bounded mixed-op loop: Set,
+// Get, Delete, MGet (3 keys), MSet (5 keys), MDel, and GetOrSet, on
+// per-worker prefixed keys plus one shared key. Each worker records its first
+// error; after the start-channel release every worker error must be nil.
+//
+//nolint:funlen,gocognit,cyclop // CONC-03 harness: 8-op mixed loop with per-op guards
+func runBatchWorkers(t *testing.T, c cache.BatchCache[string, string]) {
+	t.Helper()
+
+	const workers = 8
+
+	const iterations = 50
+
+	start := make(chan struct{})
+	errs := make([]error, workers)
+
+	var wg sync.WaitGroup
+
+	for i := range workers {
+		wg.Go(func() {
+			<-start
+
+			ctx := t.Context()
+			prefix := "w" + strconv.Itoa(i)
+
+			step := func(s int) bool {
+				if s%3 == 0 {
+					if err := c.Delete(ctx, fmt.Sprintf("%s:%02d", prefix, s)); err != nil {
+						errs[i] = err
+
+						return false
+					}
+				}
+
+				c.MGet(ctx, fmt.Sprintf("%s:%02d", prefix, s), fmt.Sprintf("%s:%02d", prefix, s), "missing")
+
+				if s%5 == 0 {
+					if err := c.MDel(ctx, "missing"); err != nil {
+						errs[i] = err
+
+						return false
+					}
+				}
+
+				if _, err := c.GetOrSet(ctx, prefix+":set", func(context.Context) (string, error) {
+					return "computed", nil
+				}); err != nil {
+					errs[i] = err
+
+					return false
+				}
+
+				return true
+			}
+
+			for s := range iterations {
+				k := fmt.Sprintf("%s:%02d", prefix, s)
+
+				if err := c.Set(ctx, k, "v"); err != nil {
+					errs[i] = err
+
+					return
+				}
+
+				if _, err := c.Get(ctx, k); err != nil {
+					errs[i] = err
+
+					return
+				}
+
+				batchKeys := map[string]string{
+					prefix + ":batch:" + strconv.Itoa(s):            "b",
+					prefix + ":batch:" + strconv.Itoa(iterations+s): "b2",
+				}
+				_ = c.MSet(ctx, batchKeys)
+
+				if !step(s) {
+					return
+				}
+			}
+		})
+	}
+
+	close(start)
+	wg.Wait()
+
+	for i, err := range errs {
+		require.NoErrorf(t, err, "worker %d", i)
+	}
 }
 
 func TestFileCRUD(t *testing.T) {
