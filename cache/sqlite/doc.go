@@ -34,8 +34,15 @@
 // Data and state: file-backed entries persist across process runs. Close
 // closes the database, which checkpoints the WAL and removes the -wal/-shm
 // sidecars on the last connection. File mode verifies journal_mode (WAL) at
-// open; a mismatch only logs a warning. WAL requires local storage: network
-// filesystems and cross-host sharing are unsupported.
+// open; a mismatch only logs a warning. File mode supports same-host
+// multi-process sharing of a cache file: WAL serializes writers and the 5 s
+// busy_timeout bounds write contention, which surfaces as an error at BEGIN
+// rather than silent corruption. A fresh database opened concurrently with
+// another process briefly retries connection establishment (busy-only,
+// bounded by the same timeout). A canceled MGet returns the partial results
+// gathered so far — the frozen MGet signature has no error channel. WAL
+// requires local storage: network filesystems and cross-host sharing are
+// unsupported.
 //
 // Long-running processes can tune WAL checkpointing with WithAutoCheckpoint
 // and reclaim space explicitly through the Optimizable interface
