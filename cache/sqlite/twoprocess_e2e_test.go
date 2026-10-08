@@ -23,18 +23,23 @@ import (
 	_ "modernc.org/sqlite" // registers the "sqlite" driver for the raw test-only handles
 )
 
-// Two-process E2E (Phase 16, D-09/D-10): the parent spawns two child processes
-// through the TestMain re-exec pattern; each child drives the SHIPPED provider
-// (the public sqlite.New + WithPath API) against one shared, fresh cache file
-// — 100 point Set/Get pairs, a point Delete with an absence check on the
-// tenth-iteration cadence, a 20-key MSet + MGet every 10th iteration, and a
-// chunked MDel every 15th — and exits 0. The provider's own open() owns the
-// bounded busy-only retry (Plan 16-02, D-06), so the child path contains no
-// retry logic at all: the production path is what the E2E exercises.
+// Two-process E2E (Phase 16, D-09/D-10): the parent spawns child processes
+// through the TestMain re-exec pattern. The contention arm drives the SHIPPED
+// provider (the public sqlite.New + WithPath API) from two processes against
+// one shared, fresh cache file — 100 point Set/Get pairs, a point Delete with
+// an absence check on the tenth-iteration cadence, a 20-key MSet + MGet every
+// 10th iteration, and a chunked MDel every 15th — and exits 0. The crash arm
+// kills a raw-handle child mid-transaction (marker-file synchronized) and
+// proves the survivor completes and the file reopens clean. The provider's
+// own open() owns the bounded busy-only retry (Plan 16-02, D-06), so the
+// contention child path contains no retry logic at all: the production path
+// is what the E2E exercises.
 const (
 	helperEnv = "SQLITE_E2E_HELPER"
 	dbEnv     = "SQLITE_E2E_DB"
 	roleEnv   = "SQLITE_E2E_ROLE"
+	crashEnv  = "SQLITE_E2E_CRASH"
+	markerEnv = "SQLITE_E2E_MARKER"
 
 	// e2eDSN mirrors the dsnSuffixFile literal in dsn.go. It belongs only to
 	// the raw test-only handles — the parent's verification handle and (Plan
@@ -57,6 +62,10 @@ const (
 	// childTimeout bounds every parent-child interaction: no child wait is
 	// unbounded (T-16-10).
 	childTimeout = 60 * time.Second
+
+	// markerTimeout bounds the crash-marker wait: the crasher must signal it
+	// holds an open write transaction within this window.
+	markerTimeout = 2 * time.Second
 
 	// e2eCreateTableSQL / e2eCreateIndexSQL / e2eUpsertSQL mirror schema.go's
 	// constants for the raw crash-child handle (same test-only mirror note as
@@ -93,8 +102,13 @@ func TestMain(m *testing.M) {
 // helperMain is the child entry point. It drives the shipped provider (the
 // public API only — the DI-15-01 bounded open retry lives inside the
 // provider's open()) against the shared database, runs the mixed workload,
-// and finishes with the role's final marker. It returns the process exit code.
+// and finishes with the role's final marker. With SQLITE_E2E_CRASH=1 it acts
+// as the crash-arm child instead. It returns the process exit code.
 func helperMain() int {
+	if os.Getenv(crashEnv) == "1" {
+		return crashMain()
+	}
+
 	role := os.Getenv(roleEnv)
 
 	c := sqlite.New[string, string](sqlite.WithPath(os.Getenv(dbEnv)))
@@ -109,6 +123,65 @@ func helperMain() int {
 	}
 
 	return 0
+}
+
+// crashMain is the crash-arm child (D-10B): it opens a raw handle (the
+// test-only DSN mirror), bootstraps the mirrored schema, holds an open
+// BEGIN IMMEDIATE transaction with one uncommitted row, signals the parent
+// through the marker file, and blocks until the parent kills it. It never
+// returns on its own.
+func crashMain() int {
+	dbPath := os.Getenv(dbEnv)
+	markerPath := os.Getenv(markerEnv)
+
+	db, err := sql.Open("sqlite", dbPath+e2eDSN)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sqlite e2e crasher: open: %v\n", err)
+
+		return 1
+	}
+	defer func() { _ = db.Close() }()
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	ctx := context.Background()
+
+	if err := e2eBootstrap(ctx, db); err != nil {
+		fmt.Fprintf(os.Stderr, "sqlite e2e crasher: bootstrap: %v\n", err)
+
+		return 1
+	}
+
+	// _txlock=immediate makes this BEGIN IMMEDIATE: the write lock is held
+	// until the parent kills the process, and the inserted row stays
+	// uncommitted (rolled back by WAL recovery after the kill).
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sqlite e2e crasher: begin: %v\n", err)
+
+		return 1
+	}
+	defer func() { _ = tx.Rollback() }() // never runs: the process is killed
+
+	if _, err := tx.ExecContext(ctx, e2eUpsertSQL, "crash:uncommitted", "pending", nil); err != nil {
+		fmt.Fprintf(os.Stderr, "sqlite e2e crasher: insert: %v\n", err)
+
+		return 1
+	}
+
+	if err := os.WriteFile(markerPath, []byte("ready"), 0o600); err != nil {
+		fmt.Fprintf(os.Stderr, "sqlite e2e crasher: marker: %v\n", err)
+
+		return 1
+	}
+
+	// Block until the parent kills the process. The timer keeps the runtime's
+	// deadlock detector quiet, so the child never exits on its own (a bare
+	// select {} would be a fatal "all goroutines are asleep" deadlock).
+	for {
+		time.Sleep(time.Minute)
+	}
 }
 
 // runContentionWorkload executes the D-10A mixed workload through the shipped
@@ -222,17 +295,20 @@ func e2eBootstrap(ctx context.Context, db *sql.DB) error {
 }
 
 // startChild launches the re-executed test binary as a helper child driving
-// the shared database with the given role. Child stdout/stderr are captured
-// into buffers for failure diagnostics; the caller registers Kill+Wait
-// cleanup for the returned process handle.
-func startChild(t *testing.T, dbPath, role string) (*exec.Cmd, *bytes.Buffer) {
+// the shared database with the given role and optional extra environment
+// entries. Child stdout/stderr are captured into buffers for failure
+// diagnostics; the caller registers Kill+Wait cleanup for the returned
+// process handle.
+func startChild(t *testing.T, dbPath, role string, extra ...string) (*exec.Cmd, *bytes.Buffer) {
 	t.Helper()
 
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(),
-		helperEnv+"=1",
-		dbEnv+"="+dbPath,
-		roleEnv+"="+role,
+		append([]string{
+			helperEnv + "=1",
+			dbEnv + "=" + dbPath,
+			roleEnv + "=" + role,
+		}, extra...)...,
 	)
 
 	var stdout, stderr bytes.Buffer
@@ -272,6 +348,29 @@ func cleanupChildren(cmds []*exec.Cmd) {
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
 		}
+	}
+}
+
+// killChild kills a child and waits for its exit with an explicit timeout. A
+// killed child reports a non-zero exit (an error from Wait); that error is
+// returned for the caller to assert — never a specific exit code or signal
+// (Windows semantics, Phase 15 Pitfall 6).
+func killChild(t *testing.T, cmd *exec.Cmd) error {
+	t.Helper()
+
+	require.NoError(t, cmd.Process.Kill())
+
+	done := make(chan error, 1)
+
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(childTimeout):
+		t.Fatalf("killed child did not exit within %s", childTimeout)
+
+		return nil
 	}
 }
 
@@ -366,4 +465,56 @@ func TestTwoProcessContention(t *testing.T) {
 			assertKeyAbsent(t, ctx, db, deleted)
 		}
 	}
+}
+
+// TestTwoProcessCrashRecovery kills a writer mid-transaction (D-10B): the
+// crasher holds an open BEGIN IMMEDIATE with an uncommitted row and signals
+// through the marker file; the parent kills it, the provider-driven survivor
+// completes its loop with exit 0, and the reopened file proves the
+// uncommitted row was rolled back while the survivor's data survived.
+func TestTwoProcessCrashRecovery(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "shared.db")
+	markerPath := filepath.Join(dir, "crash.marker")
+
+	crasher, crasherErr := startChild(t, dbPath, "crasher", crashEnv+"=1", markerEnv+"="+markerPath)
+
+	t.Cleanup(func() { cleanupChildren([]*exec.Cmd{crasher}) })
+
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(markerPath)
+
+		return err == nil
+	}, markerTimeout, 10*time.Millisecond, "crasher must signal it holds an open write transaction")
+
+	survivor, survivorErr := startChild(t, dbPath, "survivor")
+
+	t.Cleanup(func() { cleanupChildren([]*exec.Cmd{survivor}) })
+
+	// The crasher never exits on its own: it is killed while holding the
+	// write lock with an uncommitted row. A killed child's wait reports an
+	// error (non-zero status) — asserted as such, never as a specific code
+	// or signal (Windows semantics, Phase 15 Pitfall 6).
+	require.Errorf(t, killChild(t, crasher), "killed crasher must not exit cleanly\nstderr:\n%s", crasherErr.String())
+
+	require.NoErrorf(t, waitChild(survivor, childTimeout), "survivor exited non-zero\nstderr:\n%s", survivorErr.String())
+
+	db, err := sql.Open("sqlite", dbPath+e2eDSN)
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	ctx := t.Context()
+
+	assertIntegrityOK(t, ctx, db)
+	assertKeyAbsent(t, ctx, db, "crash:uncommitted")
+
+	var raw string
+
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT value FROM cache_entries WHERE cache_key = ?", "survivor:final").Scan(&raw))
+
+	var marker string
+
+	require.NoError(t, json.Unmarshal([]byte(raw), &marker))
+	assert.Equal(t, "done", marker, "survivor final marker")
 }
