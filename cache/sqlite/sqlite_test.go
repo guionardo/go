@@ -450,3 +450,37 @@ func TestClosedErrorPrefix(t *testing.T) {
 	require.ErrorIs(t, err, sqlite.ErrClosed)
 	require.ErrorContains(t, err, "cache/sqlite:")
 }
+
+func TestOptimizable(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithPath(filepath.Join(t.TempDir(), "optimize.db")))
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	opt, ok := c.(sqlite.Optimizable)
+	require.True(t, ok, "New must return a value implementing sqlite.Optimizable")
+
+	require.NoError(t, c.Set(t.Context(), "k", "v"))
+
+	require.NoError(t, opt.Checkpoint(t.Context()))
+	require.NoError(t, opt.Vacuum(t.Context()))
+
+	got, err := c.Get(t.Context(), "k")
+	require.NoError(t, err)
+	assert.Equal(t, "v", got)
+}
+
+func TestOptimizableMemory(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	opt, ok := c.(sqlite.Optimizable)
+	require.True(t, ok)
+
+	// Memory mode has no WAL: the checkpoint is a valid busy=0 no-op.
+	require.NoError(t, opt.Checkpoint(t.Context()))
+}

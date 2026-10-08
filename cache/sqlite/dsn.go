@@ -3,6 +3,7 @@ package sqlite
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -13,6 +14,10 @@ import (
 const (
 	dsnSuffixFile   = "?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate"
 	dsnSuffixMemory = "?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate"
+
+	// dsnAutoCheckpointPrefix opens the wal_autocheckpoint pragma append; the
+	// value is always strconv.Itoa of a caller int, never a caller string.
+	dsnAutoCheckpointPrefix = "&_pragma=wal_autocheckpoint("
 
 	// memoryPath is the SQLite in-memory database path.
 	memoryPath = ":memory:"
@@ -71,12 +76,18 @@ func validName(name string) bool {
 }
 
 // buildDSN appends the compile-time-constant pragma suffix to the validated
-// path. The only variable component is the already-validated path itself —
-// pragma values are never derived from caller input.
-func buildDSN(path string, memory bool) string {
+// path. The only variable components are the already-validated path and the
+// autocheckpoint page count formatted by strconv.Itoa — no caller string ever
+// reaches the DSN (A6). Memory mode ignores the autocheckpoint parameter.
+func buildDSN(path string, memory bool, autoCheckpointPages int) string {
 	if memory {
 		return path + dsnSuffixMemory
 	}
 
-	return path + dsnSuffixFile
+	dsn := path + dsnSuffixFile
+	if autoCheckpointPages > 0 {
+		dsn += dsnAutoCheckpointPrefix + strconv.Itoa(autoCheckpointPages) + ")"
+	}
+
+	return dsn
 }

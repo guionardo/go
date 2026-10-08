@@ -20,8 +20,10 @@ import (
 
 // sqliteCache is the SQLite-backed provider. It implements the cache.cacher
 // primitive interface (GetFunc/SetFunc/DeleteFunc/CloseFunc and the batch
-// methods); New wraps it in a cache.NewConcreteCache, which supplies the
-// shared Cache surface (singleflight GetOrSet dedup, Cache interface).
+// methods); New embeds it in the batchCache adapter built on
+// cache.NewConcreteCache, which supplies the shared Cache surface (singleflight
+// GetOrSet dedup, Cache interface) plus the sqlite.Optimizable maintenance
+// surface.
 //
 // The database pool is pinned to a single connection in both modes: it is
 // mandatory for :memory: correctness (each pooled connection would otherwise
@@ -55,7 +57,8 @@ var (
 //
 // New never fails: open or validation errors are recorded and deferred, and
 // the first operation that needs the database returns them wrapped. Returns a
-// cache.BatchCache sharing the in-memory singleflight GetOrSet.
+// cache.BatchCache sharing the in-memory singleflight GetOrSet; the returned
+// value also implements Optimizable (type-assert to reach Checkpoint/Vacuum).
 func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
 	cfg := defaultConfig()
 	for _, opt := range opts {
@@ -68,7 +71,10 @@ func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
 	}
 	c.initErr = c.open(context.Background(), cfg)
 
-	return cache.NewConcreteCache[K, V](c)
+	return &batchCache[K, V]{
+		BatchCache: cache.NewConcreteCache[K, V](c),
+		provider:   c,
+	}
 }
 
 // open resolves the location, creates the cache directory for file mode, opens
@@ -86,7 +92,7 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 		}
 	}
 
-	db, err := sql.Open("sqlite", buildDSN(path, memory))
+	db, err := sql.Open("sqlite", buildDSN(path, memory, cfg.AutoCheckpoint))
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,11 @@ type (
 		Memory        bool
 		DefaultTTL    time.Duration
 		SweepInterval time.Duration
+
+		// AutoCheckpoint tunes wal_autocheckpoint for file-mode caches: when
+		// positive, the DSN sets the page threshold. Zero keeps SQLite's
+		// default (1000 pages); memory mode ignores it (D-07).
+		AutoCheckpoint int
 	}
 
 	// Option is a functional option for configuring the SQLite cache provider.
@@ -61,5 +66,15 @@ func WithDefaultTTL(ttl time.Duration) Option {
 func WithSweepInterval(d time.Duration) Option {
 	return func(cfg *Config) {
 		cfg.SweepInterval = d
+	}
+}
+
+// WithAutoCheckpoint tunes WAL automatic checkpointing for file-mode caches:
+// pages > 0 sets wal_autocheckpoint to that page count; the zero value keeps
+// SQLite's default (1000 pages) — no sentinel semantics (D-07). Non-positive
+// values append nothing, and memory mode ignores the option.
+func WithAutoCheckpoint(pages int) Option {
+	return func(cfg *Config) {
+		cfg.AutoCheckpoint = pages
 	}
 }

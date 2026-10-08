@@ -284,6 +284,52 @@ func TestPragmaReadBack(t *testing.T) {
 	})
 }
 
+// TestAutoCheckpointReadBack proves WithAutoCheckpoint rides in the file-mode
+// DSN and reaches the pinned connection: the pragma read-back equals the
+// configured page count. The zero value keeps SQLite's default of 1000 pages
+// (D-07, no sentinel semantics), and memory mode ignores the option.
+func TestAutoCheckpointReadBack(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configured_pages_read_back", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "autockpt.db")), WithAutoCheckpoint(200))
+		require.NoError(t, c.initErr)
+
+		assert.Equal(t, 200, readAutoCheckpoint(t, c))
+	})
+
+	t.Run("default_is_1000", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "default.db")))
+		require.NoError(t, c.initErr)
+
+		assert.Equal(t, 1000, readAutoCheckpoint(t, c))
+	})
+
+	t.Run("memory_mode_ignores_option", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory(), WithAutoCheckpoint(200))
+		require.NoError(t, c.initErr)
+
+		assert.Equal(t, 1000, readAutoCheckpoint(t, c))
+	})
+}
+
+// readAutoCheckpoint reads back the effective wal_autocheckpoint page count
+// from the provider's pinned connection.
+func readAutoCheckpoint(t *testing.T, c *sqliteCache[string, string]) int {
+	t.Helper()
+
+	var pages int
+	require.NoError(t, c.db.QueryRowContext(t.Context(), "PRAGMA wal_autocheckpoint").Scan(&pages))
+
+	return pages
+}
+
 // countCacheTables returns the number of sqlite_master entries named
 // cache_entries on the provider's pinned connection.
 func countCacheTables(t *testing.T, c *sqliteCache[string, string]) int {

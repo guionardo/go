@@ -165,15 +165,26 @@ func TestDSNBuildDSN(t *testing.T) {
 	t.Parallel()
 
 	filePath := filepath.Join(t.TempDir(), "cache.db")
+	fileSuffix := "?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate"
 
-	assert.Equal(t,
-		filePath+"?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate",
-		buildDSN(filePath, false))
+	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, 0))
+
+	// pages > 0 appends the wal_autocheckpoint pragma (A6: the only variable
+	// DSN component is strconv.Itoa of a caller int).
+	assert.Equal(t, filePath+fileSuffix+"&_pragma=wal_autocheckpoint(200)", buildDSN(filePath, false, 200))
+
+	// pages <= 0 appends nothing and keeps the driver default.
+	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, -5))
 
 	assert.Equal(t,
 		memoryPath+"?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate",
-		buildDSN(memoryPath, true))
+		buildDSN(memoryPath, true, 0))
+
+	// Memory mode ignores the autocheckpoint option (no WAL there).
+	assert.Equal(t,
+		memoryPath+"?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate",
+		buildDSN(memoryPath, true, 200))
 
 	// Memory mode must not carry the journal_mode key (SQLite reports "memory").
-	assert.NotContains(t, buildDSN(memoryPath, true), "journal_mode")
+	assert.NotContains(t, buildDSN(memoryPath, true, 0), "journal_mode")
 }
