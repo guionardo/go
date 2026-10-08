@@ -21,16 +21,16 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **STOR-02**: An empty path selects `:memory:` mode; both file and `:memory:` modes pin the pool to one connection (`SetMaxOpenConns(1)`, `SetMaxIdleConns(1)`) — mandatory for `:memory:` correctness.
 - [x] **STOR-03**: Every pooled connection receives DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock mode — using the pinned driver's validated DSN keys; a read-back test asserts `journal_mode` is WAL for file databases.
 - [x] **STOR-04**: Schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`); schema is fixed: `cache_key TEXT PRIMARY KEY`, `value TEXT` (JSON), `expires_at INTEGER NULL`.
-- [ ] **STOR-05**: `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); reopening an existing cache file preserves unexpired entries.
+- [x] **STOR-05**: `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); reopening an existing cache file preserves unexpired entries.
 - [x] **STOR-06**: Path values containing DSN metacharacters (`?`, `#`) are rejected or escaped so user-supplied paths cannot inject DSN parameters.
 - [ ] **STOR-07**: Long-running processes can tune WAL checkpointing (`wal_autocheckpoint` option) and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
 
 ### Expiry & Reclamation
 
-- [ ] **TTL-01**: TTL resolution matches existing providers — per-call TTL wins, zero/absent falls back to the provider default, no default means no expiry; expiry is stored as an absolute UnixNano timestamp and survives restarts.
-- [ ] **TTL-02**: Expired entries are never returned: reads filter on `expires_at` and return `ErrMiss`; reads never delete rows.
-- [ ] **TTL-03**: A best-effort sweep runs on open, deleting expired rows in one pass, backed by a partial index on `expires_at`.
-- [ ] **TTL-04**: An optional periodic sweep interval (mirroring mem/postgres `SweepInterval`) can be configured; when unset, startup sweep + read filtering is the only reclamation.
+- [x] **TTL-01**: TTL resolution matches existing providers — per-call TTL wins, zero/absent falls back to the provider default, no default means no expiry; expiry is stored as an absolute UnixNano timestamp and survives restarts.
+- [x] **TTL-02**: Expired entries are never returned: reads filter on `expires_at` and return `ErrMiss`; reads never delete rows.
+- [x] **TTL-03**: A best-effort sweep runs on open, deleting expired rows in one pass, backed by a partial index on `expires_at`.
+- [x] **TTL-04**: An optional periodic sweep interval (mirroring mem/postgres `SweepInterval`) can be configured; when unset, startup sweep + read filtering is the only reclamation.
 
 ### Batch Operations
 
@@ -103,13 +103,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STOR-02 | Phase 15 | Complete |
 | STOR-03 | Phase 15 | Complete |
 | STOR-04 | Phase 15 | Complete |
-| STOR-05 | Phase 15 | Pending |
+| STOR-05 | Phase 15 | Complete |
 | STOR-06 | Phase 15 | Complete |
 | STOR-07 | Phase 15 | Pending |
-| TTL-01 | Phase 15 | Pending |
-| TTL-02 | Phase 15 | Pending |
-| TTL-03 | Phase 15 | Pending |
-| TTL-04 | Phase 15 | Pending |
+| TTL-01 | Phase 15 | Complete |
+| TTL-02 | Phase 15 | Complete |
+| TTL-03 | Phase 15 | Complete |
+| TTL-04 | Phase 15 | Complete |
 | BATCH-01 | Phase 16 | Pending |
 | BATCH-02 | Phase 16 | Pending |
 | BATCH-03 | Phase 16 | Pending |

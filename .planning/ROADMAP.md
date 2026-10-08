@@ -69,7 +69,7 @@
   4. Expiry behaves with TTL parity: per-call TTL wins, zero/absent falls back to the provider default, none means no expiry — stored as an absolute UnixNano timestamp that survives restarts; expired entries are never returned and reads never delete rows; a best-effort sweep runs on open, and an optional periodic sweep interval (mem/postgres parity) reclaims entries in long-running processes.
   5. Every pooled connection carries the DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock — verified by read-back (`journal_mode` is `wal` for file databases); callers can tune `wal_autocheckpoint` and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 Plans:
 **Wave 1**
 
@@ -77,7 +77,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 15-02-PLAN.md — TTL expiry, filter-only reads, sweep-on-open + opt-in periodic sweeper, durability lifecycle (sidecar removal, reopen persistence)
+- [x] 15-02-PLAN.md — TTL expiry, filter-only reads, sweep-on-open + opt-in periodic sweeper, durability lifecycle (sidecar removal, reopen persistence)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -130,6 +130,6 @@ Plans:
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
-| 15. Provider Foundation + Core Semantics | v1.8 | 1/3 | In Progress|  |
+| 15. Provider Foundation + Core Semantics | v1.8 | 2/3 | In Progress|  |
 | 16. Batch + Multi-Process Hardening | v1.8 | 0/— | Not started | - |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |

@@ -5,15 +5,15 @@ milestone_name: SQLite Cache Backend
 current_phase: 15
 current_phase_name: Provider Foundation + Core Cache Semantics
 status: executing
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-10-08T14:09:43.079Z"
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-10-08T14:31:21.103Z"
 last_activity: 2026-10-08
 last_activity_desc: Phase 15 execution started
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 state_head: c1e1f64fd44aecdaaba77c66f7b879eaaed609fe
 ---
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-10-08)
 ## Current Position
 
 Phase: 15 (Provider Foundation + Core Cache Semantics) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-10-08 — Phase 15 execution started
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 14-semantics-hardening-release-polish P03 | 8min | 2 tasks | 1 files |
 | Phase 14 P04 | 34 | 3 tasks | 3 files |
 | Phase 15 P01 | 14 min | 3 tasks | 11 files |
+| Phase 15 P02 | 18 min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,10 @@ Recent decisions affecting current work:
 - [Phase 15]: cache/sqlite foundation ships DSN-carried pragmas, pinned 1-connection pool, BEGIN IMMEDIATE bootstrap, deferred initErr taxonomy (PROV-01..04, STOR-01..04, STOR-06)
 - [Phase 15]: Per-commit coverage gate forced pure unit tests into the tracer commit (66.4% -> 84.9%); tasks 2-3 still own behavioral tests
 - [Phase 15]: modernc.org/libc v1.77.1 transitively requires x/tools v0.50.0 — the wider x/* MVS bumps from go mod tidy are mandatory, not incidental
+- [Phase 15]: Sweeper lifecycle: startSweeper() extraction keeps sweepLoop() ctx-free while satisfying contextcheck; stop/done channels exist only when the interval is positive (nil for d <= 0, D-08)
+- [Phase 15]: CloseFunc order: CAS guard -> close(stop) + <-done -> db.Close(); sidecar removal only via the engine's last-connection checkpoint (no provider file deletion)
+- [Phase 15]: TTL semantics proven filter-only: reads never delete rows (raw COUNT stays 1), reclamation only via open sweep + opt-in ticker; absolute UnixNano bound now in SQL
+- [Phase 15]: Pre-existing concurrent first-open WAL conversion race deferred to Phase 16 (DI-15-01, deferred-items.md): journal_mode=WAL conversion can return immediate SQLITE_BUSY; retry policy belongs to CONC-01/02 per 15-RESEARCH
 
 ### Pending Todos
 
@@ -105,8 +110,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T14:09:43.071Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-10-08T14:31:21.098Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
