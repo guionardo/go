@@ -96,12 +96,12 @@ Plans:
   4. Contention surfaces at `BEGIN` within `busy_timeout` as a bounded error (immediate transaction lock mode; no unbounded auto-retry), the provider passes `go test -race` under concurrent goroutines on the pinned single-connection pool, and package docs state WAL's constraints (local storage only, same-host sharing).
   5. A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
 
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 16-01-PLAN.md — Two-process spike: raw vs bounded-retry policy arms on one cache file; 16-SPIKE-FINDINGS.md evidence record (D-11; CONC-01 exit-criterion precondition)
+- [x] 16-01-PLAN.md — Two-process spike: raw vs bounded-retry policy arms on one cache file; 16-SPIKE-FINDINGS.md evidence record (D-11; CONC-01 exit-criterion precondition)
 - [ ] 16-02-PLAN.md — Provider hardening: bounded open retry closes DI-15-01 (D-06) + journal_size_limit DSN (D-08) + CONC-02 bounded-contention proof
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -145,5 +145,5 @@ Plans:
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
-| 16. Batch + Multi-Process Hardening | v1.8 | 0/— | Not started | - |
+| 16. Batch + Multi-Process Hardening | v1.8 | 1/4 | In Progress|  |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |

@@ -5,17 +5,17 @@ milestone_name: SQLite Cache Backend
 current_phase: 16
 current_phase_name: Batch Surface + Multi-Process Hardening
 status: executing
-stopped_at: Phase 16 context gathered
-last_updated: "2026-10-08T19:47:05.904Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-10-08T22:10:18.344Z"
 last_activity: 2026-10-08
-last_activity_desc: Phase 15 complete, transitioned to Phase 16
-state_head: 9b9413a0913c377283e5234a7a193ad385a135ba
+last_activity_desc: Phase 16 execution resumed (wave continue)
+state_head: c311bb803e2915998076107bbe5d4d47014e8e97
 progress:
   total_phases: 3
   completed_phases: 13
   total_plans: 7
-  completed_plans: 3
-  percent: 43
+  completed_plans: 4
+  percent: 57
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-08)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 15 — Provider Foundation + Core Cache Semantics
+**Current focus:** Phase 16 — Batch Surface + Multi-Process Hardening
 
 ## Current Position
 
-Phase: 16 (Batch Surface + Multi-Process Hardening) — READY TO EXECUTE
-Plan: Not started
+Phase: 16 (Batch Surface + Multi-Process Hardening) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-10-08 — Phase 15 complete, transitioned to Phase 16
+Last activity: 2026-10-08 — Phase 16 execution resumed (wave continue)
 
-Progress: [████░░░░░░] 43%
+Progress: [██████░░░░] 57%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [████░░░░░░] 43%
 | Phase 15 P01 | 14 min | 3 tasks | 11 files |
 | Phase 15 P02 | 18 min | 3 tasks | 6 files |
 | Phase 15 P03 | 9 min | 3 tasks | 10 files |
+| Phase 16 P01 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase 15]: Blocked checkpoint shape empirically verified before tests — PRAGMA wal_checkpoint(TRUNCATE) returns err=nil with busy=1 after the 5s busy timeout; the three-column scan plus a busy!=0 descriptive error is the shipped implementation
 - [Phase 15]: WithAutoCheckpoint pages>0 appends _pragma=wal_autocheckpoint(strconv.Itoa) in file mode only; read-back proves 200 configured / 1000 default / memory ignored; maintenance SQL lives only in optimize.go (VACUUM prohibition grep holds)
 - [Phase 15]: STOR-07 closed — all Phase 15 requirement families (PROV/STOR/TTL) green repo-wide with no cache/sqlite coverage override; package at 92.5%, total 81.5%, Windows CGO-free build and golangci-lint clean
+- [Phase 16]: 16-01: Two-process WAL spike confirmed the D-06 retry policy (5 ms backoff / 5 s budget / busy-only Code()&0xff==5 at the PingContext seam): raw arm failed 8/10 runs with immediate SQLITE_BUSY (DI-15-01 reproduced cross-process), policy arm ran 30/30 clean with journal_mode=wal, integrity_check=ok and exactly 301 rows per role
+- [Phase 16]: 16-01: Harness children use raw database/sql handles with spike-local DSN/schema/SQL mirrors (plus a Rule 3 schema-bootstrap addition); the mirrors are eliminated in Plan 16-04 when children rewire to the shipped provider
+- [Phase 16]: 16-01: Raw arm is observational only (SQLITE_E2E_RETRY=0, never a gate); the e2e build tag keeps the harness invisible to the unit lane and leaves coverage metrics unchanged (no cache/sqlite override)
 
 ### Pending Todos
 
@@ -115,9 +119,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T18:37:35.445Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-batch-surface-multi-process-hardening/16-CONTEXT.md
+Last session: 2026-10-08T22:10:18.323Z
+Stopped at: Completed 16-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
