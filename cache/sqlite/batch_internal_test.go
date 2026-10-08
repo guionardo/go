@@ -63,6 +63,8 @@ func TestChunksOf(t *testing.T) {
 		{name: "exactly_100_one_chunk", n: 100, size: 100, want: []int{100}},
 		{name: "101_splits_100_plus_1", n: 101, size: 100, want: []int{100, 1}},
 		{name: "250_splits_100_100_50", n: 250, size: 100, want: []int{100, 100, 50}},
+		{name: "zero_size_no_chunks", n: 10, size: 0, want: nil},
+		{name: "negative_size_no_chunks", n: 10, size: -5, want: nil},
 	}
 
 	for _, tc := range cases {

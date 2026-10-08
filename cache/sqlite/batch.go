@@ -41,9 +41,10 @@ func uniqueKeys[K comparable](keys []K) []K {
 }
 
 // chunksOf splits keys into size-bounded chunks preserving input order. An
-// empty input yields no chunks, so callers naturally issue no query (D-02).
+// empty input — or a non-positive size — yields no chunks, so callers
+// naturally issue no query (D-02).
 func chunksOf[K comparable](keys []K, size int) [][]K {
-	if len(keys) == 0 {
+	if len(keys) == 0 || size <= 0 {
 		return nil
 	}
 
