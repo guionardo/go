@@ -34,15 +34,15 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Batch Operations
 
-- [ ] **BATCH-01**: `MGet` retrieves multiple keys via chunked `IN`-list queries; missing, expired, and undecodable entries are silently skipped (bounded chunk size).
-- [ ] **BATCH-02**: `MSet` writes all pairs in a single transaction with a prepared upsert (`INSERT ... ON CONFLICT DO UPDATE`); the batch is atomic — any error rolls back the whole batch; one TTL applies to the batch.
-- [ ] **BATCH-03**: `MDel` deletes multiple keys via chunked `IN`-list deletes; idempotent for missing keys.
+- [x] **BATCH-01**: `MGet` retrieves multiple keys via chunked `IN`-list queries; missing, expired, and undecodable entries are silently skipped (bounded chunk size).
+- [x] **BATCH-02**: `MSet` writes all pairs in a single transaction with a prepared upsert (`INSERT ... ON CONFLICT DO UPDATE`); the batch is atomic — any error rolls back the whole batch; one TTL applies to the batch.
+- [x] **BATCH-03**: `MDel` deletes multiple keys via chunked `IN`-list deletes; idempotent for missing keys.
 
 ### Multi-Process & Concurrency
 
 - [x] **CONC-01**: Two processes sharing one cache file can read and write without corruption or hard failure under contention; verified by a two-process spike (helper-process pattern) that is an exit criterion for the multi-process phase.
 - [x] **CONC-02**: Write transactions acquire locks immediately (immediate transaction lock mode) so contention surfaces at BEGIN rather than mid-transaction; contention beyond `busy_timeout` surfaces as an error — no unbounded auto-retry.
-- [ ] **CONC-03**: The provider passes `go test -race` with concurrent goroutines on the pinned single-connection pool.
+- [x] **CONC-03**: The provider passes `go test -race` with concurrent goroutines on the pinned single-connection pool.
 - [ ] **CONC-04**: Package docs state that WAL requires local storage (network filesystems unsupported) and that file sharing is same-host only.
 - [ ] **CONC-05**: A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
 
@@ -110,12 +110,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TTL-02 | Phase 15 | Complete |
 | TTL-03 | Phase 15 | Complete |
 | TTL-04 | Phase 15 | Complete |
-| BATCH-01 | Phase 16 | Pending |
-| BATCH-02 | Phase 16 | Pending |
-| BATCH-03 | Phase 16 | Pending |
+| BATCH-01 | Phase 16 | Complete |
+| BATCH-02 | Phase 16 | Complete |
+| BATCH-03 | Phase 16 | Complete |
 | CONC-01 | Phase 16 | Complete |
 | CONC-02 | Phase 16 | Complete |
-| CONC-03 | Phase 16 | Pending |
+| CONC-03 | Phase 16 | Complete |
 | CONC-04 | Phase 16 | Pending |
 | CONC-05 | Phase 16 | Pending |
 | QUAL-01 | Phase 17 | Pending |

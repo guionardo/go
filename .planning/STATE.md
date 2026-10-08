@@ -5,17 +5,17 @@ milestone_name: SQLite Cache Backend
 current_phase: 16
 current_phase_name: Batch Surface + Multi-Process Hardening
 status: executing
-stopped_at: Completed 16-02-PLAN.md
-last_updated: "2026-10-08T22:28:35.780Z"
+stopped_at: Completed 16-03-PLAN.md
+last_updated: "2026-10-08T22:55:05.686Z"
 last_activity: 2026-10-08
 last_activity_desc: Phase 16 execution resumed (wave continue)
-state_head: add32ba69d41973e990a1c7a45116433d2a4a0f4
+state_head: 7a0151a5058c88b1a4f1e31128d2da242e2a707c
 progress:
   total_phases: 3
   completed_phases: 13
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 6
+  percent: 86
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-10-08)
 ## Current Position
 
 Phase: 16 (Batch Surface + Multi-Process Hardening) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-10-08 — Phase 16 execution resumed (wave continue)
 
-Progress: [███████░░░] 71%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Progress: [███████░░░] 71%
 | Phase 15 P03 | 9 min | 3 tasks | 10 files |
 | Phase 16 P01 | 4min | 2 tasks | 2 files |
 | Phase 16-batch-surface-multi-process-hardening P02 | 23 | 3 tasks | 6 files |
+| Phase 16-batch-surface-multi-process-hardening P03 | 20 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Recent decisions affecting current work:
 - [Phase 16-batch-surface-multi-process-hardening]: TDD commit pattern under the repo constraint (no empty commits; per-commit coverage gate): in-session assertion-level RED evidence ships with its implementation in feat commits; test-only hardening commits as test(16-02)
 - [Phase 16-batch-surface-multi-process-hardening]: journal_size_limit ships as a buildDSN parameter + compile-time constant 64 << 20, no new exported option (OQ1 resolution); non-positive appends nothing
 - [Phase 16-batch-surface-multi-process-hardening]: Classifier uses named constants sqliteBusyCode/sqliteBusyMask over the plan's literal &0xff==5 shape — identical semantics, mnd-clean
+- [Phase 16-batch-surface-multi-process-hardening]: TDD commit pattern per the repo constraint: in-session assertion-level RED evidence (stub-then-real, verified RED_EVIDENCE_OK) ships with the implementation in feat commits; test-only hardening commits as test(16-03)
+- [Phase 16-batch-surface-multi-process-hardening]: TestBatchPlaceholderSmoke removed in Task 1 (MSet/MDel legs depended on then-stub methods — Rule 3); TestBatchMGet covers MGet there; TestBatchSemantics lands as the full replacement in Task 3
+- [Phase 16-batch-surface-multi-process-hardening]: msetTx/mgetChunk helper extractions keep cyclop/sqlclosecheck clean while preserving the single-transaction MSet seam and close-before-next-chunk row handling
 
 ### Pending Todos
 
@@ -123,8 +127,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T22:28:35.761Z
-Stopped at: Completed 16-02-PLAN.md
+Last session: 2026-10-08T22:55:05.667Z
+Stopped at: Completed 16-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

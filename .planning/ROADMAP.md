@@ -96,7 +96,7 @@ Plans:
   4. Contention surfaces at `BEGIN` within `busy_timeout` as a bounded error (immediate transaction lock mode; no unbounded auto-retry), the provider passes `go test -race` under concurrent goroutines on the pinned single-connection pool, and package docs state WAL's constraints (local storage only, same-host sharing).
   5. A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
 
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 **Wave 1**
@@ -106,7 +106,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 16-03-PLAN.md — Batch surface: chunked MGet/MDel + atomic prepared-upsert MSet (BATCH-01..03, D-01..D-05) + race-clean CONC-03
+- [x] 16-03-PLAN.md — Batch surface: chunked MGet/MDel + atomic prepared-upsert MSet (BATCH-01..03, D-01..D-05) + race-clean CONC-03
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -145,5 +145,5 @@ Plans:
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
-| 16. Batch + Multi-Process Hardening | v1.8 | 2/4 | In Progress|  |
+| 16. Batch + Multi-Process Hardening | v1.8 | 3/4 | In Progress|  |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |
