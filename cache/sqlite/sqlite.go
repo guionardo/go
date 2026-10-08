@@ -1,0 +1,266 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver (CGO-free)
+
+	"github.com/guionardo/go/cache"
+)
+
+var (
+	// ErrClosed is returned by operations attempted on a closed cache.
+	ErrClosed = errors.New("cache/sqlite: cache is closed")
+
+	// ErrInvalidPath is returned when a path or cache name fails validation.
+	ErrInvalidPath = errors.New("cache/sqlite: invalid path")
+)
+
+var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
+	return slog.With(slog.String("module", "cache/sqlite"))
+})
+
+// sqliteCache is the SQLite-backed provider. It implements the cache.cacher
+// primitive interface (GetFunc/SetFunc/DeleteFunc/CloseFunc and the batch
+// methods); New wraps it in a cache.NewConcreteCache, which supplies the
+// shared Cache surface (singleflight GetOrSet dedup, Cache interface).
+//
+// The database pool is pinned to a single connection in both modes: it is
+// mandatory for :memory: correctness (each pooled connection would otherwise
+// open a private database) and provides in-process serialization.
+type sqliteCache[K comparable, V any] struct {
+	db         *sql.DB
+	defaultTTL time.Duration
+	initErr    error
+	closed     atomic.Bool
+}
+
+// New creates a new SQLite cache provider with optional functional options.
+//
+// New never fails: open or validation errors are recorded and deferred, and
+// the first operation that needs the database returns them wrapped. Returns a
+// cache.BatchCache sharing the in-memory singleflight GetOrSet.
+func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
+	cfg := defaultConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	c := &sqliteCache[K, V]{defaultTTL: cfg.DefaultTTL}
+	c.initErr = c.open(context.Background(), cfg)
+
+	return cache.NewConcreteCache[K, V](c)
+}
+
+// open resolves the location, creates the cache directory for file mode, opens
+// the database with the DSN-carried pragmas, pins the pool to one connection,
+// and bootstraps the schema.
+func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
+	path, memory, err := resolveLocation(cfg, os.UserCacheDir)
+	if err != nil {
+		return err
+	}
+
+	if !memory {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+	}
+
+	db, err := sql.Open("sqlite", buildDSN(path, memory))
+	if err != nil {
+		return err
+	}
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+	db.SetConnMaxIdleTime(0)
+
+	c.db = db
+
+	if err := c.bootstrap(ctx); err != nil {
+		_ = db.Close()
+		c.db = nil
+		return err
+	}
+
+	return nil
+}
+
+// bootstrap creates the fixed schema inside one transaction. Because the DSN
+// carries _txlock=immediate, BeginTx issues BEGIN IMMEDIATE, so concurrent
+// first-opens serialize at BEGIN and the CREATE ... IF NOT EXISTS statements
+// are idempotent.
+func (c *sqliteCache[K, V]) bootstrap(ctx context.Context) error {
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // no-op after Commit
+
+	if _, err := tx.ExecContext(ctx, CreateTableSQL); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, CreateIndexSQL); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// check returns the deferred open/validation error, or ErrClosed once the
+// cache has been closed. It is the first statement of every operation.
+func (c *sqliteCache[K, V]) check() error {
+	if c.initErr != nil {
+		return fmt.Errorf("cache/sqlite: %w", c.initErr)
+	}
+	if c.closed.Load() {
+		return fmt.Errorf("cache/sqlite: %w", ErrClosed)
+	}
+	return nil
+}
+
+// GetFunc retrieves a value by key. Returns cache.ErrMiss if not found or
+// expired. Only sql.ErrNoRows maps to ErrMiss; every other failure (including
+// malformed JSON) is returned as itself.
+func (c *sqliteCache[K, V]) GetFunc(ctx context.Context, key K) (V, error) {
+	var zero V
+	if err := c.check(); err != nil {
+		return zero, err
+	}
+
+	var data string
+	err := c.db.QueryRowContext(ctx, SelectSQL, fmt.Sprint(key), time.Now().UnixNano()).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return zero, fmt.Errorf("cache/sqlite: %w", cache.ErrMiss)
+	}
+	if err != nil {
+		return zero, fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	var value V
+	if err := json.Unmarshal([]byte(data), &value); err != nil {
+		return zero, fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	return value, nil
+}
+
+// SetFunc stores a value with optional per-key TTL. The expiry is stored as
+// an absolute UnixNano integer; a missing TTL stores SQL NULL. A marshal
+// failure returns an error and stores nothing.
+func (c *sqliteCache[K, V]) SetFunc(ctx context.Context, key K, value V, ttl ...time.Duration) error {
+	if err := c.check(); err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	expiresAt, hasTTL := c.resolveTTL(ttl...)
+	var exp any
+	if hasTTL {
+		exp = expiresAt
+	}
+
+	if _, err := c.db.ExecContext(ctx, UpsertSQL, fmt.Sprint(key), string(data), exp); err != nil {
+		return fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteFunc removes a key. Deleting a missing key is a no-op.
+func (c *sqliteCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
+	if err := c.check(); err != nil {
+		return err
+	}
+
+	if _, err := c.db.ExecContext(ctx, DeleteSQL, fmt.Sprint(key)); err != nil {
+		return fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	return nil
+}
+
+// CloseFunc closes the database (the last connection checkpoints the WAL and
+// removes the -wal/-shm sidecars). It is idempotent and returns nil even when
+// the handle deferred an open error.
+func (c *sqliteCache[K, V]) CloseFunc() error {
+	if c.closed.CompareAndSwap(false, true) {
+		if c.db != nil {
+			return c.db.Close()
+		}
+	}
+
+	return nil
+}
+
+// MGetFunc retrieves values for multiple keys, skipping missing or errored
+// keys.
+//
+// Phase 16: replace with a chunked IN-list query (BATCH-01).
+func (c *sqliteCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
+	result := make(map[K]V, len(keys))
+	for _, key := range keys {
+		value, err := c.GetFunc(ctx, key)
+		if err != nil {
+			continue // missing or errored key — skip
+		}
+		result[key] = value
+	}
+
+	return result
+}
+
+// MSetFunc stores multiple key-value pairs, one point operation per pair.
+//
+// Phase 16: replace with a single-transaction prepared upsert (BATCH-02).
+func (c *sqliteCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	for key, value := range items {
+		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// MDelFunc removes multiple keys, one point operation per key.
+//
+// Phase 16: replace with a chunked IN-list delete (BATCH-03).
+func (c *sqliteCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	for _, key := range keys {
+		if err := c.DeleteFunc(ctx, key); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// resolveTTL resolves the effective expiration for a Set operation.
+// Precedence: per-call TTL > provider-level default > no expiry.
+func (c *sqliteCache[K, V]) resolveTTL(ttl ...time.Duration) (int64, bool) {
+	if len(ttl) > 0 && ttl[0] > 0 {
+		return time.Now().Add(ttl[0]).UnixNano(), true
+	}
+	if c.defaultTTL > 0 {
+		return time.Now().Add(c.defaultTTL).UnixNano(), true
+	}
+
+	return 0, false
+}
