@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
@@ -222,5 +223,257 @@ func TestMGetFunc(t *testing.T) {
 
 		got := c.MGetFunc(t.Context(), keys...)
 		assert.Equal(t, want, got)
+	})
+}
+
+// countTableRows returns the total raw row count of cache_entries, bypassing
+// the provider's expiry filter. It takes no *testing.T so it is safe to call
+// from require.Eventually condition goroutines.
+func countTableRows(db *sql.DB) (int, error) {
+	var count int
+
+	err := db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM cache_entries").Scan(&count)
+
+	return count, err
+}
+
+// TestMSetFunc covers the BATCH-02 behavior matrix on the internal receiver:
+// empty no-op, pre-marshal atomicity, happy path with one TTL for the batch,
+// upsert overwrite, and closed-provider error.
+//
+//nolint:funlen // behavior matrix, mirroring the mem_test.go precedent
+func TestMSetFunc(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty_map_nil_no_transaction", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		require.NoError(t, c.MSetFunc(t.Context(), map[string]string{}))
+
+		count, err := countTableRows(c.db)
+		require.NoError(t, err)
+		assert.Zero(t, count, "D-02: an empty batch writes nothing")
+	})
+
+	t.Run("marshal_failure_writes_nothing", func(t *testing.T) {
+		t.Parallel()
+
+		// A [string, any] provider so a chan value reaches the marshal step.
+		cfg := defaultConfig()
+		WithMemory()(cfg)
+
+		anyC := &sqliteCache[string, any]{}
+		anyC.initErr = anyC.open(t.Context(), cfg)
+
+		t.Cleanup(func() { _ = anyC.CloseFunc() })
+
+		require.NoError(t, anyC.initErr)
+
+		// Pre-marshal ordering (D-04): the valid pair must not land when a
+		// sibling value fails to marshal — nothing is written before BeginTx.
+		err := anyC.MSetFunc(t.Context(), map[string]any{"ok": "v", "bad": make(chan int)})
+		require.Error(t, err)
+		require.ErrorContains(t, err, "cache/sqlite:")
+
+		count, err := countTableRows(anyC.db)
+		require.NoError(t, err)
+		assert.Zero(t, count, "a marshal error must leave zero rows from the batch")
+	})
+
+	t.Run("happy_path_one_ttl_for_batch", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		items := map[string]string{"a": "1", "b": "2", "c": "3"}
+		require.NoError(t, c.MSetFunc(t.Context(), items, time.Hour))
+
+		got := c.MGetFunc(t.Context(), "a", "b", "c")
+		assert.Equal(t, items, got)
+
+		// One TTL resolved once for the whole batch: all rows share the exact
+		// same absolute expiry (mem parity, D-04).
+		expA := readRawExpiry(t, c.db, "a")
+		expB := readRawExpiry(t, c.db, "b")
+		expC := readRawExpiry(t, c.db, "c")
+
+		require.NotNil(t, expA)
+		assert.Equal(t, expA, expB)
+		assert.Equal(t, expA, expC)
+	})
+
+	t.Run("overwrite_replaces_value_and_expiry", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		require.NoError(t, c.SetFunc(t.Context(), "k", "old", time.Hour))
+		require.NoError(t, c.MSetFunc(t.Context(), map[string]string{"k": "new"}))
+
+		got, err := c.GetFunc(t.Context(), "k")
+		require.NoError(t, err)
+		assert.Equal(t, "new", got)
+
+		// Upsert semantics: the no-TTL MSet replaced the hour-long expiry with
+		// SQL NULL.
+		assert.Nil(t, readRawExpiry(t, c.db, "k"))
+	})
+
+	t.Run("closed_provider_wrapped_errclosed", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+		require.NoError(t, c.CloseFunc())
+
+		err := c.MSetFunc(t.Context(), map[string]string{"k": "v"})
+		require.ErrorIs(t, err, ErrClosed)
+		require.ErrorContains(t, err, "cache/sqlite:")
+	})
+}
+
+// readRawExpiry returns the raw expires_at value for key (nil for SQL NULL).
+// It fails the test on a query error.
+func readRawExpiry(t *testing.T, db *sql.DB, key string) any {
+	t.Helper()
+
+	var exp sql.NullInt64
+
+	err := db.QueryRowContext(context.Background(),
+		"SELECT expires_at FROM cache_entries WHERE cache_key = ?", key).Scan(&exp)
+	require.NoError(t, err)
+
+	if !exp.Valid {
+		return nil
+	}
+
+	return exp.Int64
+}
+
+// TestMSetNoPartialWrites proves the D-04 atomicity invariant: an MSet whose
+// context cancels mid-batch leaves the table at 0 or all rows — never a
+// partial write (Pitfall 4). The invariant is checked across repeated runs so
+// the rollback branch executes in practice.
+func TestMSetNoPartialWrites(t *testing.T) {
+	t.Parallel()
+
+	const batchSize = 2000
+
+	items := make(map[string]string, batchSize)
+	for i := range batchSize {
+		items[fmt.Sprintf("bulk-%04d", i)] = fmt.Sprintf("v-%04d", i)
+	}
+
+	for iteration := range 5 {
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		// Cancel roughly 1 ms after start: early enough that the exec loop
+		// usually cannot complete, late enough that the transaction opened.
+		ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
+
+		err := c.MSetFunc(ctx, items)
+
+		cancel()
+
+		count, countErr := countTableRows(c.db)
+		require.NoError(t, countErr)
+
+		require.Truef(t, count == 0 || count == batchSize,
+			"iteration %d: stored count must be 0 or %d, never partial (got %d, err %v)",
+			iteration, batchSize, count, err)
+
+		if err == nil {
+			require.Equal(t, batchSize, count, "a successful MSet stores the whole batch")
+		}
+	}
+}
+
+// TestMDelFunc covers the BATCH-03 behavior matrix on the internal receiver:
+// missing no-op, duplicate collapse, chunked deletes at 250 keys, idempotent
+// re-run, and fail-fast wrapped errors.
+//
+//nolint:funlen // behavior matrix, mirroring the mem_test.go precedent
+func TestMDelFunc(t *testing.T) {
+	t.Parallel()
+
+	t.Run("missing_keys_nil", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		require.NoError(t, c.MDelFunc(t.Context(), "no-such-a", "no-such-b"))
+	})
+
+	t.Run("empty_input_nil_no_query", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		require.NoError(t, c.MDelFunc(t.Context()))
+	})
+
+	t.Run("duplicate_input_keys_delete_once", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		require.NoError(t, c.SetFunc(t.Context(), "dup", "v"))
+
+		require.NoError(t, c.MDelFunc(t.Context(), "dup", "dup", "dup"))
+		assert.Equal(t, 0, countKeyRows(t, c.db, "dup"))
+	})
+
+	t.Run("chunked_250_keys_all_deleted", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		keys := make([]string, 0, 250)
+
+		for i := range 250 {
+			key := fmt.Sprintf("del-%03d", i)
+			keys = append(keys, key)
+			require.NoError(t, c.SetFunc(t.Context(), key, "v"))
+		}
+
+		require.NoError(t, c.MDelFunc(t.Context(), keys...))
+		assert.Empty(t, c.MGetFunc(t.Context(), keys...))
+
+		// Idempotent: the second identical call is a nil no-op.
+		require.NoError(t, c.MDelFunc(t.Context(), keys...))
+	})
+
+	t.Run("closed_db_handle_fail_fast_wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+		require.NoError(t, c.db.Close())
+
+		err := c.MDelFunc(t.Context(), "a")
+		require.Error(t, err)
+		require.ErrorContains(t, err, "cache/sqlite:")
+	})
+
+	t.Run("closed_provider_wrapped_errclosed", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+		require.NoError(t, c.CloseFunc())
+
+		err := c.MDelFunc(t.Context(), "a")
+		require.ErrorIs(t, err, ErrClosed)
+		require.ErrorContains(t, err, "cache/sqlite:")
 	})
 }

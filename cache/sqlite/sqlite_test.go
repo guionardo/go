@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -72,6 +73,57 @@ func TestBatchMGet(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return len(c.MGet(t.Context(), "ttl")) == 0
 	}, time.Second, 5*time.Millisecond)
+}
+
+// TestBatchMSetOneTTL pins the black-box D-04 contract: one TTL binds the
+// whole batch, so every key of an MSet expires together (require.Eventually
+// over MGet emptiness, mirroring the mem provider's resolveTTL-once).
+func TestBatchMSetOneTTL(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	items := map[string]string{
+		"k1": "1",
+		"k2": "2",
+		"k3": "3",
+	}
+
+	require.NoError(t, c.MSet(t.Context(), items, 40*time.Millisecond))
+
+	require.Len(t, c.MGet(t.Context(), "k1", "k2", "k3"), 3)
+
+	require.Eventually(t, func() bool {
+		return len(c.MGet(t.Context(), "k1", "k2", "k3")) == 0
+	}, time.Second, 5*time.Millisecond)
+}
+
+// TestBatchMDel pins the black-box BATCH-03 contract: chunked deletes at 150
+// keys (two 100-key chunks) remove every row, a re-run is an idempotent nil,
+// and MGet reflects the deletions.
+func TestBatchMDel(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	keys := make([]string, 0, 150)
+	for i := range 150 {
+		keys = append(keys, fmt.Sprintf("k%03d", i))
+	}
+
+	require.NoError(t, c.MSet(t.Context(), map[string]string{"k000": "0", "k149": "149"}))
+	require.Len(t, c.MGet(t.Context(), keys...), 2)
+
+	require.NoError(t, c.MDel(t.Context(), keys...))
+	assert.Empty(t, c.MGet(t.Context(), keys...))
+	assert.Empty(t, c.MGet(t.Context(), "k000", "k001"))
+
+	// Idempotent: deleting missing keys is a nil no-op.
+	require.NoError(t, c.MDel(t.Context(), keys...))
 }
 
 func TestFileCRUD(t *testing.T) {

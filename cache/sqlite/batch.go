@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+// msetPair is one pre-marshaled batch entry: the stringified cache key and
+// the JSON data. Pairs are built up-front by MSetFunc so a marshal error can
+// never leave a partial write (D-04).
+type msetPair struct{ key, data string }
+
 // chunkSize bounds the number of keys per IN-list query (D-01: fixed internal
 // constant, no option surface). 100 keys + the bound now = 101 parameters —
 // far below SQLite's 32766-variable limit.
@@ -134,16 +139,94 @@ func (c *sqliteCache[K, V]) mgetChunk(ctx context.Context, chunk []K, now int64,
 	}
 }
 
-// MSetFunc stores multiple key-value pairs atomically.
-//
-// TRANSIENT STUB: no-op so the MSet target assertions fail.
+// MSetFunc stores multiple key-value pairs as one atomic batch (D-04,
+// BATCH-02). Every value is marshaled up-front — before the transaction opens
+// — so any error (marshal, begin, prepare, exec, commit) leaves zero rows from
+// the batch. Exactly one TTL is resolved for the whole batch, and one prepared
+// upsert runs per pair inside a single BEGIN IMMEDIATE transaction (the DSN
+// carries _txlock=immediate).
 func (c *sqliteCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
+	if err := c.check(); err != nil {
+		return err
+	}
+
+	if len(items) == 0 {
+		return nil // D-02: an empty batch opens no transaction
+	}
+
+	pairs := make([]msetPair, 0, len(items))
+
+	for key, value := range items {
+		data, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("cache/sqlite: %w", err)
+		}
+
+		pairs = append(pairs, msetPair{key: fmt.Sprint(key), data: string(data)})
+	}
+
+	expiresAt, hasTTL := c.resolveTTL(ttl...)
+
+	var exp any
+	if hasTTL {
+		exp = expiresAt
+	}
+
+	return c.msetTx(ctx, pairs, exp)
+}
+
+// msetTx writes every pre-marshaled pair inside one transaction with a single
+// prepared upsert. Commit success commits the whole batch; any error rolls
+// everything back via the deferred Rollback — the no-partial-writes invariant
+// (Pitfall 4). No per-pair autocommit path exists.
+func (c *sqliteCache[K, V]) msetTx(ctx context.Context, pairs []msetPair, exp any) error {
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	defer func() { _ = tx.Rollback() }() // no-op after Commit — atomicity backstop
+
+	stmt, err := tx.PrepareContext(ctx, UpsertSQL)
+	if err != nil {
+		return fmt.Errorf("cache/sqlite: %w", err)
+	}
+
+	defer func() { _ = stmt.Close() }()
+
+	for _, p := range pairs {
+		if _, err := stmt.ExecContext(ctx, p.key, p.data, exp); err != nil {
+			return fmt.Errorf("cache/sqlite: %w", err) // defer rolls the batch back
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("cache/sqlite: %w", err)
+	}
+
 	return nil
 }
 
-// MDelFunc removes multiple keys.
-//
-// TRANSIENT STUB: no-op so the MDel target assertions fail.
+// MDelFunc removes multiple keys via chunked IN-list deletes (D-05, BATCH-03).
+// Duplicate and missing keys are no-ops; the first chunk error returns the
+// wrapped error (fail-fast — partial deletion is acceptable because MDel is
+// idempotent and a caller may safely retry).
 func (c *sqliteCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
+	if err := c.check(); err != nil {
+		return err
+	}
+
+	for _, chunk := range chunksOf(uniqueKeys(keys), chunkSize) {
+		strKeys := make([]any, 0, len(chunk))
+
+		for _, key := range chunk {
+			strKeys = append(strKeys, fmt.Sprint(key))
+		}
+
+		if _, err := c.db.ExecContext(ctx, fmt.Sprintf(MDelSQL, inPlaceholders(len(chunk))), strKeys...); err != nil {
+			return fmt.Errorf("cache/sqlite: %w", err)
+		}
+	}
+
 	return nil
 }
