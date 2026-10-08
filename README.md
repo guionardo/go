@@ -19,6 +19,7 @@ Golang tools, examples, and packages
 | [valkey](#package-cache) | `cache/valkey` | Valkey cache backend |
 | [memcache](#package-cache) | `cache/memcache` | Memcache cache backend |
 | [postgres](#package-cache) | `cache/postgres` | PostgreSQL cache backend |
+| [sqlite](#package-cache) | `cache/sqlite` | SQLite cache backend (embedded, survives restarts) |
 | [config](#package-config) | `config` | Typed configuration provider (YAML + env + validation) |
 | [environment](#package-config) | `config/environment` | Environment variable parsing |
 | [profile](#package-config) | `config/profile` | YAML profile loading and merging |
@@ -81,6 +82,7 @@ Each provider lives in its own sub-package and is independently importable:
 | `cache/valkey` | Valkey | valkey-go | Eager — dials at construction |
 | `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
 | `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
+| `cache/sqlite` | SQLite (embedded) | modernc.org/sqlite | Eager — local file, lazy errors |
 
 #### Interfaces
 
