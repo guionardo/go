@@ -104,6 +104,19 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 
 	c.db = db
 
+	// D-06: a fresh file's WAL conversion races another process's first open
+	// and can return immediate SQLITE_BUSY with the busy handler bypassed
+	// (DI-15-01). Retry only connection establishment — ping before the
+	// bootstrap DDL, which needs no retry (0/240 observed failures after a
+	// successful ping) — only busy-classified errors, within the busy_timeout
+	// budget. Exhaustion rides New's deferred initErr path.
+	if err := retryBusy(ctx, c.db.PingContext); err != nil {
+		_ = db.Close()
+		c.db = nil
+
+		return err
+	}
+
 	if err := c.bootstrap(ctx); err != nil {
 		_ = db.Close()
 		c.db = nil
