@@ -43,8 +43,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **CONC-01**: Two processes sharing one cache file can read and write without corruption or hard failure under contention; verified by a two-process spike (helper-process pattern) that is an exit criterion for the multi-process phase.
 - [x] **CONC-02**: Write transactions acquire locks immediately (immediate transaction lock mode) so contention surfaces at BEGIN rather than mid-transaction; contention beyond `busy_timeout` surfaces as an error — no unbounded auto-retry.
 - [x] **CONC-03**: The provider passes `go test -race` with concurrent goroutines on the pinned single-connection pool.
-- [ ] **CONC-04**: Package docs state that WAL requires local storage (network filesystems unsupported) and that file sharing is same-host only.
-- [ ] **CONC-05**: A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
+- [x] **CONC-04**: Package docs state that WAL requires local storage (network filesystems unsupported) and that file sharing is same-host only.
+- [x] **CONC-05**: A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
 
 ### Delivery & Quality
 
@@ -116,8 +116,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONC-01 | Phase 16 | Complete |
 | CONC-02 | Phase 16 | Complete |
 | CONC-03 | Phase 16 | Complete |
-| CONC-04 | Phase 16 | Pending |
-| CONC-05 | Phase 16 | Pending |
+| CONC-04 | Phase 16 | Complete |
+| CONC-05 | Phase 16 | Complete |
 | QUAL-01 | Phase 17 | Pending |
 | QUAL-02 | Phase 17 | Pending |
 | QUAL-03 | Phase 17 | Pending |

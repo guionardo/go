@@ -4,18 +4,18 @@ milestone: v1.8
 milestone_name: SQLite Cache Backend
 current_phase: 16
 current_phase_name: Batch Surface + Multi-Process Hardening
-status: executing
-stopped_at: Completed 16-03-PLAN.md
-last_updated: "2026-10-08T22:55:05.686Z"
+status: verifying
+stopped_at: Completed 16-04-PLAN.md
+last_updated: "2026-10-08T23:06:46.017Z"
 last_activity: 2026-10-08
 last_activity_desc: Phase 16 execution resumed (wave continue)
-state_head: 7a0151a5058c88b1a4f1e31128d2da242e2a707c
+state_head: a717aac65655aa410af8b350a2bbc969513c396e
 progress:
   total_phases: 3
   completed_phases: 13
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-10-08)
 
 Phase: 16 (Batch Surface + Multi-Process Hardening) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-08 — Phase 16 execution resumed (wave continue)
 
-Progress: [█████████░] 86%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Progress: [█████████░] 86%
 | Phase 16 P01 | 4min | 2 tasks | 2 files |
 | Phase 16-batch-surface-multi-process-hardening P02 | 23 | 3 tasks | 6 files |
 | Phase 16-batch-surface-multi-process-hardening P03 | 20 | 3 tasks | 5 files |
+| Phase 16 P04 | 9min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,10 @@ Recent decisions affecting current work:
 - [Phase 16-batch-surface-multi-process-hardening]: TDD commit pattern per the repo constraint: in-session assertion-level RED evidence (stub-then-real, verified RED_EVIDENCE_OK) ships with the implementation in feat commits; test-only hardening commits as test(16-03)
 - [Phase 16-batch-surface-multi-process-hardening]: TestBatchPlaceholderSmoke removed in Task 1 (MSet/MDel legs depended on then-stub methods — Rule 3); TestBatchMGet covers MGet there; TestBatchSemantics lands as the full replacement in Task 3
 - [Phase 16-batch-surface-multi-process-hardening]: msetTx/mgetChunk helper extractions keep cyclop/sqlclosecheck clean while preserving the single-transaction MSet seam and close-before-next-chunk row handling
+- [Phase 16]: 16-04: parent raw verification decodes the provider's JSON-encoded value column (json.Unmarshal); the old raw-handle spike compared plain strings and could never match
+- [Phase 16]: 16-04: crash child blocks on a timer loop (not bare select {}) so the Go deadlock detector never terminates it on its own before the parent kills it
+- [Phase 16]: 16-04: contention row-count contract pinned to 287 per role with the 14-distinct-deletion derivation in the constant's doc comment; deleted-key spot checks 0000/0007 (MDel) + 0050 (point)
+- [Phase 16]: 16-04: CI race step gated to runner.os != 'Windows' (C toolchain); Windows -race broadening recorded as a reviewer-flagged follow-up in the workflow comment
 
 ### Pending Todos
 
@@ -127,8 +132,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T22:55:05.667Z
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-10-08T23:06:45.989Z
+Stopped at: Completed 16-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
