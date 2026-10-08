@@ -62,21 +62,25 @@
 **Depends on**: Nothing (v1.8 start; follows Phase 14 — builds on the shipped v1.6 cache architecture; `cache/` root and the five providers stay frozen)
 **Requirements**: PROV-01, PROV-02, PROV-03, PROV-04, STOR-01, STOR-02, STOR-03, STOR-04, STOR-05, STOR-06, STOR-07, TTL-01, TTL-02, TTL-03, TTL-04
 **Success Criteria** (what must be TRUE):
+
   1. Caller calls `sqlite.New[K, V](opts...)` and receives a `cache.BatchCache[K, V]` built on the sqlite provider + `cache.NewConcreteCache`, in three location modes — default `os.UserCacheDir()` + cache name, explicit path override, and `:memory:`; both file and memory modes pin the pool to exactly one connection; paths containing DSN metacharacters (`?`, `#`) are rejected.
   2. Get/Set/Delete/GetOrSet/Close match the five existing providers' contracts: `fmt.Sprint` keys, JSON values, misses wrapping `cache.ErrMiss`, context-aware SQL, idempotent `Close`, `cache/sqlite:` error prefix — and `GetOrSet` dedups through the shared `SingleflightGetOrSet` with no second dedup layer.
   3. Data survives restarts: reopening an existing cache file preserves unexpired entries; `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`, fixed three-column schema).
   4. Expiry behaves with TTL parity: per-call TTL wins, zero/absent falls back to the provider default, none means no expiry — stored as an absolute UnixNano timestamp that survives restarts; expired entries are never returned and reads never delete rows; a best-effort sweep runs on open, and an optional periodic sweep interval (mem/postgres parity) reclaims entries in long-running processes.
   5. Every pooled connection carries the DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock — verified by read-back (`journal_mode` is `wal` for file databases); callers can tune `wal_autocheckpoint` and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 Plans:
 **Wave 1**
-- [ ] 15-01-PLAN.md — Provider foundation: pinned dependency, constructor + location modes, primitive CRUD contracts, error taxonomy (tracer-led; batch placeholders with Phase 16 TODO)
+
+- [x] 15-01-PLAN.md — Provider foundation: pinned dependency, constructor + location modes, primitive CRUD contracts, error taxonomy (tracer-led; batch placeholders with Phase 16 TODO)
 
 **Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 15-02-PLAN.md — TTL expiry, filter-only reads, sweep-on-open + opt-in periodic sweeper, durability lifecycle (sidecar removal, reopen persistence)
 
 **Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 15-03-PLAN.md — Storage controls (`Optimizable` checkpoint/vacuum, `WithAutoCheckpoint`), docs, example, README rows, repo-wide coverage gate
 
 ### Phase 16: Batch Surface + Multi-Process Hardening
@@ -85,6 +89,7 @@ Plans:
 **Depends on**: Phase 15
 **Requirements**: BATCH-01, BATCH-02, BATCH-03, CONC-01, CONC-02, CONC-03, CONC-04, CONC-05
 **Success Criteria** (what must be TRUE):
+
   1. `MGet` retrieves multiple keys via chunked `IN` queries — missing, expired, and undecodable entries are silently skipped (bounded chunk size); `MDel` deletes via chunked `IN` lists and is idempotent for missing keys.
   2. `MSet` writes all pairs in a single transaction with one prepared upsert (`INSERT ... ON CONFLICT DO UPDATE`), one TTL for the batch — and the batch is atomic: any error rolls back the whole batch.
   3. Two OS processes sharing one cache file can read and write without corruption or hard failure under contention — verified by the two-process spike (helper-process pattern), which is the phase exit criterion.
@@ -99,6 +104,7 @@ Plans:
 **Depends on**: Phase 16
 **Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-04
 **Success Criteria** (what must be TRUE):
+
   1. The package builds and tests with `CGO_ENABLED=0` on Linux, macOS, and Windows (CI matrix green); `modernc.org/sqlite` v1.60.1 and the exact `modernc.org/libc` pin are in `go.mod`.
   2. Tests cover unit, `:memory:`, reopen/persistence, concurrent, and sweep scenarios; coverage gates pass with no `.testcoverage-quick.yml` override (package ≥80%, file ≥70%, total ≥75%).
   3. `doc.go` documents the provider (TTL, reopen persistence, `:memory:`, multi-process constraints), a runnable example exists, and the README package index is updated.
@@ -124,6 +130,6 @@ Plans:
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
-| 15. Provider Foundation + Core Semantics | v1.8 | 0/3 | Not started | - |
+| 15. Provider Foundation + Core Semantics | v1.8 | 1/3 | In Progress|  |
 | 16. Batch + Multi-Process Hardening | v1.8 | 0/— | Not started | - |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |

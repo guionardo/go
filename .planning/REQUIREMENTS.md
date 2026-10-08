@@ -10,19 +10,19 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Provider Integration
 
-- [ ] **PROV-01**: `sqlite.New[K, V](opts...)` returns `cache.BatchCache[K, V]`, built on a sqlite provider implementing the `cacher[K, V]` primitive and wrapped by `cache.NewConcreteCache` — matching the shape of the five existing providers.
-- [ ] **PROV-02**: `GetOrSet` uses the shared `SingleflightGetOrSet` (fast-path Get, double-check Get, panic recovery); the provider adds no second dedup layer.
-- [ ] **PROV-03**: Keys are stringified with `fmt.Sprint` and values serialized with `encoding/json`, matching redis/postgres wire semantics; misses return an error wrapping `cache.ErrMiss`.
-- [ ] **PROV-04**: All SQL calls use context-aware methods; `Delete` of a missing key is a no-op; `Close` is idempotent; provider errors carry a `cache/sqlite:` prefix.
+- [x] **PROV-01**: `sqlite.New[K, V](opts...)` returns `cache.BatchCache[K, V]`, built on a sqlite provider implementing the `cacher[K, V]` primitive and wrapped by `cache.NewConcreteCache` — matching the shape of the five existing providers.
+- [x] **PROV-02**: `GetOrSet` uses the shared `SingleflightGetOrSet` (fast-path Get, double-check Get, panic recovery); the provider adds no second dedup layer.
+- [x] **PROV-03**: Keys are stringified with `fmt.Sprint` and values serialized with `encoding/json`, matching redis/postgres wire semantics; misses return an error wrapping `cache.ErrMiss`.
+- [x] **PROV-04**: All SQL calls use context-aware methods; `Delete` of a missing key is a no-op; `Close` is idempotent; provider errors carry a `cache/sqlite:` prefix.
 
 ### Storage & Location
 
-- [ ] **STOR-01**: Default location is `os.UserCacheDir()/<cache-name>/` (created with `MkdirAll`, 0700) when constructed with a cache name; an explicit path override is accepted as given (parent directories created as needed).
-- [ ] **STOR-02**: An empty path selects `:memory:` mode; both file and `:memory:` modes pin the pool to one connection (`SetMaxOpenConns(1)`, `SetMaxIdleConns(1)`) — mandatory for `:memory:` correctness.
-- [ ] **STOR-03**: Every pooled connection receives DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock mode — using the pinned driver's validated DSN keys; a read-back test asserts `journal_mode` is WAL for file databases.
-- [ ] **STOR-04**: Schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`); schema is fixed: `cache_key TEXT PRIMARY KEY`, `value TEXT` (JSON), `expires_at INTEGER NULL`.
+- [x] **STOR-01**: Default location is `os.UserCacheDir()/<cache-name>/` (created with `MkdirAll`, 0700) when constructed with a cache name; an explicit path override is accepted as given (parent directories created as needed).
+- [x] **STOR-02**: An empty path selects `:memory:` mode; both file and `:memory:` modes pin the pool to one connection (`SetMaxOpenConns(1)`, `SetMaxIdleConns(1)`) — mandatory for `:memory:` correctness.
+- [x] **STOR-03**: Every pooled connection receives DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock mode — using the pinned driver's validated DSN keys; a read-back test asserts `journal_mode` is WAL for file databases.
+- [x] **STOR-04**: Schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`); schema is fixed: `cache_key TEXT PRIMARY KEY`, `value TEXT` (JSON), `expires_at INTEGER NULL`.
 - [ ] **STOR-05**: `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); reopening an existing cache file preserves unexpired entries.
-- [ ] **STOR-06**: Path values containing DSN metacharacters (`?`, `#`) are rejected or escaped so user-supplied paths cannot inject DSN parameters.
+- [x] **STOR-06**: Path values containing DSN metacharacters (`?`, `#`) are rejected or escaped so user-supplied paths cannot inject DSN parameters.
 - [ ] **STOR-07**: Long-running processes can tune WAL checkpointing (`wal_autocheckpoint` option) and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
 
 ### Expiry & Reclamation
@@ -95,16 +95,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 15 | Pending |
-| PROV-02 | Phase 15 | Pending |
-| PROV-03 | Phase 15 | Pending |
-| PROV-04 | Phase 15 | Pending |
-| STOR-01 | Phase 15 | Pending |
-| STOR-02 | Phase 15 | Pending |
-| STOR-03 | Phase 15 | Pending |
-| STOR-04 | Phase 15 | Pending |
+| PROV-01 | Phase 15 | Complete |
+| PROV-02 | Phase 15 | Complete |
+| PROV-03 | Phase 15 | Complete |
+| PROV-04 | Phase 15 | Complete |
+| STOR-01 | Phase 15 | Complete |
+| STOR-02 | Phase 15 | Complete |
+| STOR-03 | Phase 15 | Complete |
+| STOR-04 | Phase 15 | Complete |
 | STOR-05 | Phase 15 | Pending |
-| STOR-06 | Phase 15 | Pending |
+| STOR-06 | Phase 15 | Complete |
 | STOR-07 | Phase 15 | Pending |
 | TTL-01 | Phase 15 | Pending |
 | TTL-02 | Phase 15 | Pending |
@@ -124,6 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-04 | Phase 17 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 27 total
 - Mapped to phases: 27
 - Unmapped: 0 ✓

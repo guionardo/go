@@ -1,21 +1,21 @@
 ---
-gsd_state_version: "1.0"
+gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: SQLite Cache Backend
 current_phase: 15
 current_phase_name: Provider Foundation + Core Cache Semantics
 status: executing
-stopped_at: Phase 15 context gathered
-last_updated: "2026-10-08T13:45:51.292Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-10-08T14:09:43.079Z"
 last_activity: 2026-10-08
-last_activity_desc: "Roadmap created: 27 requirements mapped across Phases 15-17"
-state_head: c7b0edf81eeafccf8495ce6e7db4d49abaf4d565
+last_activity_desc: Phase 15 execution started
 progress:
   total_phases: 3
-  completed_phases: 12
+  completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
+state_head: c1e1f64fd44aecdaaba77c66f7b879eaaed609fe
 ---
 
 # Project State
@@ -25,16 +25,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-08)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** v1.8 SQLite Cache Backend — Phase 15 (Provider Foundation + Core Cache Semantics)
+**Current focus:** Phase 15 — Provider Foundation + Core Cache Semantics
 
 ## Current Position
 
-Phase: 15 (Provider Foundation + Core Cache Semantics) — READY TO EXECUTE
-Plan: — of —
+Phase: 15 (Provider Foundation + Core Cache Semantics) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-10-08 — Roadmap created: 27 requirements mapped across Phases 15-17
+Last activity: 2026-10-08 — Phase 15 execution started
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 14 P02 | 6min | 3 tasks | 7 files |
 | Phase 14-semantics-hardening-release-polish P03 | 8min | 2 tasks | 1 files |
 | Phase 14 P04 | 34 | 3 tasks | 3 files |
+| Phase 15 P01 | 14 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [v1.8 Research]: Pool pinned to one connection (MaxOpenConns=1, MaxIdleConns=1) for both file and `:memory:` modes — the single most important correctness decision
 - [v1.8 Research]: Schema = fixed 3-column `cache_entries` (`cache_key TEXT PRIMARY KEY`, `value TEXT`, `expires_at INTEGER NULL`) + partial expiry index; `auto_vacuum=NONE` recommended; opt-in optimize helper instead of default VACUUM
 - [Carried from v1.7]: Repo forbids empty commits; RED ships with its implementation in the feat commit; `make coverage-quick` green repo-wide (80.7%) must not regress
+- [Phase 15]: cache/sqlite foundation ships DSN-carried pragmas, pinned 1-connection pool, BEGIN IMMEDIATE bootstrap, deferred initErr taxonomy (PROV-01..04, STOR-01..04, STOR-06)
+- [Phase 15]: Per-commit coverage gate forced pure unit tests into the tracer commit (66.4% -> 84.9%); tasks 2-3 still own behavioral tests
+- [Phase 15]: modernc.org/libc v1.77.1 transitively requires x/tools v0.50.0 — the wider x/* MVS bumps from go mod tidy are mandatory, not incidental
 
 ### Pending Todos
 
@@ -101,9 +105,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T12:36:45.617Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-provider-foundation-core-cache-semantics/15-CONTEXT.md
+Last session: 2026-10-08T14:09:43.071Z
+Stopped at: Completed 15-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
