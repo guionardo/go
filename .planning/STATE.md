@@ -5,17 +5,17 @@ milestone_name: SQLite Cache Backend
 current_phase: 16
 current_phase_name: Batch Surface + Multi-Process Hardening
 status: executing
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-10-08T22:10:18.344Z"
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-10-08T22:28:35.780Z"
 last_activity: 2026-10-08
 last_activity_desc: Phase 16 execution resumed (wave continue)
-state_head: c311bb803e2915998076107bbe5d4d47014e8e97
+state_head: add32ba69d41973e990a1c7a45116433d2a4a0f4
 progress:
   total_phases: 3
   completed_phases: 13
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 5
+  percent: 71
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-10-08)
 ## Current Position
 
 Phase: 16 (Batch Surface + Multi-Process Hardening) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-10-08 — Phase 16 execution resumed (wave continue)
 
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Progress: [██████░░░░] 57%
 | Phase 15 P02 | 18 min | 3 tasks | 6 files |
 | Phase 15 P03 | 9 min | 3 tasks | 10 files |
 | Phase 16 P01 | 4min | 2 tasks | 2 files |
+| Phase 16-batch-surface-multi-process-hardening P02 | 23 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Recent decisions affecting current work:
 - [Phase 16]: 16-01: Two-process WAL spike confirmed the D-06 retry policy (5 ms backoff / 5 s budget / busy-only Code()&0xff==5 at the PingContext seam): raw arm failed 8/10 runs with immediate SQLITE_BUSY (DI-15-01 reproduced cross-process), policy arm ran 30/30 clean with journal_mode=wal, integrity_check=ok and exactly 301 rows per role
 - [Phase 16]: 16-01: Harness children use raw database/sql handles with spike-local DSN/schema/SQL mirrors (plus a Rule 3 schema-bootstrap addition); the mirrors are eliminated in Plan 16-04 when children rewire to the shipped provider
 - [Phase 16]: 16-01: Raw arm is observational only (SQLITE_E2E_RETRY=0, never a gate); the e2e build tag keeps the harness invisible to the unit lane and leaves coverage metrics unchanged (no cache/sqlite override)
+- [Phase 16-batch-surface-multi-process-hardening]: TDD commit pattern under the repo constraint (no empty commits; per-commit coverage gate): in-session assertion-level RED evidence ships with its implementation in feat commits; test-only hardening commits as test(16-02)
+- [Phase 16-batch-surface-multi-process-hardening]: journal_size_limit ships as a buildDSN parameter + compile-time constant 64 << 20, no new exported option (OQ1 resolution); non-positive appends nothing
+- [Phase 16-batch-surface-multi-process-hardening]: Classifier uses named constants sqliteBusyCode/sqliteBusyMask over the plan's literal &0xff==5 shape — identical semantics, mnd-clean
 
 ### Pending Todos
 
@@ -119,8 +123,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T22:10:18.323Z
-Stopped at: Completed 16-01-PLAN.md
+Last session: 2026-10-08T22:28:35.761Z
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
