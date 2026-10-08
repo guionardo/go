@@ -5,11 +5,11 @@ titles: json
 findings:
   - id: WR-01
     severity: warning
-    disposition: open
+    disposition: fixed
     title: "`retryBusyWithin` can overrun its budget by a full extra `fn` call"
   - id: WR-02
     severity: warning
-    disposition: open
+    disposition: fixed
     title: "`chunksOf` hangs forever (infinite loop, unbounded allocation) on `size <= 0`"
   - id: IN-01
     severity: info
@@ -31,17 +31,17 @@ findings:
     severity: info
     disposition: open
     title: "`coverage` job pins unpinned third-party actions at old majors (pre-existing)"
-open: 7
+open: 5
 total: 7
-recorded: 2026-10-08T23:20:43.845Z
+recorded: 2026-10-08T23:44:30.739Z
 ---
 
 # Phase 16: Code Review Disposition
 
 | Finding | Severity | Disposition | Source |
 |---------|----------|-------------|--------|
-| WR-01 | warning | open | - |
-| WR-02 | warning | open | - |
+| WR-01 | warning | fixed | 16-REVIEW-FIX.md |
+| WR-02 | warning | fixed | 16-REVIEW-FIX.md |
 | IN-01 | info | open | - |
 | IN-02 | info | open | - |
 | IN-03 | info | open | - |
