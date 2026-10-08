@@ -1,182 +1,177 @@
 # Project Research Summary
 
-**Project:** `github.com/guionardo/go` — milestone v1.7 `project_probe` package
-**Domain:** Best-effort project detection library (folder → language/name/version/description) inside a stdlib-first Go utility monorepo
-**Researched:** 2026-09-28
-**Confidence:** HIGH (with MEDIUM pockets — see Confidence Assessment)
+**Project:** `github.com/guionardo/go` — milestone v1.8 SQLite Cache Backend (`cache/sqlite`)
+**Domain:** Embedded persistent cache provider (sixth backend) added to a stdlib-first Go utility monorepo
+**Researched:** 2026-10-08
+**Confidence:** HIGH for stack and design; one LOW pocket — multi-process `SQLITE_BUSY` behavior (implementation-time spike required; see Gaps)
 
 ## Executive Summary
 
-`project_probe` is a small, best-effort Go library that reads a folder's contents and reports the project's language, name, version, and description across 7 languages (Go, Python, JS/TS, C#/.NET, Rust, Java/Kotlin, PHP) — never failing: unknown content yields a typed `Unknown` value with nil error, and only hard I/O failures (missing/unreadable folder) return errors. Research across the ecosystem (GitHub Linguist, Snyk, vership, opendray/projectscan, Rust `project-detect`, IntelliJ) converges on one design: **an ordered cascade of manifest-first detectors, first match wins, unknown = fallback value never an error**. The mature ecosystem API is a single `Probe(folder) (ProjectData, error)` entry point backed by a private ordered detector registry with a `(ProjectData, bool)` contract — not error-as-control-flow, not plugin registration.
+v1.8 adds the sixth cache backend — `cache/sqlite` — delivering durable, zero-infrastructure local caching for CLIs and small services, safe for multi-process access via WAL. All four research streams converge on the same design: **exactly one new direct dependency** (`modernc.org/sqlite` v1.60.1, the CGO-free pure-Go driver bundling SQLite 3.53.4, requiring Go ≥1.26 and `modernc.org/libc` v1.77.1 exact), everything else stdlib (`database/sql`, `encoding/json`, `os.UserCacheDir`). The provider structurally implements the existing unexported `cacher[K,V]` primitive inside a new package; `cache.NewConcreteCache` then supplies `Cache`, `BatchCache`, and singleflight `GetOrSet` for free, exactly like `cache/postgres`. No root-cache files change; no Docker for tests; no background goroutine anywhere.
 
-The recommended approach is **zero new runtime dependencies**. Every manifest format in scope parses with Go 1.26 stdlib (`os`, `bufio`, `strings`, `encoding/json`, `encoding/xml`, `path/filepath`, minimal `regexp`) plus one unexported section-aware TOML-subset reader (~80 lines) for `pyproject.toml`/`Cargo.toml` — Go stdlib has no TOML parser (verified on Go 1.27.0), and the already-present `yaml.v3` is a category error for TOML. A full TOML dependency (`pelletier/go-toml/v2` or BurntSushi) is explicitly deferred to the framework-detection milestone. The deprecated `project_detector/` sample (which does not compile — 3 verified build errors) must be deleted as a stack-level prerequisite; its logic is the design reference, its dependencies are not.
+The implementation recipe is small and now well specified: DSN-carried pragmas on every pooled connection (WAL, `busy_timeout(5000)`, `synchronous=NORMAL`, `_txlock=immediate`), a pool pinned to one connection for **both** file and `:memory:` modes (the single most important decision), idempotent schema DDL under a `BEGIN IMMEDIATE` bootstrap with a partial expiry index, absolute UnixNano TTLs with lazy delete on read plus a one-shot sweep on open, and one transaction per batch write. Multi-process semantics are verified against sqlite.org primary docs; bbolt and badger are explicitly rejected because both fail the multi-process requirement.
 
-Key risks and mitigations: (1) **API contract ambiguity** (error vs Unknown) — write the contract in `doc.go` on day one, error reserved for I/O failures only; (2) **silent wrong values from naive parsing** (BOM, quotes, comments, XML root trap) — one shared `readManifest` helper (size cap + BOM strip), `XMLName` pattern for XML, strict degrade-to-empty for TOML, all verified by locally-run experiments; (3) **version semantics** — the go.mod `go` directive is a language floor, not a release version; report raw strings, never fabricate, and record the decision; (4) **Windows `path` vs `filepath`** — ban `path`, add a pure-string Windows-path test. Confidence is HIGH overall: stack, architecture, and pitfalls research all include locally-verified experiments (Go 1.26.4/1.27.0) and converging primary sources; features research is MEDIUM (cross-checked across 10+ tools, some single-source claims).
+The dominant risks are mechanical-but-invisible failure classes, each with a cheap mandatory countermeasure: `:memory:` + `database/sql` silently creating multiple databases (pin pool to 1); pragmas landing on only one pooled connection or DSN dialects being ignored (per-connection DSN pragmas + read-back verification tests); WAL silently falling back on network filesystems (read-back `journal_mode` check + docs); `SQLITE_BUSY` escaping `busy_timeout` on deferred read→write upgrades (`_txlock=immediate` + bounded retry backstop); Windows temp-dir handle leaks (idempotent `Close` + `t.Cleanup(close)`); and unbounded file/WAL growth (documented high-water-mark + `journal_size_limit`). The one genuine LOW-confidence area — observable two-process `SQLITE_BUSY` behavior under the chosen pragma set — cannot be desk-researched and is carried as a mandatory implementation-time spike and a phase exit criterion.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Stdlib-only parsing with one hand-rolled unexported TOML subset reader. Verified facts driving decisions: Go stdlib has **no TOML parser** (checked on Go 1.27.0); `pyproject.toml`/`Cargo.toml` are TOML, so the existing `yaml.v3` dep cannot help; the mature pattern is manifest-first ordered cascades (Linguist, Snyk), not content-based detection (`go-enry` is the wrong abstraction). The deprecated `project_detector/` sample is the structural design reference but breaks the build (3 errors: missing `gs-dev`, missing BurntSushi go.sum entry) — delete it in this milestone.
+One new direct dependency and nothing else at runtime. `modernc.org/sqlite` v1.60.1 (tagged 2026-09-29, verified current on `proxy.golang.org`; its `go.mod` requires Go ≥1.26.0, satisfied by the repo's Go 1.26.4) registers the standard `"sqlite"` `database/sql` driver, bundles SQLite 3.53.4 (past the 3.51.3 WAL-reset and 3.53.4 journal-rollback corruption fixes), and builds on all CI platforms with `CGO_ENABLED=0` — no gcc, no msys2, working cross-compilation and `-race`. The dependency tree grows (~10 small transitive modules) and cold builds are slower (~23 MB module; multi-MB generated source) — cache `GOMODCACHE`/`GOCACHE` in CI.
 
 **Core technologies:**
-- Go 1.26.4 (go.mod; local 1.27.0): language + toolchain — repo constraint; all features used are ≥1.24 (`strings.SplitSeq`)
-- `os`/`bufio`/`strings`: folder listing, line-oriented manifest reads (go.mod, .sln, gradle, README) — stdlib, bounded scanners
-- `encoding/json`: `package.json`, `composer.json` — typed struct decode, strict JSON (no JSONC concern)
-- `encoding/xml`: `.csproj`, `.slnx`, `pom.xml` — local-name matching is namespace-agnostic (handles real `xmlns`); use the `XMLName` pattern (root-trap verified)
-- `path/filepath`: discovery + Windows-safe path handling — `path` package is banned (silent Windows breakage verified)
-- Unexported `toml.go` subset reader (~80 lines): section-tracked `key = "value"` extraction for `[project]`/`[tool.poetry]`/`[package]` — strict degrade-to-empty on anything else; **defer** `pelletier/go-toml/v2` to the framework-detection milestone
-- `errors`: sentinel `ErrNotDir`-style error for the one real error path (folder missing/unreadable)
-- Dev tools (existing, no changes): `make coverage-quick` (pkg ≥80/file ≥70/total ≥75 — no override needed; `testdata/` auto-excluded), golangci-lint with `#nosec G304` annotations on manifest reads, `doc.go` convention, README package index row, commitlint `feat(project_probe):`
+- `modernc.org/sqlite` v1.60.1 — the only mature actively-maintained CGO-free SQLite driver; the milestone-mandated choice
+- `modernc.org/libc` v1.77.1 (indirect, **pin exact**) — upstream mandate (cznic/sqlite#177): downstream must pin the driver's libc version or mysterious corruption follows; add a `go.mod` comment (optionally a CI assertion)
+- `database/sql` — pool, per-connection prepared-statement cache, context-carrying queries; no wrapper library
+- `encoding/json` + `fmt.Sprint` — value/key parity with all five existing providers (hard contract)
+- `os.UserCacheDir` + `path/filepath` — default location (`$XDG_CACHE_HOME`/`~/.cache`, `~/Library/Caches`, `%LocalAppData%`; errors when undetermined — propagate, never fall back)
+- Rejected: mattn/go-sqlite3 (needs CGO on all 3 CI OSes), ncruces/go-sqlite3 (Wasm memory overhead, Windows pooled-writer WAL bug history), zombiezen (no `database/sql` by design), bbolt/badger (fail multi-process), ORMs/query builders, `file::memory:?cache=shared`, `synchronous=OFF`, auto-`VACUUM`
+
+### DSN Pragma Syntax — Contradiction Reconciled (Version-Qualified)
+
+The four research files contradicted each other on modernc's DSN pragma syntax. The contradiction resolves on **driver version**, not on a general truth:
+
+- **FEATURES.md / ARCHITECTURE.md (the `_pragma` claim):** "mattn-style `_journal_mode=WAL` shorthand is silently ignored" — this is true for modernc versions **before v1.55.0**, the likely context of the cited production incident (MaorBril/clauder PR #24). It is **not** a property of the pinned driver.
+- **STACK.md (the shorthand claim):** STACK read the v1.60.1 module source from `$GOMODCACHE` and verified the validated shorthand keys (`_busy_timeout`, `_journal_mode`, `_synchronous`, …) were **added in v1.55.0 (2026-07-20)**, are validated against the mattn-compatible value set (a typo fails the open), and are applied in a fixed order with `busy_timeout` first. PITFALLS.md independently corroborates: v1.60.1 "now supports validated mattn-compatible shorthands."
+- **PITFALLS.md on `_pragma`:** `_pragma` values remain **executed as verbatim SQL per connection** (multi-statement capable after `;`) — functional, but it carries SQL authority for any non-constant value.
+
+**Resolution for v1.8:** build the provider-constructed DSN from the **validated shorthand keys**:
+
+```
+<plain-absolute-path>?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate
+```
+
+Both forms are functionally correct on v1.60.1, so this is a hygiene decision, not a correctness gap: shorthand is validated (fail-fast on typo) and cannot execute injected SQL, whereas `_pragma` executes verbatim. ARCHITECTURE.md's preference for `_pragma` ("most explicit, universally documented") is legitimate but carries the weaker safety property for zero benefit on the pinned version. Values are compile-time constants either way; never interpolate caller input into either form.
+
+**Mandatory mechanical guard (settles any residual doubt, not because the question is open):** Phase 1 ships PITFALLS.md's verification tests — read back `PRAGMA journal_mode` (`QueryRow`, must be `wal` in file mode; warn/degrade on mismatch) and assert `busy_timeout`/`synchronous` take effect on the pooled connection. This test mechanically falsifies "silently ignored" on the pinned version and is the guard against future minor-version drift. Also reject/escape `?` and `#` in user-supplied paths (everything after the first `?` is driver DSN query territory).
 
 ### Expected Features
 
-Manifest-first detection with per-field fallback chains is table stakes; the never-fail `Unknown` contract and README-description fallback are the differentiators. Version is always the raw manifest string, empty when absent/dynamic — never fabricated, never normalized.
+The milestone is a **provider-addition**, not a new architecture: `cacher[K,V]` conformance through `NewConcreteCache`, TTL semantics, key/value encoding, error taxonomy, and singleflight behavior are inherited contracts from v1.6 — the new work is the SQL implementation of seven primitive methods plus constructor/options. Scope is identical across all four files; no feature disputes.
 
-**Must have (table stakes):**
-- 7 manifest-first language detectors (Go, Python, JS/TS, C#/.NET, Rust, Java/Kotlin, PHP), ordered, first-match wins — the core feature
-- Name extraction: manifest name → folder base fallback
-- Version extraction: raw manifest value, empty when absent/dynamic (go.mod `go` directive semantics = P1 documentation decision)
-- Description: manifest field → README first-paragraph fallback → empty (README fallback required because go.mod and gradle have no description field)
-- `Unknown` type with nil error for unmatched folders — best-effort contract
-- Folder validation + ignore-list hygiene (vendored/build/IDE dirs must not masquerade as markers)
+**Must have (table stakes, P1):**
+- `cacher[K,V]` conformance (Get/Set/Delete/Close funcs) via `NewConcreteCache` → returns `BatchCache[K,V]`; GetOrSet singleflight inherited, not reimplemented
+- `MGet`/`MSet`/`MDel` with v1.6 batch semantics (only-found-keys, best-effort skip on undecodable, idempotent MDel, single TTL per MSet)
+- TTL parity with postgres/mem `resolveTTL` (per-key >0 wins; 0/negative = never; absent → DefaultTTL; DefaultTTL≤0 = no expiry), stored as absolute UnixNano (NULL = none) so expiry survives restarts
+- Expired entries never returned (`ErrMiss`); lazy delete on read + one-shot sweep on open (no goroutine)
+- Multi-process WAL + `busy_timeout` DSN on every connection; `_txlock=immediate`
+- Three location modes: default `os.UserCacheDir` + name; explicit path; `:memory:` (pool-pinned). **Option-API ambiguity to settle:** the milestone phrase "`:memory:` when path empty" collides with "empty = unset" for the default branch — recommend explicit `WithMemory()` (plus `:memory:` sentinel through `WithPath`), per ARCHITECTURE D1
+- JSON/`fmt.Sprint`/err/ctx parity, `cache/sqlite:` error prefix, wrapped `cache.ErrMiss`
+- Tests (`:memory:` + files, TTL, persistence/reopen, concurrency under `-race`), coverage gates, `doc.go`, runnable example
 
-**Should have (competitive):**
-- Never-fail `Probe(folder) (ProjectData, error)` — error reserved for I/O failures; display tooling can call it unconditionally
-- Stdlib-only with minimal TOML subset parser — repo constraint honored; malformed TOML → Unknown, never error
-- README first-paragraph description fallback — only description source for 2 of 7 languages
-- Deterministic detector ordering — predictable output, trivially testable
+**Should have (differentiators, P2):**
+- Zero-infrastructure durable cache — position as "mem that survives restarts; redis/postgres without the infra"
+- `:memory:` as a drop-in fast/test double (no Docker)
+- Multi-process shared cache file — the only embedded option that does this
+- Transactional batch writes (single tx, one prepared statement, one commit)
+- Optional storage lifecycle controls (checkpoint/optimize), periodic sweep, max-entries cap — only with evidence
 
-**Defer (v2+ / P2-P3):**
-- P2: `tsconfig.json` as TS confirmation, `settings.gradle` `rootProject.name`, lockfile secondary confirmation, .csproj selection rule
-- P3/deferred milestone: framework detection (dependencies-based), extension-count fallback, monorepo/workspace detection, version normalization, detection-depth scanning
-- Anti-features (never for v1.7): executing build tools, network calls, recursive/symlink-following discovery, full TOML dep, version normalization, parsing `build.gradle` code as data, lockfile-first detection
+**Defer / anti-features (explicitly NOT v1.8):**
+- LRU/size eviction (read amplification); encryption at rest (impossible in pure-Go); network FS / multi-host (WAL cannot); cross-process invalidation pub/sub; custom codecs; delete-on-read of expired rows; split read/write pools; blanket retry-past-`busy_timeout`; shared-cache `:memory:` DSN; schema migration framework; periodic `VACUUM`/auto_vacuum default; background sweep loop; background write-serializer goroutine
 
 ### Architecture Approach
 
-A private, ordered slice of per-language detectors, each with a `detectX(folder, entries) (ProjectData, bool)` contract; the registry does one `os.ReadDir`, filters ignored dirs, iterates detectors first-match-wins, then falls through to `LanguageUnknown` with nil error. Detectors are root-scoped only (no subdir probing), self-contained per language file, and share three unexported helpers: `toml.go`, `readme.go`, `ignore.go`. `ProjectData{Folder, Language, Name, Version, Description}` with independent per-field fallbacks. `(ProjectData, bool)` was validated across opendray, Rust project-detect, vership; plugin-style registration was rejected (global mutable state, no consumer need).
+New package only — `cache/` root and all five providers untouched. `sqliteCache[K,V]` implements the seven unexported primitive methods structurally; `New` wraps it with `cache.NewConcreteCache`. Layout mirrors postgres minus the sweeper loop: `doc.go`, `options.go` (Config + functional options), `sqlite.go` (New, DSN builder, 7 methods, resolveTTL), `schema.go` (DDL constants), `sweep.go` (one-shot), plus tests/example.
 
-**Major components:**
-1. `probe.go` — `ProjectData`, language constants, `Probe()` entry point, `doc.go` (contract written here)
-2. `registry.go` — single `os.ReadDir`, ignored-dir filter, ordered `[]detectorFunc` loop, Unknown fallback (~60 lines)
-3. `detector_<lang>.go` ×7 — root marker claim + manifest parse + per-field fallbacks, one file per language
-4. `toml.go` — section-aware TOML subset scanner (shared by Python + Rust)
-5. `readme.go` — README first-paragraph extraction (description fallback)
-6. `ignore.go` — vendored/generated dir exclusion set
-
-Package name `projectprobe` (directory `project_probe/`, repo convention). Build order from research: skeleton+Unknown contract → shared helpers → text/JSON detectors → XML+TOML detectors → polish.
+**Major components and decisions:**
+1. `New[K,V](opts...)` — config → location resolution (`os.UserCacheDir` default; `MkdirAll`; `UserCacheDir` errors propagate) → DSN build → `sql.Open("sqlite", dsn)` → pool pinning → schema DDL → WAL read-back → sweep-on-open → wrap
+2. Pool: **`SetMaxOpenConns(1)` + `SetMaxIdleConns(1)` + zero conn lifetimes for BOTH modes** — serializes in-process access (no provider mutex needed), removes in-process `SQLITE_BUSY` races; critical for `:memory:` (per-connection private DBs; last close destroys it) and recommended by modernc docs
+3. Pragmas via DSN only (never post-open `db.Exec`, which sticks to one pooled connection); `_txlock=immediate` makes every `BeginTx` a `BEGIN IMMEDIATE` (removes deferred read→write upgrade `SQLITE_BUSY_SNAPSHOT`/517)
+4. Schema: `CREATE TABLE IF NOT EXISTS cache_entries (cache_key TEXT PRIMARY KEY, value TEXT NOT NULL, expires_at INTEGER) WITHOUT ROWID` + partial index `ON cache_entries(expires_at) WHERE expires_at IS NOT NULL`; wrap bootstrap in `BEGIN IMMEDIATE` + re-read for cold-start race safety (PITFALLS Pitfall 5); write `user_version=1` as the future migration hook; no migration framework. **auto_vacuum: recommend NONE** (3-of-4 sources: STACK, ARCHITECTURE, FEATURES anti-feature; PITFALLS pitches INCREMENTAL for TTL churn) — creation-time irreversible, so record the decision; escape path is an offline `VACUUM` if growth complaints materialize; set `journal_size_limit` (~4–8 MB) as a cheap WAL disk cap and document high-water-mark behavior
+5. TTL/read path: SELECT → `sql.ErrNoRows` → wrap `ErrMiss`; expired row → best-effort conditional DELETE (`AND expires_at <= ?` — safe against concurrent refresh) → `ErrMiss`; unmarshal failure = error, not miss. MGet filters expired in SQL and does not lazy-delete (documented asymmetry)
+6. Batch: MSet = one tx + one prepared upsert (`ON CONFLICT(cache_key) DO UPDATE`), fail-fast + rollback; MGet = one chunked `IN` query (chunk ~500; verify bundled `SQLITE_MAX_VARIABLE_NUMBER`, 32,766 modern / 999 legacy); MDel = tx + chunked `IN`; always fully consume/close `Rows` (checkpoint starvation)
+7. Sweep: one-shot best-effort DELETE on open, `slog.Warn` on failure, never fails construction
+8. Error contract: only `sql.ErrNoRows`/expiry → wrapped `ErrMiss`; DB failures never become misses; all errors prefixed `cache/sqlite:`; `Close` idempotent; decide/document `ErrClosed` behavior (mem does not return it — divergence risk, PITFALLS Pitfall 8)
 
 ### Critical Pitfalls
 
-1. **API contract ambiguity (error vs Unknown)** — write the contract in `doc.go` day one: error reserved for hard I/O failures; detectors return `(data, bool)`, never error-as-control-flow; empty folder → Unknown + nil error; ordered slice, never map iteration (nondeterministic)
-2. **Naive line-scanning silently produces wrong values** (BOM, quoted module directives, trailing comments — all verified on Go 1.26.4) — one shared `readManifest` helper: size cap (1 MB) → BOM strip → parse; parse failure ⇒ empty fields, never an error; every parser gets a BOM fixture
-3. **`encoding/xml` root-element trap** — struct-with-wrapped-root silently parses to all-empty fields (verified); use `XMLName xml.Name` pattern matching root children by local name; assert at least one field populated per fixture
-4. **Version semantics** — go directive is a language floor (not a release version; decision record required); pom child inherits `<parent><version>` (verified); Cargo `version.workspace = true`; pyproject `dynamic = ["version"]` — report raw, empty when absent, never fabricate "0.0.0"
-5. **Unpruned vendored dirs / Windows `path` vs `filepath`** — `fs.SkipDir` hygiene at every level if any subdir scan exists (10k-file benchmark fixture); ban `path` imports (verified: `path.Base` on Windows paths returns the whole path), pure-string Windows-path unit test
+Full register in PITFALLS.md (7 critical, 6 moderate, 4 minor). Top 5 by severity for this milestone:
+
+1. **`:memory:` + `database/sql` = multiple separate databases** — pin `MaxOpenConns(1)` + `MaxIdleConns(1)`, zero conn lifetimes; never use shared-cache as the default fix; test with concurrent goroutines asserting `db.Stats().OpenConnections == 1`
+2. **Pragmas on one connection only / silently ignored** — all per-connection pragmas ride in the DSN; read back `journal_mode == wal` and assert `busy_timeout`/`synchronous` on the pooled connection; eager `Ping`/verification at `New` so bad DSN fails at construction
+3. **WAL on network filesystems — corruption risk and silent fallback** — `PRAGMA journal_mode=WAL` silently returns the previous mode when shared memory is unavailable; check the read-back, error/degrade loudly, document local-disk-only (NFS/SMB/OneDrive/Dropbox)
+4. **`busy_timeout` blind spots** — deferred read→write upgrade (`SQLITE_BUSY_SNAPSHOT`, code 517), WAL switch/last-close, checkpoint locking escape the busy handler; use autocommit single-statement writes + `_txlock=immediate` + a bounded, ctx-aware retry backstop (codes 5/6; 517 = restart transaction); never blanket-retry past timeout
+5. **Cold-start schema bootstrap race** — two processes on a fresh DB both migrate; wrap version read + DDL + version write in one `BEGIN IMMEDIATE` and re-read inside the lock; concurrent-open test (4 goroutines + ideally 2 processes)
+
+Also critical/moderate: Windows handle leaks (`Close` idempotent, `t.Cleanup(close)`, no permission assertions); DSN path escaping/name traversal (`?`/`#`/`..`, allow-list the cache name); `os.UserCacheDir` errors/missing dirs; file/WAL growth (freelist high-water, checkpoint starvation, `journal_size_limit`); coverage gates with **no override** for an embedded provider; key/TTL parity drift; conformance/bench registration; sidecar file lifecycle docs.
 
 ## Implications for Roadmap
 
-Suggested phase structure (synthesized from ARCHITECTURE.md build order + PITFALLS.md phase mapping; each phase leaves the package green under `make coverage-quick`):
+**Recommended: a 3-phase structure** — the natural refinement of ARCHITECTURE.md's 2-phase grouping (steps 1–3 core; 4–5 batch + hardening) using PITFALLS.md's four severity tiers compressed to three. The 2-phase alternative (core vs batch+hardening) is viable but buries the milestone's only LOW-confidence unknown (the two-process spike) inside a fat hardening phase; giving batch + multi-process concurrency its own phase boundary lets the spike results shape the retry design and gives the security/coverage/docs sweep a clean home. Recommend 3 phases.
 
-### Phase 1: Package Foundation — API Contract + Repo Cleanup
-**Rationale:** The Unknown-without-error contract is the riskiest design bet and shapes every later phase; the dead `project_detector/` sample must be removed before any code lands (verified: `go build ./...` fails).
-**Delivers:** `doc.go` with the written error/Unknown contract, `probe.go` (`ProjectData`, 7+Unknown language constants, `Probe`), `registry.go` with `(ProjectData, bool)` ordered loop, `ignore.go`, shared `readManifest` helper (1 MB cap + BOM strip); `project_detector/` deleted; contract tests (empty folder → Unknown+nil, missing folder → error, unknown folder → Unknown+nil); `filepath`-only discipline + Windows-path unit test.
-**Addresses:** FEATURES table stakes — Unknown contract, folder validation, ignore hygiene.
-**Avoids:** PITFALLS C1 (API contract), C10 (dead sample), C6 (`path` vs `filepath`), foundation of C8 (readManifest).
-**Research flag:** None — well-documented, standard patterns. Skip research-phase.
+### Phase 1: Provider Foundation + Core Cache Semantics (Get/Set/Delete/TTL/Sweep)
 
-### Phase 2: Text/JSON Detectors — Go, JS/TS, PHP + README Fallback
-**Rationale:** Easiest parsers first (line scan + `encoding/json` are stdlib-trivial) validate the detector contract shape before TOML complexity arrives; `readme.go` lands here because go.mod has no description field, so the fallback chain is exercised immediately.
-**Delivers:** `detector_go.go` (go.mod module + go directive), `detector_javascript.go` (package.json), `detector_php.go` (composer.json), `readme.go`; BOM/quoted-module/comment fixtures; go-directive-as-version decision record in PROJECT.md.
-**Addresses:** FEATURES P1 — Go/JS/PHP detectors, name/version/description chains, README fallback.
-**Avoids:** PITFALLS C2 (line-scanning BOM/quotes/comments), C9 (naive README first-paragraph), C8 seeds for JSON.
-**Research flag:** None — stdlib behaviors verified locally; standard patterns. Skip research-phase.
+**Rationale:** Every other phase builds on the constructor/open path, and all six Critical P1 pitfalls live here (memory pool, per-connection pragmas, network-FS WAL fallback, cold-start race, DSN escaping, location errors). Core primitives + TTL + sweep leave a *working* `cache.Cache[K,V]` with singleflight `GetOrSet` — a shippable vertical slice per GSD phase discipline.
+**Delivers:** `go.mod` pin (`modernc.org/sqlite` v1.60.1 + explicit `modernc.org/libc` v1.77.1, decision recorded in PROJECT.md); package skeleton (`options.go`, `schema.go`, `sqlite.go`, `sweep.go`, `doc.go`); location modes (default UserCacheDir + name allow-listing/MkdirAll/error propagation; explicit path; `WithMemory()`); DSN builder with validated shorthand keys + `?`/`#` rejection; pool pinning both modes; `BEGIN IMMEDIATE` bootstrap DDL + `user_version=1` + auto_vacuum(NONE)+`journal_size_limit` decision; WAL read-back verification; per-connection pragma assertion tests; Get/Set/Delete/Close + `resolveTTL` + lazy delete + sweep-on-open; error taxonomy (`ErrMiss` only for miss/expiry).
+**Addresses:** FEATURES P1 items 1, 3–7 — cacher conformance, TTL parity, expiry/sweep, persistence, location modes, parity contracts.
+**Avoids:** Pitfalls 1, 2, 3, 5, 8, 9, 10, 14, 15.
+**Research flag:** No deep research needed — patterns are documented and source-verified. Two discuss-phase decisions: (a) `WithMemory()` vs literal empty-path semantics (ARCHITECTURE D1 open question); (b) confirmation that the shorthand-key DSN + read-back test is the locked form. The read-back test is a first implementation task, not optional.
 
-### Phase 3: TOML Subset + Python/Rust Detectors
-**Rationale:** The TOML subset reader is the only genuinely novel parsing code; land it with its two real consumers so its strict degrade-to-empty contract is proven by fixtures, not by theory.
-**Delivers:** `toml.go` (section-aware: `[project]`, `[tool.poetry]`, `[package]`; single-line `key = "value"` only; anything else → empty field), `detector_python.go`, `detector_rust.go`; TOML decision record (hand-rolled now; `pelletier/go-toml/v2` at framework milestone); Cargo `version.workspace` semantics decision.
-**Addresses:** FEATURES P1 — Python/Rust detectors, TOML subset parser (differentiator).
-**Avoids:** PITFALLS C2-TOML variant, Anti-Pattern 3 (naive regex TOML), C8 (fuzz seeds from real manifests).
-**Research flag:** Phase 3 — MEDIUM-confidence area: the strict degrade-to-empty behavior on legal-but-unsupported TOML (dotted keys, multiline strings, inline tables, workspace inheritance) needs fixture-driven validation during planning. Use `/gsd-plan-phase --research-phase 3`.
+### Phase 2: Batch Surface + Multi-Process Concurrency Hardening
 
-### Phase 4: XML Detectors — C#/.NET + Java/Kotlin
-**Rationale:** XML is the last parser family; the verified `XMLName` pattern and golden namespace fixtures de-risk both detectors. Includes the unresolved .NET marker-precedence decision.
-**Delivers:** `detector_dotnet.go` (`.sln`/`.slnx`/`.csproj`), `detector_java.go` (`pom.xml`/`build.gradle(.kts)`); golden fixtures with `xmlns` + BOM; pom `<parent><version>` inheritance fixtures; non-empty-field assertions per fixture; per-language manifest precedence tests (sln > csproj, pyproject > setup.py).
-**Addresses:** FEATURES P1 — C#/.NET and Java/Kotlin detectors (highest-complexity pair).
-**Avoids:** PITFALLS C3 (XML root trap), C7 (manifest precedence, monorepo fixtures).
-**Research flag:** Phase 4 — two open items: (a) **.NET subdir scan conflict**: STACK.md's per-language mapping includes a bounded 1-level subdir scan for `*.csproj`, while ARCHITECTURE.md (Pattern 4) and PITFALLS.md (Anti-Pattern 2) explicitly reject subdir probing ("a `.csproj` in a subdir belongs to a nested project"). Recommendation: root-scoped markers only, per the 2-of-3 consensus and the milestone's "what is *this* folder" contract; revisit only if .NET misclassification reports arrive. (b) **Detector ordering**: STACK.md cascade (Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP) vs ARCHITECTURE.md example order (go, rust, dotnet, java, python, js, php) differ — pick one documented order (recommend STACK's, matching the sample's relative order with Go first) during planning.
+**Rationale:** Batch ops complete the interface surface (depends on Phase 1's SQL constants and TTL handling); multi-process safety is the milestone's headline promise but rests on the only LOW-confidence behavior — the two-process `SQLITE_BUSY` spike is this phase's exit criterion and its results pin the retry policy.
+**Delivers:** `MGetFunc` (chunked `IN`, expired rows filtered, undecodable skipped), `MSetFunc` (one tx, one prepared upsert, fail-fast + rollback), `MDelFunc` (tx + chunked `IN`, idempotent) with chunk constant validated against the bundled `SQLITE_MAX_VARIABLE_NUMBER`; autocommit audit for single-statement writes; bounded ctx-aware retry helper (codes 5/6, 517 = restart, `interrupted` handling; ~3–5 attempts, 10–50 ms jittered backoff; **backstop only**, never blanket retry-past-timeout); **two-process spike** using the helper-process pattern (`os/exec` re-running the test binary — two `sql.DB` handles in one process do NOT reproduce POSIX cross-process locks); contention/`-race` tests; MGet/MSet/MDel at >1,000 keys.
+**Addresses:** FEATURES P1 batch + multi-process items; MVP batch semantics.
+**Avoids:** Pitfalls 4 (busy_timeout blind spots), 11 (batch limits/semantics), 12 residual (interrupt classification).
+**Research flag:** **Yes — `/gsd-plan-phase --research-phase 2`.** This is the LOW-confidence area: observable residual `SQLITE_BUSY` probability, retry policy shape, modernc context-cancellation interrupt behavior (#198/#241), and WAL + `auto_vacuum` interaction under real multi-process churn.
 
-### Phase 5: Semantics, Hardening, and Release Polish
-**Rationale:** Version/description semantics need cross-file and cross-language resolution that individual detector phases can't fully own; fuzzing and fixture breadth are the last defense against silent-wrong-value failures; the package must ship with docs and CI integration complete.
-**Delivers:** Consolidated version-semantics decision records (go directive; Cargo workspace resolution; Maven parent inheritance — raw string, never fabricated); README variant fixtures (rst underline headings, badge-first, ToC); fuzz targets with real-manifest seed corpora for all parsers (run during normal `go test`, count toward coverage); 10k-entry benchmark fixture; `doc.go` prose + README package index row; `go vet`/lint pass (G304 annotations).
-**Addresses:** FEATURES P1 completion + "Looks Done But Isn't" checklist (PITFALLS).
-**Avoids:** PITFALLS C4 (version semantics), C8 (robustness + fuzz), C9 remainder, performance traps.
-**Research flag:** Phase 5 (light) — Cargo workspace cross-file resolution design has no single verified source; validate during planning. Skip research-phase for the rest (standard hardening patterns).
+### Phase 3: Delivery Hardening — CI Matrix, Coverage, Docs, Registrations
+
+**Rationale:** Windows handle semantics, the no-override coverage gates, conformance registrations, and operational docs are delivery-critical work untouched by earlier phases; docs carry the constraints users will otherwise hit (network FS, sidecars, growth). The repo's per-commit coverage gate means tests accrue in every phase — this phase closes the last gaps and proves the gates.
+**Delivers:** Windows-green tests (`t.Cleanup(close)` everywhere, idempotent `Close`, no permission assertions, temp-dir determinism); non-Docker `providerCase` registration in `cache/cache_e2e_test.go` + benchmark entry in `bench_test.go`; `make coverage-quick` green with **no `.testcoverage-quick.yml` override** (pkg ≥80 / file ≥70 / total ≥75); `go mod tidy` diff reviewed + `govulncheck` clean; `doc.go` statements (WAL local-disk-only, sidecar lifecycle, growth high-water-mark + delete-to-reclaim, `:memory:` single-connection serialization), `example_test.go`, README/AGENTS table rows; PITFALLS "Looks Done But Isn't" checklist sweep; `make quality-report` before tag.
+**Addresses:** FEATURES project Definition of Done; MVP tests/docs items.
+**Avoids:** Pitfalls 6, 7 (documentation half), 12 (quality half), 13, 16, 17.
+**Research flag:** No — standard project-hardening patterns, fully specified in PITFALLS.md.
 
 ### Phase Ordering Rationale
-- **Contract first, parsers later:** the Unknown-without-error contract is the riskiest bet and every later phase builds on it; `readManifest` (BOM+cap) must exist before any parser (PITFALLS C2/C8)
-- **Easiest parsers before harder ones:** text/JSON → TOML → XML de-risks the `(ProjectData, bool)` detector shape before the novel TOML subset and XML trap arrive (ARCHITECTURE build order)
-- **Shared helpers before consumers:** `toml.go`/`readme.go` land before or with their first consumers so two language families don't re-implement the same helper
-- **Version/description semantics consolidated at the end:** decisions (go directive, workspace inheritance) need cross-file evidence from all detector phases; the PITFALLS mapping converges on this as a final phase
-- **Cleanup is prerequisite, not optional:** `project_detector/` deletion lands in Phase 1 because it breaks the build and CI cleanliness (verified)
 
-### Research Flags
-Needs research during planning (`/gsd-plan-phase --research-phase N`):
-- **Phase 3:** TOML strict-degrade-to-empty edge cases (dotted keys, multiline strings, inline tables, `version.workspace`) — MEDIUM confidence, needs fixture-driven validation
-- **Phase 4:** .NET marker precedence + root-only vs 1-level subdir scan (STACK vs ARCHITECTURE/PITFALLS conflict); detector ordering policy (two candidate orders in research)
-- **Phase 5 (light):** Cargo workspace cross-file version resolution design
-
-Standard patterns (skip research-phase):
-- **Phase 1:** API contract, registry loop, ignore list — well-documented, locally verified
-- **Phase 2:** go.mod/package.json/composer.json parsing + README extraction — stdlib behaviors verified by local experiments
+- **Constructor first:** the DSN/pool/schema decisions (all creation-time or irreversible: `auto_vacuum`, expiry index) are prerequisites for every behavior and own the Critical pitfalls
+- **Primitives before batch:** batch methods reuse Phase 1's SQL constants and TTL resolution; splitting them avoids blocking the working `Cache` slice on batch complexity
+- **Concurrency/spike before declaring the milestone promise:** the milestone *is* multi-process safety; the LOW-confidence behavior must be measured (Phase 2), not assumed, and the retry policy derives from it
+- **Delivery hardening last but enforced throughout:** coverage gates run per commit, so each phase ships green; Phase 3 aggregates Windows/docs/registrations/quality-report
+- **Frozen interfaces:** no phase may touch `cache/` root or existing providers (v1.6 D-02) — the compile-time contract is exercised by `New`'s return
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Stdlib TOML absence verified locally on Go 1.27.0; go.mod evidence (broken sample, dep graph); modfile/BurntSushi/go-toml docs cross-checked |
-| Features | MEDIUM | Cross-checked across Snyk source, Linguist, PEP 621, Composer/MSBuild docs, langforge, repo-scanner, detect-stack, Understand-Anything; single-source claims (detect-stack, SherlockIO) marked LOW |
-| Architecture | HIGH | Converging primary sources across 6+ implementations (Linguist, opendray, vership, Rust project-detect, projectdetect, IntelliJ); README-fallback specifics MEDIUM |
-| Pitfalls | HIGH | Stdlib behaviors verified in local experiments on Go 1.26.4/1.27.0 (digests in `.planning/research/.cache/`); ecosystem conventions cross-checked |
+| Stack | HIGH | Driver/pragma/WAL facts verified against primary sources: module proxy, v1.60.1 source in `$GOMODCACHE` (DSN docs, apply order, `StrictPragmas`, changelog), sqlite.org docs. Version facts date-stamped 2026-10-08 |
+| Features | HIGH (MEDIUM pockets) | HIGH for engine/driver behavior and interface-parity requirements (official docs + local code inspection); MEDIUM for Go-ecosystem TTL/sweep/pool idioms (consensus across 4+ independent implementations). One stale claim (DSN shorthand) version-qualified and reconciled above |
+| Architecture | MEDIUM | Integration wiring HIGH (direct code inspection); SQLite mechanics MEDIUM (docs + independent implementations converging); multi-process `SQLITE_BUSY` LOW pending spike |
+| Pitfalls | HIGH (SQLite semantics), MEDIUM (driver-specific) | HIGH for SQLite semantics from official docs/forum; MEDIUM for modernc version-specific and Windows ecosystem reports (cross-checked community incidents) |
 
-**Overall confidence:** HIGH (features research is the MEDIUM outlier; all three other areas include locally-verified experiments)
+**Overall confidence:** HIGH for the design and stack; the single LOW-confidence pocket (observable multi-process contention behavior) is isolated, scheduled, and does not block design — it blocks only the claim "multi-process safe" until the Phase 2 spike passes.
 
 ### Gaps to Address
 
-- **.NET subdir scan (STACK vs ARCHITECTURE/PITFALLS conflict):** resolved in synthesis in favor of root-scoped markers (2-of-3 consensus); confirm during Phase 4 planning
-- **Detector ordering discrepancy:** STACK.md cascade vs ARCHITECTURE.md example order differ; fix one documented order during roadmap/planning (recommend: Go → Python → C#/.NET → JS/TS → Rust → Java/Kotlin → PHP)
-- **go.mod `go` directive as Version:** P1 documentation decision — recommend reporting the raw directive with a documented "language floor, not release version" semantic (opendray precedent + milestone spec) recorded in PROJECT.md; alternative is a dedicated `GoVersion` field. Decide in Phase 2.
-- **`path_tools` reuse (FEATURES) vs stdlib-only sibling imports (ARCHITECTURE/STACK):** resolved in favor of stdlib-only (`filepath.Abs` + `os.ReadDir` + small `hasFile` helper); `path_tools` remains an acceptable alternative if team prefers in-repo reuse — confirm during planning
-- **Language constants refinement (TypeScript/Kotlin):** ARCHITECTURE lists optional refinement constants; recommend shipping 7 constants + `Unknown` in v1.7, refining via `tsconfig.json`/`build.gradle.kts` signals as P2 (matches FEATURES P2 triggers)
-- **README fallback specifics:** rst underline headings, badge/ToC skipping heuristics are convention-level (MEDIUM); validate with real-world README fixtures during Phase 2 implementation
-- **`project_detector/` deletion:** ARCHITECTURE.md's integration table says "leave as-is" but STACK.md + PITFALLS.md (verified build break) mandate deletion — treat deletion as authoritative; note ARCHITECTURE row as stale
+- **Two-process `SQLITE_BUSY` spike (mandatory, implementation-time):** run two OS processes writing one file through modernc with WAL + `busy_timeout`; measure whether/when errors escape the timeout; confirm the retry helper absorbs residual; use the helper-process pattern (same-process handles don't reproduce cross-process locks). Phase 2 exit criterion. (questions.md #4)
+- **DSN shorthand behavior:** settled at source level (v1.60.1 validated shorthand support; the "silently ignored" claim is pre-v1.55.0) — still ship the Phase 1 pragma read-back tests as the mechanical guard; do not ship on assumption regardless of DSN form.
+- **`WithPath("")` / `WithMemory()` option-API ambiguity:** milestone's "`:memory:` when path empty" cannot be taken literally alongside "empty = unset" for the default branch; settle in Phase 1 discussion (recommend explicit `WithMemory()` + `:memory:` sentinel).
+- **`auto_vacuum` decision (creation-time, irreversible):** recommend NONE + documented high-water-mark + offline-`VACUUM` escape vs PITFALLS' INCREMENTAL pitch; lock in Phase 1 and record it; add `journal_size_limit` (~4–8 MB).
+- **Context-cancellation interrupt behavior:** modernc #198/#241 show possible pooled-connection poisoning (`interrupted (9)`) after cancel; verify pinned-version behavior under `-race` stress or classify `interrupted` as retryable.
+- **`ErrClosed` semantics:** `mem` does not return it today; decide and test the sqlite behavior explicitly (driver error wrapped vs sentinel) to avoid divergence.
+- **Retry scope reconciliation:** PITFALLS requires a bounded retry backstop; FEATURES lists blanket retry-past-timeout as an anti-feature. Reconciled: retry only for the non-timeout-covered cases (WAL switch/bootstrap, 517 restart, `interrupted`), never as a blanket policy — confirm exact policy when the spike reports.
+- **Chunk constant (500) and `journal_size_limit` value:** conservative defaults; validate against the bundled build's limits/config in Phase 2 with benchmarks where cheap.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Local toolchain experiments Go 1.26.4/1.27.0 (2026-09-28) — stdlib TOML absence (`go doc encoding/toml` fails), JSON/XML BOM behavior, `encoding/xml` root-element pattern + namespaces, pom parent-version inheritance, `filepath.WalkDir` symlink behavior, `path.Base` on Windows paths, go.mod BOM/quoted-module parsing (digests in `.planning/research/.cache/`)
-- In-repo evidence — `project_detector/` build failure (3 errors), `go.mod` (yaml.v3 direct, x/mod indirect), `.testcoverage-quick.yml`, Makefile, CI workflow (3-OS matrix), package conventions (`doc.go`, README index)
-- golang/go issues #60791, #68361 — no stdlib TOML adoption; Go 1.26 release notes (go.dev/doc/go1.26)
-- GitHub Linguist `lib/linguist.rb` — ordered `STRATEGIES` cascade, first-single-candidate wins
-- Rust `project-detect` crate + `vership` `project/detect.rs` + `opendray/projectscan` — ordered marker checks, `(Stack, bool)` contract, ordering-as-ambiguity-resolution, go-directive-as-version, ignored-dir maps
-- JetBrains intellij-community `FileTypeRegistry.java` — plugin registration pattern (rejected), "refrain from throwing exceptions"
+- `modernc.org/sqlite` v1.60.1 module source read from `$GOMODCACHE` (`driver.go`, `sqlite.go`, `doc.go`, `CHANGELOG.md`, `go.mod`) — DSN keys/order, `StrictPragmas`, platform matrix, libc pin, pool guidance
+- `sqlite.org` primary documentation — wal.html, pragma.html, inmemorydb.html, lang_upsert.html, wal-lock.md, rescode.html, busy_timeout C API, howtocorrupt.html, useovernet.html, lang_vacuum.html, lang_transaction.html
+- `proxy.golang.org` module metadata (versions, dates, `go.mod` requirements) — checked 2026-10-08
+- Go stdlib docs — `go doc os.UserCacheDir`; database/sql connection-management guidance
+- Local code inspection — `cache/{cache,concrete_cache,singleflight,errors}.go`, `cache/postgres/*`, `cache/mem/*`, `cache/cache_e2e_test.go`, `cache/bench_test.go`, `.testcoverage-quick.yml`, `.github/workflows/go.yml`, `go.mod`, `AGENTS.md`
 
 ### Secondary (MEDIUM confidence)
-- `pkg.go.dev/golang.org/x/mod/modfile` v0.41.0 — `ModulePath` tolerant extraction (upgrade path for go.mod parsing)
-- `github.com/pelletier/go-toml/v2` v2.4.x + `github.com/BurntSushi/toml` v1.6 — TOML library landscape (deferral boundary; go-toml/v2 preferred if dep ever added)
-- Snyk CLI source `detect.ts` — ordered `DETECTABLE_FILES` basename list, first-match
-- `github.com/go-enry/go-enry/v2` — unknown-is-empty contract, vendor hygiene (wrong abstraction for this task)
-- `github.com/aquasecurity/go-dep-parser` — per-format parser architecture reference (absorbed into Trivy; do not take as dep)
-- PEP 621 pyproject.toml spec, Composer schema/Packagist, .NET SDK MSBuild properties docs — per-language version/name semantics
-- `rios0rios0/langforge`, `@codegeneai/repo-scanner`, `nickpending/llmcli-tools` (language-detect), `Lum1104/Understand-Anything`, mise docs — feature landscape cross-checks
-- Prior research cache — Snyk pattern, mise/asdf version-file discovery
+- `pkg.go.dev/modernc.org/sqlite` v1.60.1 package docs — DSN syntax, pool warnings, native-vs-C performance
+- Field reports cross-checked: MaorBril/clauder PR #24 and opentalon PR #314 (silently ignored mattn-style DSN keys), trip2g (517 `SQLITE_BUSY_SNAPSHOT`/`_txlock`), hollis-labs/go-sqlite, mattn FAQ #204/#906/#511/#1205 (`:memory:` pooling, Windows handles), cznic/sqlite #177/#198/#241 (libc pin, interrupt poisoning), Rails PR #57076 (`auto_vacuum=incremental`), NetBird #6701 + checkpoint-starvation write-ups
+- Independent benchmarks: `go-sqlite-benchmark-mattn-vs-modernc` (17–54% directional), blinki-io/dingo PR #2499 (fixed-shape prepared SQL)
+- TTL/sweep pattern consensus: requests-cache (Python), cameo sqlite-cache (Rust), sqlite-kv (TS)
+- Competitor docs: etcd-io/bbolt (exclusive lock, single-process), dgraph badger (directory lock)
 
 ### Tertiary (LOW confidence)
-- `Luum-Home/luum-cognitive-os` (detect-stack) — name priority chain (single source)
-- `griffincancode/sherlockio` — lockfile exclusion rationale (single source)
-- `richardwooding/projectdetect` — indicator-based registry, multi-match API (single project, used only as contrast)
-- `dispat` scanner docs — `Manifest{Path, Name, Version}` shape, name preference chain (MEDIUM, used for data model)
+- Single-source ecosystem claims used directionally only (individual benchmark figures; ncruces Windows WAL-index report used to reject the alternative, not to make positive design claims)
 
 ---
-*Research completed: 2026-09-28*
-*Ready for roadmap: yes*
+*Research synthesized: 2026-10-08*
+*Ready for roadmap: yes — recommended structure: 3 phases; Phase 2 requires deeper research/spike*
