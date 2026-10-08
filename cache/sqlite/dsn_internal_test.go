@@ -9,33 +9,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLocation(t *testing.T) {
-	t.Parallel()
+// locationCase is one row of the resolveLocation precedence matrix.
+type locationCase struct {
+	name       string
+	cfg        *Config
+	dir        func() (string, error)
+	wantPath   string
+	wantMemory bool
+	wantErr    bool
+}
 
-	root := t.TempDir()
+// testAppName is a valid cache name reused across the location tests.
+const testAppName = "app"
+
+func locationCases(root string) []locationCase {
 	ok := func() (string, error) { return root, nil }
 	fail := func() (string, error) { return "", errors.New("user cache dir unavailable") }
 
-	tests := []struct {
-		name       string
-		cfg        *Config
-		dir        func() (string, error)
-		wantPath   string
-		wantMemory bool
-		wantErr    bool
-	}{
+	return []locationCase{
 		{
 			name:       "memory_option",
 			cfg:        &Config{Memory: true},
 			dir:        ok,
-			wantPath:   ":memory:",
+			wantPath:   memoryPath,
 			wantMemory: true,
 		},
 		{
 			name:       "memory_path_sentinel",
-			cfg:        &Config{Path: ":memory:"},
+			cfg:        &Config{Path: memoryPath},
 			dir:        ok,
-			wantPath:   ":memory:",
+			wantPath:   memoryPath,
 			wantMemory: true,
 		},
 		{
@@ -46,39 +49,45 @@ func TestLocation(t *testing.T) {
 		},
 		{
 			name:     "name_resolves_under_user_cache_dir",
-			cfg:      &Config{Name: "app"},
+			cfg:      &Config{Name: testAppName},
 			dir:      ok,
-			wantPath: filepath.Join(root, "app", "cache.db"),
+			wantPath: filepath.Join(root, testAppName, "cache.db"),
 		},
 		{
 			name:       "zero_value_is_memory",
 			cfg:        &Config{},
 			dir:        ok,
-			wantPath:   ":memory:",
+			wantPath:   memoryPath,
 			wantMemory: true,
 		},
 		{
 			name:       "memory_beats_path_and_name",
-			cfg:        &Config{Memory: true, Path: filepath.Join(root, "x.db"), Name: "app"},
+			cfg:        &Config{Memory: true, Path: filepath.Join(root, "x.db"), Name: testAppName},
 			dir:        ok,
-			wantPath:   ":memory:",
+			wantPath:   memoryPath,
 			wantMemory: true,
 		},
 		{
 			name:     "path_beats_name",
-			cfg:      &Config{Path: filepath.Join(root, "win.db"), Name: "app"},
+			cfg:      &Config{Path: filepath.Join(root, "win.db"), Name: testAppName},
 			dir:      ok,
 			wantPath: filepath.Join(root, "win.db"),
 		},
 		{
 			name:    "user_cache_dir_error_propagates",
-			cfg:     &Config{Name: "app"},
+			cfg:     &Config{Name: testAppName},
 			dir:     fail,
 			wantErr: true,
 		},
 	}
+}
 
-	for _, tc := range tests {
+func TestLocation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	for _, tc := range locationCases(root) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -128,7 +137,7 @@ func TestInvalidPathAndName(t *testing.T) {
 		root := t.TempDir()
 		dir := func() (string, error) { return root, nil }
 
-		for _, n := range []string{"app", "my.cache_1-x", "A"} {
+		for _, n := range []string{testAppName, "my.cache_1-x", "A"} {
 			path, memory, err := resolveLocation(&Config{Name: n}, dir)
 			require.NoError(t, err)
 			assert.False(t, memory)
@@ -139,7 +148,7 @@ func TestInvalidPathAndName(t *testing.T) {
 	t.Run("valid_name_allow_list", func(t *testing.T) {
 		t.Parallel()
 
-		assert.True(t, validName("app"))
+		assert.True(t, validName(testAppName))
 		assert.True(t, validName("my.cache_1-x"))
 		assert.False(t, validName(""))
 		assert.False(t, validName("."))
@@ -162,9 +171,9 @@ func TestDSNBuildDSN(t *testing.T) {
 		buildDSN(filePath, false))
 
 	assert.Equal(t,
-		":memory:?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate",
-		buildDSN(":memory:", true))
+		memoryPath+"?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate",
+		buildDSN(memoryPath, true))
 
 	// Memory mode must not carry the journal_mode key (SQLite reports "memory").
-	assert.NotContains(t, buildDSN(":memory:", true), "journal_mode")
+	assert.NotContains(t, buildDSN(memoryPath, true), "journal_mode")
 }

@@ -1,11 +1,13 @@
 package sqlite
 
 import (
+	"context"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/guionardo/go/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,6 +142,30 @@ func countCacheTables(t *testing.T, c *sqliteCache[string, string]) int {
 	return count
 }
 
+// probeConcurrentOpen opens the cache at path, stores and reads back a probe
+// value, and returns the first error encountered.
+func probeConcurrentOpen(t *testing.T, path string) error {
+	t.Helper()
+
+	c := New[string, string](WithPath(path))
+	defer func() { _ = c.Close() }()
+
+	if err := c.Set(t.Context(), "probe", "ok"); err != nil {
+		return err
+	}
+
+	value, err := c.Get(t.Context(), "probe")
+	if err != nil {
+		return err
+	}
+
+	if value != "ok" {
+		return assert.AnError
+	}
+
+	return nil
+}
+
 func TestBootstrapIdempotence(t *testing.T) {
 	t.Parallel()
 
@@ -170,31 +196,9 @@ func TestBootstrapIdempotence(t *testing.T) {
 		errs := make([]error, workers)
 
 		for i := range errs {
-			wg.Add(1)
-
-			go func() {
-				defer wg.Done()
-
-				c := New[string, string](WithPath(path))
-				defer func() { _ = c.Close() }()
-
-				if err := c.Set(t.Context(), "probe", "ok"); err != nil {
-					errs[i] = err
-
-					return
-				}
-
-				value, err := c.Get(t.Context(), "probe")
-				if err != nil {
-					errs[i] = err
-
-					return
-				}
-
-				if value != "ok" {
-					errs[i] = assert.AnError
-				}
-			}()
+			wg.Go(func() {
+				errs[i] = probeConcurrentOpen(t, path)
+			})
 		}
 
 		wg.Wait()
@@ -207,4 +211,75 @@ func TestBootstrapIdempotence(t *testing.T) {
 		require.NoError(t, c.initErr)
 		assert.Equal(t, 1, countCacheTables(t, c))
 	})
+}
+
+func TestDeferredErr(t *testing.T) {
+	t.Parallel()
+
+	c := New[string, string](WithPath("bad?path"))
+	require.NotNil(t, c)
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	_, err := c.Get(t.Context(), "k")
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInvalidPath)
+	require.ErrorContains(t, err, "cache/sqlite")
+
+	err = c.Set(t.Context(), "k", "v")
+	require.ErrorIs(t, err, ErrInvalidPath)
+
+	err = c.Delete(t.Context(), "k")
+	require.ErrorIs(t, err, ErrInvalidPath)
+
+	// Close is cleanup: it returns nil even when the handle deferred an open error.
+	require.NoError(t, c.Close())
+}
+
+func TestClosedTaxonomy(t *testing.T) {
+	t.Parallel()
+
+	c := newInternalProvider(t, WithMemory())
+	require.NoError(t, c.initErr)
+	require.NoError(t, c.CloseFunc())
+
+	_, err := c.GetFunc(t.Context(), "k")
+	require.ErrorIs(t, err, ErrClosed)
+
+	err = c.SetFunc(t.Context(), "k", "v")
+	require.ErrorIs(t, err, ErrClosed)
+
+	err = c.DeleteFunc(t.Context(), "k")
+	require.ErrorIs(t, err, ErrClosed)
+
+	require.NoError(t, c.CloseFunc()) // idempotent
+}
+
+func TestCorruptedRowNotMiss(t *testing.T) {
+	t.Parallel()
+
+	c := newInternalProvider(t, WithMemory())
+	require.NoError(t, c.initErr)
+
+	// Seed a row whose value is not valid JSON straight through the handle.
+	_, err := c.db.ExecContext(t.Context(), UpsertSQL, "corrupt", "{not-json", nil)
+	require.NoError(t, err)
+
+	_, err = c.GetFunc(t.Context(), "corrupt")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, cache.ErrMiss)
+	require.ErrorContains(t, err, "cache/sqlite")
+}
+
+func TestCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	c := newInternalProvider(t, WithMemory())
+	require.NoError(t, c.initErr)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := c.GetFunc(ctx, "k")
+	require.Error(t, err)
 }

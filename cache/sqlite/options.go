@@ -2,16 +2,18 @@ package sqlite
 
 import "time"
 
-// Config holds configuration for the SQLite cache provider.
-type Config struct {
-	Name       string
-	Path       string
-	Memory     bool
-	DefaultTTL time.Duration
-}
+type (
+	// Config holds configuration for the SQLite cache provider.
+	Config struct {
+		Name       string
+		Path       string
+		Memory     bool
+		DefaultTTL time.Duration
+	}
 
-// Option is a functional option for configuring the SQLite cache provider.
-type Option func(*Config)
+	// Option is a functional option for configuring the SQLite cache provider.
+	Option func(*Config)
+)
 
 // defaultConfig returns the zero-value configuration: an in-memory cache
 // (zero value = memory mode).

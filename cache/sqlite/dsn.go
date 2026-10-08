@@ -13,6 +13,9 @@ import (
 const (
 	dsnSuffixFile   = "?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate"
 	dsnSuffixMemory = "?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate"
+
+	// memoryPath is the SQLite in-memory database path.
+	memoryPath = ":memory:"
 )
 
 // resolveLocation resolves the configured location to a database path using
@@ -23,24 +26,27 @@ const (
 // another directory.
 func resolveLocation(cfg *Config, userCacheDir func() (string, error)) (path string, memory bool, err error) {
 	switch {
-	case cfg.Memory || cfg.Path == ":memory:":
-		return ":memory:", true, nil
+	case cfg.Memory || cfg.Path == memoryPath:
+		return memoryPath, true, nil
 	case cfg.Path != "":
 		if strings.ContainsAny(cfg.Path, "?#") {
 			return "", false, fmt.Errorf("%w: path must not contain '?' or '#'", ErrInvalidPath)
 		}
+
 		return cfg.Path, false, nil
 	case cfg.Name != "":
 		if !validName(cfg.Name) {
 			return "", false, fmt.Errorf("%w: invalid cache name %q", ErrInvalidPath, cfg.Name)
 		}
+
 		root, err := userCacheDir()
 		if err != nil {
 			return "", false, fmt.Errorf("resolve user cache dir: %w", err)
 		}
+
 		return filepath.Join(root, cfg.Name, "cache.db"), false, nil
 	default:
-		return ":memory:", true, nil
+		return memoryPath, true, nil
 	}
 }
 
@@ -51,6 +57,7 @@ func validName(name string) bool {
 	if name == "" || name == "." || name == ".." {
 		return false
 	}
+
 	for _, r := range name {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
@@ -59,6 +66,7 @@ func validName(name string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -69,5 +77,6 @@ func buildDSN(path string, memory bool) string {
 	if memory {
 		return path + dsnSuffixMemory
 	}
+
 	return path + dsnSuffixFile
 }

@@ -18,18 +18,6 @@ import (
 	"github.com/guionardo/go/cache"
 )
 
-var (
-	// ErrClosed is returned by operations attempted on a closed cache.
-	ErrClosed = errors.New("cache/sqlite: cache is closed")
-
-	// ErrInvalidPath is returned when a path or cache name fails validation.
-	ErrInvalidPath = errors.New("cache/sqlite: invalid path")
-)
-
-var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
-	return slog.With(slog.String("module", "cache/sqlite"))
-})
-
 // sqliteCache is the SQLite-backed provider. It implements the cache.cacher
 // primitive interface (GetFunc/SetFunc/DeleteFunc/CloseFunc and the batch
 // methods); New wraps it in a cache.NewConcreteCache, which supplies the
@@ -44,6 +32,21 @@ type sqliteCache[K comparable, V any] struct {
 	initErr    error
 	closed     atomic.Bool
 }
+
+// cacheDirPerm is the permission mode for cache directories.
+const cacheDirPerm = 0o700
+
+var (
+	// ErrClosed is returned by operations attempted on a closed cache.
+	ErrClosed = errors.New("cache/sqlite: cache is closed")
+
+	// ErrInvalidPath is returned when a path or cache name fails validation.
+	ErrInvalidPath = errors.New("cache/sqlite: invalid path")
+
+	logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
+		return slog.With(slog.String("module", "cache/sqlite"))
+	})
+)
 
 // New creates a new SQLite cache provider with optional functional options.
 //
@@ -72,7 +75,7 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 	}
 
 	if !memory {
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), cacheDirPerm); err != nil {
 			return err
 		}
 	}
@@ -92,6 +95,7 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 	if err := c.bootstrap(ctx); err != nil {
 		_ = db.Close()
 		c.db = nil
+
 		return err
 	}
 
@@ -126,6 +130,7 @@ func (c *sqliteCache[K, V]) bootstrap(ctx context.Context) error {
 	if _, err := tx.ExecContext(ctx, CreateTableSQL); err != nil {
 		return err
 	}
+
 	if _, err := tx.ExecContext(ctx, CreateIndexSQL); err != nil {
 		return err
 	}
@@ -139,9 +144,11 @@ func (c *sqliteCache[K, V]) check() error {
 	if c.initErr != nil {
 		return fmt.Errorf("cache/sqlite: %w", c.initErr)
 	}
+
 	if c.closed.Load() {
 		return fmt.Errorf("cache/sqlite: %w", ErrClosed)
 	}
+
 	return nil
 }
 
@@ -155,10 +162,12 @@ func (c *sqliteCache[K, V]) GetFunc(ctx context.Context, key K) (V, error) {
 	}
 
 	var data string
+
 	err := c.db.QueryRowContext(ctx, SelectSQL, fmt.Sprint(key), time.Now().UnixNano()).Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
 		return zero, fmt.Errorf("cache/sqlite: %w", cache.ErrMiss)
 	}
+
 	if err != nil {
 		return zero, fmt.Errorf("cache/sqlite: %w", err)
 	}
@@ -185,6 +194,7 @@ func (c *sqliteCache[K, V]) SetFunc(ctx context.Context, key K, value V, ttl ...
 	}
 
 	expiresAt, hasTTL := c.resolveTTL(ttl...)
+
 	var exp any
 	if hasTTL {
 		exp = expiresAt
@@ -234,6 +244,7 @@ func (c *sqliteCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
 		if err != nil {
 			continue // missing or errored key — skip
 		}
+
 		result[key] = value
 	}
 
@@ -272,6 +283,7 @@ func (c *sqliteCache[K, V]) resolveTTL(ttl ...time.Duration) (int64, bool) {
 	if len(ttl) > 0 && ttl[0] > 0 {
 		return time.Now().Add(ttl[0]).UnixNano(), true
 	}
+
 	if c.defaultTTL > 0 {
 		return time.Now().Add(c.defaultTTL).UnixNano(), true
 	}
