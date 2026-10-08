@@ -37,6 +37,7 @@ The module is divided into four broad groups. The `cache` and `config` packages 
  │ cache/valkey (Valkey)         │        │
  │ cache/memcache (Memcache)     │        │
  │ cache/postgres (Postgres)     │        │
+ │ cache/sqlite   (SQLite)       │        │
  └───────────────────────────────┘        │
                                           │
  ┌───────────────────────────────────────────────────────────────┐
@@ -99,6 +100,7 @@ cache/            Generic cache interface + SingleflightGetOrSet; safe single bi
   valkey/         Valkey backend (valkey-go), eager dial.
   memcache/       Memcache backend (gomemcache).
   postgres/       Postgres backend (pgx/v5, pgxpool at construction).
+  sqlite/         SQLite backend (modernc.org/sqlite, pure Go; single pooled connection).
 config/           Generic typed config provider (YAML profiles + env + validation).
   environment/    Env-var parsing into struct fields via tags.
   profile/        Scope-based YAML profile discovery and merging.

@@ -69,7 +69,7 @@ The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Clo
 
 All providers share a common `cache.NewConcreteCache` adapter. `GetOrSet` is deduplicated via `SingleflightGetOrSet` (concurrent misses on the same key run the setter exactly once).
 
-All providers also implement `BatchCache[K, V]` (embedded in `Cache`), exposing `MGet`, `MSet`, and `MDel` with provider-optimal strategies: single-lock for in-memory, GetMulti for memcache, pipelines for redis/valkey, and SendBatch for postgres.
+All providers also implement `BatchCache[K, V]` (embedded in `Cache`), exposing `MGet`, `MSet`, and `MDel` with provider-optimal strategies: single-lock for in-memory, GetMulti for memcache, pipelines for redis/valkey, chunked IN queries + single-transaction upsert for sqlite, and SendBatch for postgres.
 
 #### Providers
 
@@ -83,6 +83,11 @@ Each provider lives in its own sub-package and is independently importable:
 | `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
 | `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
 | `cache/sqlite` | SQLite (embedded) | modernc.org/sqlite | Eager — local file, lazy errors |
+
+`cache/sqlite` is pure-Go embedded SQLite with no server to run: the zero-value
+configuration opens an in-memory cache, `WithPath`/`WithName` open a durable
+WAL-mode file that survives restarts, and the same file can be shared by
+multiple processes on one host (a 5 s busy timeout bounds write contention).
 
 #### Interfaces
 
@@ -151,7 +156,7 @@ fmt.Println(results["a"]) // "alpha"
 _ = bc.MDel(ctx, "a", "b")
 ```
 
-Each provider uses an optimal batching strategy: single lock (in-memory), GetMulti (memcache), pipelines (redis/valkey), or SendBatch (postgres).
+Each provider uses an optimal batching strategy: single lock (in-memory), GetMulti (memcache), pipelines (redis/valkey), chunked IN queries + single-transaction upsert (sqlite), or SendBatch (postgres).
 
 #### Benchmark Results
 

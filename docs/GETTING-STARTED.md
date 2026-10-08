@@ -53,7 +53,7 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 
 Running the E2E tests (`make test-e2e`) and the full coverage report (`make coverage`) requires a
 running Docker daemon because the cache providers (Redis, Valkey, Memcache, Postgres) are tested in
-containers. The Makefile defaults `DOCKER_HOST` to an OrbStack socket; override it on the command
+containers — the SQLite backend is embedded and needs no Docker. The Makefile defaults `DOCKER_HOST` to an OrbStack socket; override it on the command
 line if you use Docker Desktop or a remote host:
 
 ```bash
@@ -107,8 +107,8 @@ make test        # or: go test ./... -v
 ```
 
 Alternatively, write a tiny program that imports one of the packages. The in-memory cache
-(`cache/mem`) and the control-flow helpers (`flow`) have no external runtime dependencies, so they
-are a good first smoke test:
+(`cache/mem`), the embedded SQLite cache (`cache/sqlite`), and the control-flow helpers (`flow`)
+have no external runtime dependencies, so they are a good first smoke test:
 
 ```go
 package main
@@ -178,7 +178,7 @@ than 1.26.4. Upgrade the toolchain (e.g., `brew upgrade go` on macOS) and re-run
 ### E2E / coverage tasks require a running Docker daemon
 
 `make test-e2e` and `make coverage` spin up containers for the Redis, Postgres, Memcache, and
-Valkey backends. Without Docker those targets fail; pass a valid `DOCKER_HOST` or start Docker
+Valkey backends (SQLite is pure-Go embedded and runs without Docker). Without Docker those targets fail; pass a valid `DOCKER_HOST` or start Docker
 first. If your container host is not the default, override it (see the example above).
 
 ## Next steps
