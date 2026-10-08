@@ -46,9 +46,22 @@ Provide reliable, well-tested utility packages that solve common Go development 
 
 <!-- Current scope. Building toward these. -->
 
+- [ ] SQLite-backed cache provider (`cache/sqlite`) — embedded persistent backend, pure-Go driver, multi-process WAL, default/`:memory:` path, TTL expiry (v1.8)
 - [ ] String utilities package (v2 backlog — truncation, padding, join/split)
 - [ ] Retry package with backoff strategies and jitter support (v2 backlog)
 - [ ] Framework detection for project_probe (v2 — dependencies-based)
+
+## Current Milestone: v1.8 SQLite Cache Backend
+
+**Goal:** Add an embedded, persistent SQLite-backed cache provider (`cache/sqlite`) — durable local caching for CLIs and small services with no external infrastructure, safe for multi-process access via WAL.
+
+**Target features:**
+- SQLite provider implementing the existing `cacher[K, V]` primitive + `BatchCache[K, V]` surface (Get/Set/Delete/GetOrSet/Close, MGet/MSet/MDel) via `NewConcreteCache`
+- Pure-Go `modernc.org/sqlite` driver (CGO-free; Linux/macOS/Windows CI)
+- Multi-process safety: WAL journal mode + `busy_timeout`
+- Location modes: default `os.UserCacheDir` path via cache name; `:memory:` when path empty; explicit path override
+- TTL expiry: lazy delete on read + sweep of expired rows on open
+- JSON values / `fmt.Sprint` key parity with existing providers; tests, coverage gates, doc.go, example
 
 ## Current State
 
@@ -159,4 +172,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-30 after v1.7 Project Probe milestone*
+*Last updated: 2026-10-08 after starting v1.8 SQLite Cache Backend milestone*
