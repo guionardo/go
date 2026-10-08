@@ -19,8 +19,19 @@ const (
 	// value is always strconv.Itoa of a caller int, never a caller string.
 	dsnAutoCheckpointPrefix = "&_pragma=wal_autocheckpoint("
 
+	// dsnJournalSizeLimitPrefix opens the journal_size_limit pragma append;
+	// the value is always strconv.FormatInt of the compile-time constant,
+	// never a caller string (D-08, A6).
+	dsnJournalSizeLimitPrefix = "&_pragma=journal_size_limit("
+
 	// memoryPath is the SQLite in-memory database path.
 	memoryPath = ":memory:"
+
+	// journalSizeLimitBytes bounds passive WAL growth between checkpoints in
+	// file mode (D-08: 64 MB hard default). It rides the DSN pragma;
+	// non-positive values append nothing and keep SQLite's unlimited default —
+	// no sentinel semantics.
+	journalSizeLimitBytes int64 = 64 << 20
 )
 
 // resolveLocation resolves the configured location to a database path using
@@ -77,9 +88,10 @@ func validName(name string) bool {
 
 // buildDSN appends the compile-time-constant pragma suffix to the validated
 // path. The only variable components are the already-validated path and the
-// autocheckpoint page count formatted by strconv.Itoa — no caller string ever
-// reaches the DSN (A6). Memory mode ignores the autocheckpoint parameter.
-func buildDSN(path string, memory bool, autoCheckpointPages int) string {
+// integer pragma values formatted by strconv — no caller string ever reaches
+// the DSN (A6). Memory mode ignores both pragma parameters; non-positive
+// values append nothing (no sentinel semantics).
+func buildDSN(path string, memory bool, autoCheckpointPages int, journalSizeLimit int64) string {
 	if memory {
 		return path + dsnSuffixMemory
 	}
@@ -87,6 +99,10 @@ func buildDSN(path string, memory bool, autoCheckpointPages int) string {
 	dsn := path + dsnSuffixFile
 	if autoCheckpointPages > 0 {
 		dsn += dsnAutoCheckpointPrefix + strconv.Itoa(autoCheckpointPages) + ")"
+	}
+
+	if journalSizeLimit > 0 {
+		dsn += dsnJournalSizeLimitPrefix + strconv.FormatInt(journalSizeLimit, 10) + ")"
 	}
 
 	return dsn

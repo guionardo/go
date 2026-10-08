@@ -167,24 +167,38 @@ func TestDSNBuildDSN(t *testing.T) {
 	filePath := filepath.Join(t.TempDir(), "cache.db")
 	fileSuffix := "?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate"
 
-	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, 0))
+	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, 0, 0))
 
 	// pages > 0 appends the wal_autocheckpoint pragma (A6: the only variable
-	// DSN component is strconv.Itoa of a caller int).
-	assert.Equal(t, filePath+fileSuffix+"&_pragma=wal_autocheckpoint(200)", buildDSN(filePath, false, 200))
+	// DSN component is strconv of a caller int).
+	assert.Equal(t, filePath+fileSuffix+"&_pragma=wal_autocheckpoint(200)", buildDSN(filePath, false, 200, 0))
 
 	// pages <= 0 appends nothing and keeps the driver default.
-	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, -5))
+	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, -5, 0))
+
+	// journalSizeLimit > 0 appends the journal_size_limit pragma (D-08, 64 MB).
+	assert.Equal(t, filePath+fileSuffix+"&_pragma=journal_size_limit(67108864)", buildDSN(filePath, false, 0, 67108864))
+
+	// Both pragmas coexist: autocheckpoint first, then journal_size_limit.
+	assert.Equal(t,
+		filePath+fileSuffix+"&_pragma=wal_autocheckpoint(200)"+"&_pragma=journal_size_limit(67108864)",
+		buildDSN(filePath, false, 200, 67108864))
+
+	// journalSizeLimit <= 0 appends nothing (no sentinel semantics).
+	assert.Equal(t, filePath+fileSuffix, buildDSN(filePath, false, 0, -1))
 
 	assert.Equal(t,
 		memoryPath+"?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate",
-		buildDSN(memoryPath, true, 0))
+		buildDSN(memoryPath, true, 0, 0))
 
-	// Memory mode ignores the autocheckpoint option (no WAL there).
+	// Memory mode ignores both pragma parameters (no WAL there).
 	assert.Equal(t,
 		memoryPath+"?_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate",
-		buildDSN(memoryPath, true, 200))
+		buildDSN(memoryPath, true, 200, 67108864))
 
 	// Memory mode must not carry the journal_mode key (SQLite reports "memory").
-	assert.NotContains(t, buildDSN(memoryPath, true, 0), "journal_mode")
+	assert.NotContains(t, buildDSN(memoryPath, true, 0, 0), "journal_mode")
+
+	// Memory mode carries neither _pragma key.
+	assert.NotContains(t, buildDSN(memoryPath, true, 200, 67108864), "_pragma")
 }

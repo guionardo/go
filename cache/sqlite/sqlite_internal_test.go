@@ -330,6 +330,54 @@ func readAutoCheckpoint(t *testing.T, c *sqliteCache[string, string]) int {
 	return pages
 }
 
+// TestJournalSizeLimitReadBack proves the D-08 64 MB bound rides the
+// file-mode DSN and reaches the pinned connection: file mode reads back
+// exactly journalSizeLimitBytes; memory mode keeps SQLite's unlimited default
+// (-1); and with WithAutoCheckpoint(200) both pragmas coexist on the same
+// connection (wal_autocheckpoint == 200, journal_size_limit == 67108864).
+func TestJournalSizeLimitReadBack(t *testing.T) {
+	t.Parallel()
+
+	t.Run("file_mode_reads_back_64mb", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "journal-limit.db")))
+		require.NoError(t, c.initErr)
+
+		assert.Equal(t, int64(67108864), readJournalSizeLimit(t, c))
+	})
+
+	t.Run("memory_mode_keeps_unlimited_default", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		assert.Equal(t, int64(-1), readJournalSizeLimit(t, c))
+	})
+
+	t.Run("coexists_with_autocheckpoint", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "coexist.db")), WithAutoCheckpoint(200))
+		require.NoError(t, c.initErr)
+
+		assert.Equal(t, 200, readAutoCheckpoint(t, c))
+		assert.Equal(t, int64(67108864), readJournalSizeLimit(t, c))
+	})
+}
+
+// readJournalSizeLimit reads back the effective journal_size_limit from the
+// provider's pinned connection.
+func readJournalSizeLimit(t *testing.T, c *sqliteCache[string, string]) int64 {
+	t.Helper()
+
+	var limit int64
+	require.NoError(t, c.db.QueryRowContext(t.Context(), "PRAGMA journal_size_limit").Scan(&limit))
+
+	return limit
+}
+
 // TestCheckpointColumns proves the PRAGMA wal_checkpoint(TRUNCATE) three-column
 // scan (Pitfall 16): a healthy checkpoint succeeds — a one-value scan would
 // fail with an argument-count error — and driver-level failures come back

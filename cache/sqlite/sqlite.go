@@ -92,7 +92,7 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 		}
 	}
 
-	db, err := sql.Open("sqlite", buildDSN(path, memory, cfg.AutoCheckpoint))
+	db, err := sql.Open("sqlite", buildDSN(path, memory, cfg.AutoCheckpoint, journalSizeLimitBytes))
 	if err != nil {
 		return err
 	}
