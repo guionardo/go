@@ -27,10 +27,13 @@ import (
 // mandatory for :memory: correctness (each pooled connection would otherwise
 // open a private database) and provides in-process serialization.
 type sqliteCache[K comparable, V any] struct {
-	db         *sql.DB
-	defaultTTL time.Duration
-	initErr    error
-	closed     atomic.Bool
+	db            *sql.DB
+	defaultTTL    time.Duration
+	sweepInterval time.Duration
+	initErr       error
+	closed        atomic.Bool
+	stop          chan struct{}
+	done          chan struct{}
 }
 
 // cacheDirPerm is the permission mode for cache directories.
@@ -59,7 +62,10 @@ func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
 		opt(cfg)
 	}
 
-	c := &sqliteCache[K, V]{defaultTTL: cfg.DefaultTTL}
+	c := &sqliteCache[K, V]{
+		defaultTTL:    cfg.DefaultTTL,
+		sweepInterval: cfg.SweepInterval,
+	}
 	c.initErr = c.open(context.Background(), cfg)
 
 	return cache.NewConcreteCache[K, V](c)
@@ -105,6 +111,12 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 
 	// TTL-03: best-effort sweep, synchronous before New returns (D-10).
 	c.sweep(ctx)
+
+	// TTL-04: opt-in periodic sweeper (D-08). A non-positive interval leaves
+	// stop/done nil and starts no goroutine.
+	if c.sweepInterval > 0 {
+		c.startSweeper()
+	}
 
 	return nil
 }
@@ -223,11 +235,17 @@ func (c *sqliteCache[K, V]) DeleteFunc(ctx context.Context, key K) error {
 	return nil
 }
 
-// CloseFunc closes the database (the last connection checkpoints the WAL and
-// removes the -wal/-shm sidecars). It is idempotent and returns nil even when
-// the handle deferred an open error.
+// CloseFunc cancels and waits for the periodic sweeper (when present), then
+// closes the database (the last connection checkpoints the WAL and removes
+// the -wal/-shm sidecars). It is idempotent and returns nil even when the
+// handle deferred an open error.
 func (c *sqliteCache[K, V]) CloseFunc() error {
 	if c.closed.CompareAndSwap(false, true) {
+		if c.stop != nil {
+			close(c.stop)
+			<-c.done
+		}
+
 		if c.db != nil {
 			return c.db.Close()
 		}

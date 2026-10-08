@@ -5,10 +5,11 @@ import "time"
 type (
 	// Config holds configuration for the SQLite cache provider.
 	Config struct {
-		Name       string
-		Path       string
-		Memory     bool
-		DefaultTTL time.Duration
+		Name          string
+		Path          string
+		Memory        bool
+		DefaultTTL    time.Duration
+		SweepInterval time.Duration
 	}
 
 	// Option is a functional option for configuring the SQLite cache provider.
@@ -50,5 +51,15 @@ func WithMemory() Option {
 func WithDefaultTTL(ttl time.Duration) Option {
 	return func(cfg *Config) {
 		cfg.DefaultTTL = ttl
+	}
+}
+
+// WithSweepInterval enables a periodic expired-row sweeper. The default is no
+// sweeper at all — a deliberate divergence from mem/postgres' default-on
+// sweeper (D-08): an unset or non-positive interval creates no goroutine, no
+// ticker, and no cancellation channels.
+func WithSweepInterval(d time.Duration) Option {
+	return func(cfg *Config) {
+		cfg.SweepInterval = d
 	}
 }

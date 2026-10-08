@@ -59,7 +59,10 @@ func newInternalProvider(t *testing.T, opts ...Option) *sqliteCache[string, stri
 		opt(cfg)
 	}
 
-	c := &sqliteCache[string, string]{defaultTTL: cfg.DefaultTTL}
+	c := &sqliteCache[string, string]{
+		defaultTTL:    cfg.DefaultTTL,
+		sweepInterval: cfg.SweepInterval,
+	}
 	c.initErr = c.open(t.Context(), cfg)
 
 	t.Cleanup(func() { _ = c.CloseFunc() })
@@ -162,6 +165,69 @@ func TestSweepFailureSwallowed(t *testing.T) {
 	c.sweep(t.Context())
 }
 
+// TestPeriodicSweep proves the opt-in ticker reclaims rows seeded after open
+// (TTL-04): only the periodic sweep can remove a row that arrived post-open.
+func TestPeriodicSweep(t *testing.T) {
+	t.Parallel()
+
+	c := newInternalProvider(t, WithMemory(), WithSweepInterval(10*time.Millisecond))
+	require.NoError(t, c.initErr)
+
+	assert.NotNil(t, c.stop)
+	assert.NotNil(t, c.done)
+
+	_, err := c.db.ExecContext(t.Context(), UpsertSQL, "tick", `"v"`, time.Now().Add(-time.Hour).UnixNano())
+	require.NoError(t, err)
+	require.Equal(t, 1, countKeyRows(t, c.db, "tick"))
+
+	require.Eventually(t, func() bool {
+		count, err := keyRowCount(c.db, "tick")
+
+		return err == nil && count == 0
+	}, time.Second, 5*time.Millisecond)
+
+	require.NoError(t, c.CloseFunc())
+	require.NoError(t, c.CloseFunc()) // idempotent
+}
+
+// TestSweeperDisabled proves the deliberate divergence from mem/postgres
+// (D-08): an unset or non-positive interval creates no sweeper at all.
+func TestSweeperDisabled(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unset_interval", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory())
+		require.NoError(t, c.initErr)
+
+		assert.Nil(t, c.stop)
+		assert.Nil(t, c.done)
+	})
+
+	t.Run("zero_and_negative_intervals", func(t *testing.T) {
+		t.Parallel()
+
+		c := newInternalProvider(t, WithMemory(), WithSweepInterval(0), WithSweepInterval(-time.Second))
+		require.NoError(t, c.initErr)
+
+		assert.Nil(t, c.stop)
+		assert.Nil(t, c.done)
+	})
+}
+
+// TestOptions_WithSweepInterval covers the WithSweepInterval option and its
+// zero-value default (no sweeper) inside this plan's file ownership.
+func TestOptions_WithSweepInterval(t *testing.T) {
+	t.Parallel()
+
+	cfg := defaultConfig()
+	require.Zero(t, cfg.SweepInterval, "default is no sweeper (D-08)")
+
+	WithSweepInterval(10 * time.Millisecond)(cfg)
+	assert.Equal(t, 10*time.Millisecond, cfg.SweepInterval)
+}
+
 func TestPoolPinned(t *testing.T) {
 	t.Parallel()
 
@@ -230,14 +296,24 @@ func countCacheTables(t *testing.T, c *sqliteCache[string, string]) int {
 	return count
 }
 
-// countKeyRows returns the raw row count for key on the given handle,
-// bypassing the provider's expiry filter.
+// keyRowCount returns the raw row count for key, bypassing the provider's
+// expiry filter. It takes no *testing.T so it is safe to call from
+// require.Eventually condition goroutines.
+func keyRowCount(db *sql.DB, key string) (int, error) {
+	var count int
+
+	err := db.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM cache_entries WHERE cache_key = ?", key).Scan(&count)
+
+	return count, err
+}
+
+// countKeyRows is the test-facing wrapper over keyRowCount.
 func countKeyRows(t *testing.T, db *sql.DB, key string) int {
 	t.Helper()
 
-	var count int
-	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT COUNT(*) FROM cache_entries WHERE cache_key = ?", key).Scan(&count))
+	count, err := keyRowCount(db, key)
+	require.NoError(t, err)
 
 	return count
 }
