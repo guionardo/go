@@ -46,24 +46,32 @@ func TestMemoryRoundTrip(t *testing.T) {
 	require.ErrorIs(t, err, sqlite.ErrClosed)
 }
 
-func TestBatchPlaceholderSmoke(t *testing.T) {
+func TestBatchMGet(t *testing.T) {
 	t.Parallel()
 
 	c := sqlite.New[string, string](sqlite.WithMemory())
 
 	t.Cleanup(func() { _ = c.Close() })
 
-	err := c.MSet(t.Context(), map[string]string{"a": "1", "b": "2"})
-	require.NoError(t, err)
+	require.NoError(t, c.Set(t.Context(), "a", "1"))
+	require.NoError(t, c.Set(t.Context(), "b", "2"))
+	require.NoError(t, c.Set(t.Context(), "c", "3"))
 
-	got := c.MGet(t.Context(), "a", "b", "missing")
-	assert.Equal(t, map[string]string{"a": "1", "b": "2"}, got)
+	// A missing key is absent from the result; the found subset returns.
+	got := c.MGet(t.Context(), "a", "missing", "c")
+	assert.Equal(t, map[string]string{"a": "1", "c": "3"}, got)
 
-	err = c.MDel(t.Context(), "a")
-	require.NoError(t, err)
+	// No arguments: the empty no-op returns an empty (non-nil) map.
+	empty := c.MGet(t.Context())
+	require.NotNil(t, empty)
+	assert.Empty(t, empty)
 
-	got = c.MGet(t.Context(), "a", "b")
-	assert.Equal(t, map[string]string{"b": "2"}, got)
+	// A short-TTL key disappears from MGet once expired (filter-only reads).
+	require.NoError(t, c.Set(t.Context(), "ttl", "soon", 40*time.Millisecond))
+
+	require.Eventually(t, func() bool {
+		return len(c.MGet(t.Context(), "ttl")) == 0
+	}, time.Second, 5*time.Millisecond)
 }
 
 func TestFileCRUD(t *testing.T) {

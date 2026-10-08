@@ -26,6 +26,20 @@ CREATE INDEX IF NOT EXISTS idx_cache_entries_expires_at
 	SelectSQL = `SELECT value FROM cache_entries
 WHERE cache_key = ? AND (expires_at IS NULL OR expires_at > ?)`
 
+	// MGetSelectSQL fetches one chunk of non-expired values by key list. The
+	// expiry predicate is folded in, so expired rows are absent by SQL — no
+	// code-level skip is needed. cache_key is selected because fmt.Sprint is
+	// not invertible and the WITHOUT ROWID table has no rowid shortcut
+	// (Finding 5); rows are re-keyed to K through the chunk's own input map.
+	// %s is ONLY the "?,?,..." marker list produced by inPlaceholders — never
+	// caller data; keys and the bound now stay parameters.
+	MGetSelectSQL = `SELECT cache_key, value FROM cache_entries
+WHERE cache_key IN (%s) AND (expires_at IS NULL OR expires_at > ?)`
+
+	// MDelSQL deletes one chunk of keys. The %s marker-list contract is the
+	// same as MGetSelectSQL; deleting a missing key is a no-op (BATCH-03).
+	MDelSQL = `DELETE FROM cache_entries WHERE cache_key IN (%s)`
+
 	// UpsertSQL stores a value, replacing any existing entry for the key.
 	UpsertSQL = `INSERT INTO cache_entries (cache_key, value, expires_at)
 VALUES (?, ?, ?)

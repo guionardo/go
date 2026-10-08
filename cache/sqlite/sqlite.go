@@ -273,50 +273,6 @@ func (c *sqliteCache[K, V]) CloseFunc() error {
 	return nil
 }
 
-// MGetFunc retrieves values for multiple keys, skipping missing or errored
-// keys.
-//
-// Phase 16: replace with a chunked IN-list query (BATCH-01).
-func (c *sqliteCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
-	result := make(map[K]V, len(keys))
-	for _, key := range keys {
-		value, err := c.GetFunc(ctx, key)
-		if err != nil {
-			continue // missing or errored key — skip
-		}
-
-		result[key] = value
-	}
-
-	return result
-}
-
-// MSetFunc stores multiple key-value pairs, one point operation per pair.
-//
-// Phase 16: replace with a single-transaction prepared upsert (BATCH-02).
-func (c *sqliteCache[K, V]) MSetFunc(ctx context.Context, items map[K]V, ttl ...time.Duration) error {
-	for key, value := range items {
-		if err := c.SetFunc(ctx, key, value, ttl...); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// MDelFunc removes multiple keys, one point operation per key.
-//
-// Phase 16: replace with a chunked IN-list delete (BATCH-03).
-func (c *sqliteCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
-	for _, key := range keys {
-		if err := c.DeleteFunc(ctx, key); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // resolveTTL resolves the effective expiration for a Set operation.
 // Precedence: per-call TTL > provider-level default > no expiry.
 func (c *sqliteCache[K, V]) resolveTTL(ttl ...time.Duration) (int64, bool) {
