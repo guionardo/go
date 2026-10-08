@@ -50,7 +50,7 @@
 
 **Milestone Goal:** Add an embedded, persistent SQLite-backed cache provider (`cache/sqlite`) — durable local caching for CLIs and small services with no external infrastructure, safe for multi-process access via WAL.
 
-- [ ] **Phase 15: Provider Foundation + Core Cache Semantics** - Sqlite provider constructor (3 location modes, pinned pool, hardened DSN), primitive Cache surface with provider parity, TTL expiry + sweeps, verified WAL pragmas, storage lifecycle controls
+- [x] **Phase 15: Provider Foundation + Core Cache Semantics** - Sqlite provider constructor (3 location modes, pinned pool, hardened DSN), primitive Cache surface with provider parity, TTL expiry + sweeps, verified WAL pragmas, storage lifecycle controls (completed 2026-10-08)
 - [ ] **Phase 16: Batch Surface + Multi-Process Hardening** - MGet/MSet/MDel with v1.6 semantics; two-process WAL safety proven by spike; bounded contention + race-clean; CI two-process E2E
 - [ ] **Phase 17: Delivery Hardening** - CGO-free three-OS CI matrix, no-override coverage gates, doc.go + runnable example + README row, benchmark entries
 
@@ -69,7 +69,7 @@
   4. Expiry behaves with TTL parity: per-call TTL wins, zero/absent falls back to the provider default, none means no expiry — stored as an absolute UnixNano timestamp that survives restarts; expired entries are never returned and reads never delete rows; a best-effort sweep runs on open, and an optional periodic sweep interval (mem/postgres parity) reclaims entries in long-running processes.
   5. Every pooled connection carries the DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock — verified by read-back (`journal_mode` is `wal` for file databases); callers can tune `wal_autocheckpoint` and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
 
-**Plans**: 3/3 plans executed
+**Plans**: 3/3 plans complete
 Plans:
 **Wave 1**
 
@@ -130,6 +130,6 @@ Plans:
 | 12. TOML Subset + Python/Rust | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
-| 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | In Progress|  |
+| 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
 | 16. Batch + Multi-Process Hardening | v1.8 | 0/— | Not started | - |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |
