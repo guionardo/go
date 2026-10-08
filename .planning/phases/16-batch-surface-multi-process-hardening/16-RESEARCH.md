@@ -649,22 +649,25 @@ func buildDSN(path string, memory bool, autoCheckpointPages int, journalSizeLimi
 
 **If this table is empty:** n/a — the table above lists open items; none blocks planning, and A2/A4/A6/A7 are planner-visible choices with defaults.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **D-08 surface: constant vs option**
    - What we know: CONTEXT code_context says no option plumbing is planned ("none planned per D-01/D-08 defaults"); D-08's text mentions a "zero-value/disabled path" mirroring `WithAutoCheckpoint`.
    - What's unclear: whether a caller-facing zero-value path must exist (option) or the param-level zero contract suffices (constant default, no option).
    - Recommendation: implement as a `buildDSN` param gated on `> 0`, shipped value = constant `64 << 20`, **no new option** (smaller API surface; option is additive later without breaking callers). If the planner disagrees, adding `WithJournalSizeLimit(int64)` mirrors `WithAutoCheckpoint` exactly and costs one option + tests.
+   - RESOLVED: recommendation adopted — buildDSN parameter + compile-time constant `journalSizeLimitBytes = 64 << 20`, no new option (Plan 16-02 Task 2).
 
 2. **Spike artifact disposition**
    - What we know: D-11 folds the pending todo; its results "confirm the retry policy before the E2E hardens it".
    - What's unclear: whether the spike is a separate scratch (throwaway) or the E2E harness's first iteration.
    - Recommendation: build the E2E harness as the spike vehicle (contention arm only), record findings in the task description/commit message (or an optional `16-SPIKE-FINDINGS.md`), then extend the same file with the crash arm and CI wiring. Marked as the agent's discretion in CONTEXT.
+   - RESOLVED: recommendation adopted — Plan 16-01 builds `cache/sqlite/twoprocess_e2e_test.go` (contention arm) + `16-SPIKE-FINDINGS.md`; Plan 16-04 extends the same file with provider-driven children, the crash arm, and CI wiring.
 
 3. **Race-detector CI scope**
    - What we know: CONC-03 requires `go test -race` green; the repo's CI has no `-race` anywhere today; `-race` needs cgo (works on linux/macos runners; Windows needs mingw).
    - What's unclear: how much OS coverage the plan should buy.
    - Recommendation: `if: runner.os != 'Windows'` in the matrix job (linux + macos), plus the existing local runs; a follow-up phase can broaden if demanded.
+   - RESOLVED: recommendation adopted — the race step carries `if: runner.os != 'Windows'` in the matrix job with a rationale comment, Windows broadening left as a documented follow-up (Plan 16-04 Task 3).
 
 ## Environment Availability
 
