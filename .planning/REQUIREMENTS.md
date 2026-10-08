@@ -95,13 +95,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| *(populated by roadmap creation)* | | |
+| PROV-01 | Phase 15 | Pending |
+| PROV-02 | Phase 15 | Pending |
+| PROV-03 | Phase 15 | Pending |
+| PROV-04 | Phase 15 | Pending |
+| STOR-01 | Phase 15 | Pending |
+| STOR-02 | Phase 15 | Pending |
+| STOR-03 | Phase 15 | Pending |
+| STOR-04 | Phase 15 | Pending |
+| STOR-05 | Phase 15 | Pending |
+| STOR-06 | Phase 15 | Pending |
+| STOR-07 | Phase 15 | Pending |
+| TTL-01 | Phase 15 | Pending |
+| TTL-02 | Phase 15 | Pending |
+| TTL-03 | Phase 15 | Pending |
+| TTL-04 | Phase 15 | Pending |
+| BATCH-01 | Phase 16 | Pending |
+| BATCH-02 | Phase 16 | Pending |
+| BATCH-03 | Phase 16 | Pending |
+| CONC-01 | Phase 16 | Pending |
+| CONC-02 | Phase 16 | Pending |
+| CONC-03 | Phase 16 | Pending |
+| CONC-04 | Phase 16 | Pending |
+| CONC-05 | Phase 16 | Pending |
+| QUAL-01 | Phase 17 | Pending |
+| QUAL-02 | Phase 17 | Pending |
+| QUAL-03 | Phase 17 | Pending |
+| QUAL-04 | Phase 17 | Pending |
 
 **Coverage:**
 - v1 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 ⚠️ (pending roadmap)
+- Mapped to phases: 27
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-08*
-*Last updated: 2026-10-08 after initial definition*
+*Last updated: 2026-10-08 after roadmap creation*
