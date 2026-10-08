@@ -45,17 +45,25 @@ func retryBusy(ctx context.Context, fn func(context.Context) error) error {
 }
 
 // retryBusyWithin calls fn until it succeeds, fails with a non-busy error, or
-// the absolute budget expires. Exhaustion returns the last busy error; a
-// canceled context short-circuits with ctx.Err(). The deadline is absolute, so
-// the total wait is bounded regardless of retry count.
+// the absolute budget expires. The deadline is checked before every attempt, so
+// once the budget is spent no further fn call is started; exhaustion returns
+// the last busy error. A canceled context short-circuits with ctx.Err(). The
+// deadline is absolute, so the total wait is bounded regardless of retry count.
 func retryBusyWithin(ctx context.Context, budget, backoff time.Duration, fn func(context.Context) error) error {
 	deadline := time.Now().Add(budget)
+	var lastErr error
 
 	for {
+		if lastErr != nil && time.Now().After(deadline) {
+			return lastErr // budget exhausted: surface the last busy error, no extra attempt
+		}
+
 		err := fn(ctx)
 		if err == nil || !isBusyError(err) || time.Now().After(deadline) {
 			return err
 		}
+
+		lastErr = err
 
 		select {
 		case <-ctx.Done():

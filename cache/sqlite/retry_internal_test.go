@@ -120,6 +120,25 @@ func TestRetryBusyWithin(t *testing.T) { //nolint:funlen // one behavior matrix 
 		assert.GreaterOrEqual(t, calls, 2, "a 20 ms budget with a 1 ms backoff must attempt more than once")
 	})
 
+	t.Run("budget_crossed_during_backoff_starts_no_extra_attempt", func(t *testing.T) {
+		t.Parallel()
+
+		calls := 0
+		fn := func(context.Context) error {
+			calls++
+			return fakeError{code: 5}
+		}
+
+		// The backoff exceeds the whole budget: after the first busy return the
+		// sleep crosses the deadline, and the loop must surface the last busy
+		// error without starting another attempt (WR-01 regression: the pre-fix
+		// loop invoked fn once more past the deadline).
+		err := retryBusyWithin(t.Context(), 10*time.Millisecond, 100*time.Millisecond, fn)
+		require.Error(t, err)
+		assert.True(t, isBusyError(err), "exhaustion must surface the last busy error")
+		assert.Equal(t, 1, calls, "no fn call may start once the budget is spent")
+	})
+
 	t.Run("canceled_ctx_short_circuits", func(t *testing.T) {
 		t.Parallel()
 
