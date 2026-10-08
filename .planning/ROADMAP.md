@@ -57,6 +57,7 @@
 ## Phase Details
 
 ### Phase 15: Provider Foundation + Core Cache Semantics
+
 **Goal**: A working, durable `cache/sqlite` provider — `sqlite.New[K, V]` constructs a `cache.BatchCache[K, V]` in all three location modes; Get/Set/Delete/GetOrSet/Close match the five existing providers' contracts; TTL expiry and sweeps are enforced; WAL pragmas are verified on every pooled connection; and long-running storage controls are available.
 **Depends on**: Nothing (v1.8 start; follows Phase 14 — builds on the shipped v1.6 cache architecture; `cache/` root and the five providers stay frozen)
 **Requirements**: PROV-01, PROV-02, PROV-03, PROV-04, STOR-01, STOR-02, STOR-03, STOR-04, STOR-05, STOR-06, STOR-07, TTL-01, TTL-02, TTL-03, TTL-04
@@ -66,13 +67,20 @@
   3. Data survives restarts: reopening an existing cache file preserves unexpired entries; `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`, fixed three-column schema).
   4. Expiry behaves with TTL parity: per-call TTL wins, zero/absent falls back to the provider default, none means no expiry — stored as an absolute UnixNano timestamp that survives restarts; expired entries are never returned and reads never delete rows; a best-effort sweep runs on open, and an optional periodic sweep interval (mem/postgres parity) reclaims entries in long-running processes.
   5. Every pooled connection carries the DSN-carried pragmas — `journal_mode=WAL` (file mode), `busy_timeout=5000`, `synchronous=NORMAL`, immediate transaction lock — verified by read-back (`journal_mode` is `wal` for file databases); callers can tune `wal_autocheckpoint` and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
+
 **Plans**: 3 plans
 Plans:
+**Wave 1**
 - [ ] 15-01-PLAN.md — Provider foundation: pinned dependency, constructor + location modes, primitive CRUD contracts, error taxonomy (tracer-led; batch placeholders with Phase 16 TODO)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 15-02-PLAN.md — TTL expiry, filter-only reads, sweep-on-open + opt-in periodic sweeper, durability lifecycle (sidecar removal, reopen persistence)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 15-03-PLAN.md — Storage controls (`Optimizable` checkpoint/vacuum, `WithAutoCheckpoint`), docs, example, README rows, repo-wide coverage gate
 
 ### Phase 16: Batch Surface + Multi-Process Hardening
+
 **Goal**: The `BatchCache` surface is complete with v1.6 semantics, and the milestone's headline promise is proven — two OS processes share one cache file under WAL without corruption, with contention bounded by `busy_timeout`.
 **Depends on**: Phase 15
 **Requirements**: BATCH-01, BATCH-02, BATCH-03, CONC-01, CONC-02, CONC-03, CONC-04, CONC-05
@@ -82,9 +90,11 @@ Plans:
   3. Two OS processes sharing one cache file can read and write without corruption or hard failure under contention — verified by the two-process spike (helper-process pattern), which is the phase exit criterion.
   4. Contention surfaces at `BEGIN` within `busy_timeout` as a bounded error (immediate transaction lock mode; no unbounded auto-retry), the provider passes `go test -race` under concurrent goroutines on the pinned single-connection pool, and package docs state WAL's constraints (local storage only, same-host sharing).
   5. A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
+
 **Plans**: TBD
 
 ### Phase 17: Delivery Hardening
+
 **Goal**: The package ships per repo standards — CGO-free builds and tests green across the three-OS CI matrix, coverage gates pass with no override, docs and a runnable example exist, and benchmarks register the backend against mem and per-key loops.
 **Depends on**: Phase 16
 **Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-04
@@ -93,6 +103,7 @@ Plans:
   2. Tests cover unit, `:memory:`, reopen/persistence, concurrent, and sweep scenarios; coverage gates pass with no `.testcoverage-quick.yml` override (package ≥80%, file ≥70%, total ≥75%).
   3. `doc.go` documents the provider (TTL, reopen persistence, `:memory:`, multi-process constraints), a runnable example exists, and the README package index is updated.
   4. Benchmark entries measure the sqlite backend against mem and per-key loops, following the v1.6 benchmark suite conventions.
+
 **Plans**: TBD
 
 ## Progress
