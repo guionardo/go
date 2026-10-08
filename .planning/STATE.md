@@ -4,17 +4,17 @@ milestone: v1.8
 milestone_name: SQLite Cache Backend
 current_phase: 15
 current_phase_name: Provider Foundation + Core Cache Semantics
-status: executing
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-10-08T14:31:21.103Z"
+status: verifying
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-10-08T14:44:15.629Z"
 last_activity: 2026-10-08
 last_activity_desc: Phase 15 execution started
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 33
 state_head: c1e1f64fd44aecdaaba77c66f7b879eaaed609fe
 ---
 
@@ -31,10 +31,10 @@ See: .planning/PROJECT.md (updated 2026-10-08)
 
 Phase: 15 (Provider Foundation + Core Cache Semantics) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-08 — Phase 15 execution started
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [███████░░░] 67%
 | Phase 14 P04 | 34 | 3 tasks | 3 files |
 | Phase 15 P01 | 14 min | 3 tasks | 11 files |
 | Phase 15 P02 | 18 min | 3 tasks | 6 files |
+| Phase 15 P03 | 9 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,10 @@ Recent decisions affecting current work:
 - [Phase 15]: CloseFunc order: CAS guard -> close(stop) + <-done -> db.Close(); sidecar removal only via the engine's last-connection checkpoint (no provider file deletion)
 - [Phase 15]: TTL semantics proven filter-only: reads never delete rows (raw COUNT stays 1), reclamation only via open sweep + opt-in ticker; absolute UnixNano bound now in SQL
 - [Phase 15]: Pre-existing concurrent first-open WAL conversion race deferred to Phase 16 (DI-15-01, deferred-items.md): journal_mode=WAL conversion can return immediate SQLITE_BUSY; retry policy belongs to CONC-01/02 per 15-RESEARCH
+- [Phase 15]: Optimizable ships as an sqlite-side batchCache adapter returned by New (the frozen root cannot forward provider methods); separate type declarations with one justified //nolint:decorder honor the plan acceptance greps while keeping golangci-lint at 0 issues
+- [Phase 15]: Blocked checkpoint shape empirically verified before tests — PRAGMA wal_checkpoint(TRUNCATE) returns err=nil with busy=1 after the 5s busy timeout; the three-column scan plus a busy!=0 descriptive error is the shipped implementation
+- [Phase 15]: WithAutoCheckpoint pages>0 appends _pragma=wal_autocheckpoint(strconv.Itoa) in file mode only; read-back proves 200 configured / 1000 default / memory ignored; maintenance SQL lives only in optimize.go (VACUUM prohibition grep holds)
+- [Phase 15]: STOR-07 closed — all Phase 15 requirement families (PROV/STOR/TTL) green repo-wide with no cache/sqlite coverage override; package at 92.5%, total 81.5%, Windows CGO-free build and golangci-lint clean
 
 ### Pending Todos
 
@@ -110,8 +115,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T14:31:21.098Z
-Stopped at: Completed 15-02-PLAN.md
+Last session: 2026-10-08T14:44:15.624Z
+Stopped at: Completed 15-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

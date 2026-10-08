@@ -23,7 +23,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **STOR-04**: Schema bootstrap is idempotent under `BEGIN IMMEDIATE` (`CREATE TABLE/INDEX IF NOT EXISTS`); schema is fixed: `cache_key TEXT PRIMARY KEY`, `value TEXT` (JSON), `expires_at INTEGER NULL`.
 - [x] **STOR-05**: `Close` performs a clean shutdown (final checkpoint; `-wal`/`-shm` removed on last connection close); reopening an existing cache file preserves unexpired entries.
 - [x] **STOR-06**: Path values containing DSN metacharacters (`?`, `#`) are rejected or escaped so user-supplied paths cannot inject DSN parameters.
-- [ ] **STOR-07**: Long-running processes can tune WAL checkpointing (`wal_autocheckpoint` option) and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
+- [x] **STOR-07**: Long-running processes can tune WAL checkpointing (`wal_autocheckpoint` option) and trigger an explicit optimize (checkpoint and/or `VACUUM`) to reclaim disk space.
 
 ### Expiry & Reclamation
 
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STOR-04 | Phase 15 | Complete |
 | STOR-05 | Phase 15 | Complete |
 | STOR-06 | Phase 15 | Complete |
-| STOR-07 | Phase 15 | Pending |
+| STOR-07 | Phase 15 | Complete |
 | TTL-01 | Phase 15 | Complete |
 | TTL-02 | Phase 15 | Complete |
 | TTL-03 | Phase 15 | Complete |
