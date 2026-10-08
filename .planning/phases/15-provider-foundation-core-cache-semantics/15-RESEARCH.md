@@ -781,7 +781,9 @@ No test framework changes: testify v1.11.1 is already a direct dependency; tests
 
 **If this table is empty:** N/A — the table above lists the open items; none blocks planning, and all are cheap to resolve.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All seven items are resolved: each carries a recommendation below, and every recommendation is adopted by the plans (15-01..15-03). None reaches planning unresolved.
 
 1. **`WITHOUT ROWID` vs plain rowid table** — Recommendation: `WITHOUT ROWID` (research-recommended; PK lookups dominate; drop-in change if the planner prefers postgres-convention parity).
 2. **`Checkpoint` semantics when `busy != 0`** — Recommendation: return a descriptive error (the caller asked to reclaim; a blocked checkpoint didn't). Alternative: log + nil. Either way consume all three PRAGMA columns.
