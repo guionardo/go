@@ -103,6 +103,9 @@ func (c *sqliteCache[K, V]) open(ctx context.Context, cfg *Config) error {
 		c.verifyJournalMode(ctx)
 	}
 
+	// TTL-03: best-effort sweep, synchronous before New returns (D-10).
+	c.sweep(ctx)
+
 	return nil
 }
 

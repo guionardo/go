@@ -33,4 +33,9 @@ ON CONFLICT(cache_key) DO UPDATE SET value = excluded.value, expires_at = exclud
 
 	// DeleteSQL removes a key. Deleting a missing key is a no-op.
 	DeleteSQL = `DELETE FROM cache_entries WHERE cache_key = ?`
+
+	// SweepSQL deletes expired rows in one pass. The predicate matches the
+	// partial index on expires_at (IS NOT NULL) and compares against a bound
+	// UnixNano — never SQL datetime('now').
+	SweepSQL = `DELETE FROM cache_entries WHERE expires_at IS NOT NULL AND expires_at <= ?`
 )

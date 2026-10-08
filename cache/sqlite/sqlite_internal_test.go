@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -11,6 +12,42 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// ttlCase is one row of the resolveTTL matrix exercised by TestResolveTTL.
+// A zero wantUntil means no expiry is expected.
+type ttlCase struct {
+	name       string
+	defaultTTL time.Duration
+	ttl        []time.Duration
+	wantUntil  time.Duration
+}
+
+// ttlMatrix mirrors the postgres resolveTTL contract: a per-call ttl > 0 wins;
+// else defaultTTL > 0 applies; else no expiry. Negative and multiple-ttl
+// inputs behave per the same predicate (only ttl[0] > 0 counts).
+var ttlMatrix = []ttlCase{
+	{
+		name:       "per_key_ttl_overrides_default",
+		defaultTTL: 10 * time.Second,
+		ttl:        []time.Duration{30 * time.Second},
+		wantUntil:  30 * time.Second,
+	},
+	{name: "zero_ttl_uses_default", defaultTTL: 10 * time.Second, ttl: []time.Duration{0}, wantUntil: 10 * time.Second},
+	{name: "no_ttl_uses_default", defaultTTL: 30 * time.Second, wantUntil: 30 * time.Second},
+	{name: "no_ttl_no_default_returns_none", wantUntil: 0},
+	{
+		name:       "negative_ttl_falls_back_to_default",
+		defaultTTL: 10 * time.Second,
+		ttl:        []time.Duration{-30 * time.Second},
+		wantUntil:  10 * time.Second,
+	},
+	{name: "negative_ttl_no_default_returns_none", ttl: []time.Duration{-30 * time.Second}, wantUntil: 0},
+	{
+		name:      "multiple_ttl_args_use_the_first",
+		ttl:       []time.Duration{30 * time.Second, time.Hour},
+		wantUntil: 30 * time.Second,
+	},
+}
 
 // newInternalProvider builds a provider directly (bypassing New) so tests can
 // assert on the underlying *sql.DB. The handle is closed via t.Cleanup.
@@ -33,45 +70,96 @@ func newInternalProvider(t *testing.T, opts ...Option) *sqliteCache[string, stri
 func TestResolveTTL(t *testing.T) {
 	t.Parallel()
 
-	t.Run("per_key_ttl_overrides_default", func(t *testing.T) {
-		t.Parallel()
+	for _, tc := range ttlMatrix {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		c := &sqliteCache[string, string]{defaultTTL: 10 * time.Second}
-		expiresAt, ok := c.resolveTTL(30 * time.Second)
+			c := &sqliteCache[string, string]{defaultTTL: tc.defaultTTL}
+			expiresAt, ok := c.resolveTTL(tc.ttl...)
 
-		require.True(t, ok)
-		assert.WithinDuration(t, time.Now().Add(30*time.Second), time.Unix(0, expiresAt), time.Second)
-	})
+			if tc.wantUntil == 0 {
+				assert.False(t, ok)
+				assert.Zero(t, expiresAt)
 
-	t.Run("zero_ttl_uses_default", func(t *testing.T) {
-		t.Parallel()
+				return
+			}
 
-		c := &sqliteCache[string, string]{defaultTTL: 10 * time.Second}
-		expiresAt, ok := c.resolveTTL(0)
+			require.True(t, ok)
+			assert.WithinDuration(t, time.Now().Add(tc.wantUntil), time.Unix(0, expiresAt), time.Second)
+		})
+	}
+}
 
-		require.True(t, ok)
-		assert.WithinDuration(t, time.Now().Add(10*time.Second), time.Unix(0, expiresAt), time.Second)
-	})
+// TestReadsNeverDeleteRows proves the read path is filter-only (TTL-02): an
+// expired Get reports ErrMiss without removing the seeded row.
+func TestReadsNeverDeleteRows(t *testing.T) {
+	t.Parallel()
 
-	t.Run("no_ttl_uses_default", func(t *testing.T) {
-		t.Parallel()
+	c := newInternalProvider(t, WithPath(filepath.Join(t.TempDir(), "read.db")))
+	require.NoError(t, c.initErr)
 
-		c := &sqliteCache[string, string]{defaultTTL: 30 * time.Second}
-		expiresAt, ok := c.resolveTTL()
+	_, err := c.db.ExecContext(t.Context(), UpsertSQL, "expired", `"v"`, time.Now().Add(-time.Hour).UnixNano())
+	require.NoError(t, err)
 
-		require.True(t, ok)
-		assert.WithinDuration(t, time.Now().Add(30*time.Second), time.Unix(0, expiresAt), time.Second)
-	})
+	_, err = c.GetFunc(t.Context(), "expired")
+	require.ErrorIs(t, err, cache.ErrMiss)
 
-	t.Run("no_ttl_no_default_returns_none", func(t *testing.T) {
-		t.Parallel()
+	assert.Equal(t, 1, countKeyRows(t, c.db, "expired"), "reads must never delete rows (TTL-02)")
+}
 
-		c := &sqliteCache[string, string]{}
-		expiresAt, ok := c.resolveTTL()
+// TestSweepOnOpen proves the open-time sweep is synchronous (TTL-03, D-10):
+// expired rows present before New are gone by the time New returns, while
+// unexpired rows survive the sweep predicate.
+func TestSweepOnOpen(t *testing.T) {
+	t.Parallel()
 
-		assert.False(t, ok)
-		assert.Zero(t, expiresAt)
-	})
+	path := filepath.Join(t.TempDir(), "sweep.db")
+
+	seed := newInternalProvider(t, WithPath(path))
+	require.NoError(t, seed.initErr)
+
+	past := time.Now().Add(-time.Hour).UnixNano()
+	future := time.Now().Add(time.Hour).UnixNano()
+
+	_, err := seed.db.ExecContext(t.Context(), UpsertSQL, "stale", `"v"`, past)
+	require.NoError(t, err)
+
+	_, err = seed.db.ExecContext(t.Context(), UpsertSQL, "fresh", `"v"`, future)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, countKeyRows(t, seed.db, "stale"))
+	require.NoError(t, seed.CloseFunc())
+
+	// Reopen through the public constructor: New runs the open-time sweep
+	// synchronously before it returns (D-10).
+	c := New[string, string](WithPath(path))
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	observer, err := sql.Open("sqlite", path)
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = observer.Close() })
+
+	assert.Equal(t, 0, countKeyRows(t, observer, "stale"), "expired row must be reclaimed by the open sweep")
+	assert.Equal(t, 1, countKeyRows(t, observer, "fresh"), "unexpired row must survive the open sweep")
+
+	// No deferred open error surfaced on the reopened handle.
+	require.NoError(t, c.Set(t.Context(), "alive", "ok"))
+}
+
+// TestSweepFailureSwallowed proves the best-effort contract (D-09): a sweep
+// against a broken handle logs and returns — nothing propagates to callers.
+func TestSweepFailureSwallowed(t *testing.T) {
+	t.Parallel()
+
+	c := newInternalProvider(t, WithMemory())
+	require.NoError(t, c.initErr)
+
+	require.NoError(t, c.db.Close())
+
+	// No panic and no error to assert: the failure is logged and swallowed.
+	c.sweep(t.Context())
 }
 
 func TestPoolPinned(t *testing.T) {
@@ -138,6 +226,18 @@ func countCacheTables(t *testing.T, c *sqliteCache[string, string]) int {
 	var count int
 	require.NoError(t, c.db.QueryRowContext(t.Context(),
 		"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'cache_entries'").Scan(&count))
+
+	return count
+}
+
+// countKeyRows returns the raw row count for key on the given handle,
+// bypassing the provider's expiry filter.
+func countKeyRows(t *testing.T, db *sql.DB, key string) int {
+	t.Helper()
+
+	var count int
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT COUNT(*) FROM cache_entries WHERE cache_key = ?", key).Scan(&count))
 
 	return count
 }

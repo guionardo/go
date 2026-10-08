@@ -2,6 +2,7 @@ package sqlite_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -94,6 +95,64 @@ func TestFilePathWithSpaces(t *testing.T) {
 	got, err := c.Get(t.Context(), "k")
 	require.NoError(t, err)
 	assert.Equal(t, "v", got)
+}
+
+func TestTTLExpiry(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "ttl", "v", 40*time.Millisecond))
+
+	got, err := c.Get(t.Context(), "ttl")
+	require.NoError(t, err)
+	assert.Equal(t, "v", got)
+
+	require.Eventually(t, func() bool {
+		_, err := c.Get(t.Context(), "ttl")
+
+		return errors.Is(err, cache.ErrMiss)
+	}, time.Second, 5*time.Millisecond)
+}
+
+func TestDefaultTTLExpiry(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory(), sqlite.WithDefaultTTL(40*time.Millisecond))
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "ttl", "v"))
+
+	got, err := c.Get(t.Context(), "ttl")
+	require.NoError(t, err)
+	assert.Equal(t, "v", got)
+
+	require.Eventually(t, func() bool {
+		_, err := c.Get(t.Context(), "ttl")
+
+		return errors.Is(err, cache.ErrMiss)
+	}, time.Second, 5*time.Millisecond)
+}
+
+func TestNoExpiry(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "forever", "v"))
+
+	// No TTL and no default means no expiry: assert presence twice rather than
+	// sleeping out an await that does not exist.
+	for range 2 {
+		got, err := c.Get(t.Context(), "forever")
+		require.NoError(t, err)
+		assert.Equal(t, "v", got)
+	}
 }
 
 func TestGetOrSetDedup(t *testing.T) {
