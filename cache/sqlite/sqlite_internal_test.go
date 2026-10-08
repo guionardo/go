@@ -378,6 +378,43 @@ func readJournalSizeLimit(t *testing.T, c *sqliteCache[string, string]) int64 {
 	return limit
 }
 
+// TestBeginContentionBounded proves CONC-02/D-07: with _txlock=immediate a
+// second connection holding the write lock makes a provider write surface a
+// busy-classified error at BEGIN, bounded by busy_timeout — the provider
+// performs no retry beyond the open window (elapsed below two budgets). After
+// the raw transaction rolls back, the identical write succeeds (recovery).
+func TestBeginContentionBounded(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "contention.db")
+
+	c := newInternalProvider(t, WithPath(path))
+	require.NoError(t, c.initErr)
+
+	// A second raw handle with the production DSN; _txlock=immediate makes its
+	// BeginTx issue BEGIN IMMEDIATE, seizing the write lock immediately.
+	blocker, err := sql.Open("sqlite", buildDSN(path, false, 0, journalSizeLimitBytes))
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = blocker.Close() })
+
+	tx, err := blocker.BeginTx(t.Context(), nil)
+	require.NoError(t, err)
+
+	start := time.Now()
+	err = c.SetFunc(t.Context(), "blocked", "v")
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "cache/sqlite:")
+	assert.True(t, isBusyError(err), "contention must surface as a busy-classified error, got: %v", err)
+	assert.Less(t, elapsed, 2*busyTimeout, "provider-side retry of BEGIN would double the wait (D-07)")
+
+	// Recovery: releasing the write lock lets the identical write succeed.
+	require.NoError(t, tx.Rollback())
+	require.NoError(t, c.SetFunc(t.Context(), "blocked", "v"))
+}
+
 // TestCheckpointColumns proves the PRAGMA wal_checkpoint(TRUNCATE) three-column
 // scan (Pitfall 16): a healthy checkpoint succeeds — a one-value scan would
 // fail with an argument-count error — and driver-level failures come back
