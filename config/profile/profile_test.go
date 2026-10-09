@@ -127,8 +127,6 @@ func TestGetProfileFiles_PathTraversal(t *testing.T) {
 		require.Contains(t, err.Error(), "escapes base path")
 	})
 
-
-
 	t.Run("scope_traversal", func(t *testing.T) {
 		t.Parallel()
 		_, _, err := getProfileFiles(tmp, "default", "../../secret")

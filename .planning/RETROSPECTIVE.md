@@ -85,6 +85,47 @@
 
 ---
 
+## Milestone: v1.7 — Project Probe
+
+**Shipped:** 2026-09-30
+**Phases:** 5 | **Plans:** 16 | **Commits:** 118
+
+### What Was Built
+- Never-fail `project_probe` package: `Probe(folder)` detecting all 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP) with name/version/description chains and README first-paragraph fallback
+- Strict-degrade TOML-subset reader with quote-aware skip states (SC4 fabrication gap found by code review, closed via gap plan)
+- Fuzz-hardened: 3 targets + 20-file `go test fuzz v1`-encoded corpus, no-panic invariant
+- Coverage gate closed repo-wide: release/update.go 68.9% → 95.9%, `make coverage-quick` green (80.7%)
+- doc.go Version-semantics contract, anti-feature audit (14-AUDIT.md), README package index
+- 820+ tests across 25 packages; UAT 12/12; security 16/16 threats closed
+
+### What Worked
+- Tracer-first planning: each phase led with an end-to-end slice verified before expansion
+- TDD adaptation (RED verified-but-uncommitted, evidence in commit bodies) kept CI green under the pre-commit go-test hook
+- Gap-closure cycle: verifier found the fabrication gap → /gsd-plan-phase --gaps → 12-04 fix → re-verify — the loop worked end-to-end
+- Code review caught real issues (quote-aware skip states, multi-badge lines, goroutine asserts, XML trim) — all fold-in fixed in Phase 14
+- Deterministic anti-feature greps (grep -E) prevented vacuous checks (two checker warnings on BRE `|`)
+
+### What Was Inefficient
+- Code review finding CR-01 (TOML fabrication) required a full gap-closure cycle — the initial whole-line skip-state design should have been quote-aware from the start
+- Verification digests went stale 4× (phases 10-13) as later phases touched shared files — required re-verification before milestone close
+- `_js` filename silently excluded from non-js builds (legacy GOARCH) — cost a rename mid-phase
+- Lint baseline of 28 pre-existing issues made "clean" need a defined delta-zero contract
+
+### Patterns Established
+- Quote-aware parsing for untrusted input: skip states must handle delimiters inside quotes (closesMultiLine/clearsBracket/opensMultiLine + pendingMLS)
+- ENOTDIR triggers instead of chmod for cross-platform error-path tests (Windows CI)
+- Fuzz corpus must be `go test fuzz v1`-encoded (raw manifests fail the build)
+- Anti-feature audits as re-runnable evidence files with disclosed exceptions (14-AUDIT.md)
+- Decode hygiene ≠ normalization: TrimSpace at decode time documented explicitly
+
+### Key Lessons
+1. Whole-line delimiter detection in parsers fabricates data — always quote-aware from the start
+2. Covered-file digests go stale when later phases touch shared packages — re-verify before milestone close
+3. A deterministic gate that cannot fail (vacuous grep) is worse than no gate — verify greps match on a sample
+4. Test-only fixes can close long-standing coverage debt (one no-options row covered 13 statements)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -93,6 +134,7 @@
 |-----------|---------|--------|------------|
 | v1.0 | 24 | 1 | Initial GSD workflow setup with plan→execute→verify→UAT cycle |
 | v1.5 | 16 | 1 | Self-update mechanism with embedded swapper; doc.go for all packages |
+| v1.7 | 118 | 5 | project_probe 7-language detection; TDD adaptation; gap-closure cycle; fuzz hardening |
 
 ### Cumulative Quality
 
@@ -100,3 +142,4 @@
 |-----------|-------|----------|-------------------|
 | v1.0 | 50 E2E + unit tests | 95%+ target | 4 (gomemcache, pgx, go-redis, valkey-go) |
 | v1.5 | 57 unit tests | 95%+ target | 1 (hashicorp/go-version) |
+| v1.7 | 820+ tests / 25 packages | 80.7% total (coverage-quick green) | 0 (stdlib-only) |

@@ -60,7 +60,7 @@ The CI runs tests on Linux, macOS, and Windows. Known platform differences:
 | Package | Description |
 |---------|-------------|
 | `br_docs` | Brazilian document validation (CPF, CNPJ) |
-| `cache` | Generic key-value cache with 5 backends (mem, Redis, Valkey, Memcache, Postgres) |
+| `cache` | Generic key-value cache with 6 backends (mem, Redis, Valkey, Memcache, Postgres, SQLite) |
 | `config` | Typed configuration provider (YAML + env + validation) |
 | `flow` | Generic control flow (ternary, defaults) |
 | `fraction` | Immutable fraction arithmetic |

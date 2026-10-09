@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -191,7 +192,14 @@ func TestCheckForUpdate_WithToken(t *testing.T) {
 	defer mu.Unlock()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
-		require.Equal(t, "Bearer ghp_test123", auth)
+		if auth != "Bearer ghp_test123" {
+			// t.Errorf is goroutine-safe; require.Equal would FailNow/Goexit
+			// on the handler goroutine (14 WR-02) — respond non-2xx so the
+			// client side fails with a clear message.
+			t.Errorf("Authorization header = %q, want %q", auth, "Bearer ghp_test123")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 
 		releaseJSON := `{
 			"tag_name": "v2.0.0",
@@ -244,6 +252,117 @@ func TestCheckForUpdate_APIError(t *testing.T) {
 	require.Contains(t, err.Error(), "unexpected status code: 403")
 }
 
+//nolint:paralleltest // global state mutation: githubAPIBase
+func TestCheckForUpdate_NoOptionsDerivesOwnerRepo(t *testing.T) {
+	t.Parallel()
+	mu.Lock()
+	defer mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Derived from the module path (getCurrentModule → url.Parse → words[1]/words[2]).
+		if r.URL.Path != "/repos/guionardo/go/releases/latest" {
+			// t.Errorf is goroutine-safe; require.Equal would FailNow/Goexit
+			// on the handler goroutine (14 WR-02) — respond non-2xx so the
+			// client side fails with a clear message.
+			t.Errorf("handler path = %q, want %q", r.URL.Path, "/repos/guionardo/go/releases/latest")
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = fmt.Fprint(w, `{"tag_name": "v2.0.0", "name": "v2.0.0", "assets": []}`)
+	}))
+	defer server.Close()
+
+	originalBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = originalBase }()
+
+	rel, newer, err := CheckForUpdate(context.Background(), "v1.0.0") // NO options → module derivation
+	require.NoError(t, err)
+	require.NotNil(t, rel)
+	require.True(t, newer)
+	require.Equal(t, "v2.0.0", rel.TagName)
+}
+
+//nolint:paralleltest // global state mutation: githubAPIBase
+func TestCheckForUpdate_RequestCreationError(t *testing.T) {
+	t.Parallel()
+	mu.Lock()
+	defer mu.Unlock()
+
+	originalBase := githubAPIBase
+	githubAPIBase = "http://exa mple.com" // space in host → NewRequestWithContext fails
+	defer func() { githubAPIBase = originalBase }()
+
+	_, _, err := CheckForUpdate(context.Background(), "v1.0.0",
+		WithOwner("test"), WithRepo("test"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid character")
+}
+
+//nolint:paralleltest // global state mutation: githubAPIBase
+func TestCheckForUpdate_NetworkError(t *testing.T) {
+	t.Parallel()
+	mu.Lock()
+	defer mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, `{"tag_name": "v2.0.0", "name": "v2.0.0", "assets": []}`)
+	}))
+	serverURL := server.URL
+	server.Close() // closed → connection refused
+
+	originalBase := githubAPIBase
+	githubAPIBase = serverURL
+	defer func() { githubAPIBase = originalBase }()
+
+	_, _, err := CheckForUpdate(context.Background(), "v1.0.0",
+		WithOwner("test"), WithRepo("test"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to get latest release")
+}
+
+//nolint:paralleltest // global state mutation: githubAPIBase
+func TestCheckForUpdate_InvalidReleaseJSON(t *testing.T) {
+	t.Parallel()
+	mu.Lock()
+	defer mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, `not-json`)
+	}))
+	defer server.Close()
+
+	originalBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = originalBase }()
+
+	_, _, err := CheckForUpdate(context.Background(), "v1.0.0",
+		WithOwner("test"), WithRepo("test"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed deserialization")
+}
+
+//nolint:paralleltest // global state mutation: githubAPIBase
+func TestCheckForUpdate_InvalidReleaseVersion(t *testing.T) {
+	t.Parallel()
+	mu.Lock()
+	defer mu.Unlock()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprint(w, `{"tag_name": "not-a-version", "name": "not-a-version", "assets": []}`)
+	}))
+	defer server.Close()
+
+	originalBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = originalBase }()
+
+	_, _, err := CheckForUpdate(context.Background(), "v1.0.0",
+		WithOwner("test"), WithRepo("test"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parsing release version")
+}
+
 func TestDownloadUpdate(t *testing.T) {
 	t.Parallel()
 	mu.Lock()
@@ -290,4 +409,83 @@ func TestDownloadUpdate_NoAsset(t *testing.T) {
 	_, err := DownloadUpdate(context.Background(), rel, os.TempDir())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no asset found")
+}
+
+//nolint:paralleltest // no global state mutation — file-local fixtures only
+func TestDownloadUpdate_MkdirAllError(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	fileAsParent := filepath.Join(dir, "file")
+	require.NoError(t, os.WriteFile(fileAsParent, []byte("x"), 0o600))
+
+	rel := &Release{
+		TagName: "v2.0.0",
+		Assets: []Asset{
+			{Name: "myapp_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"},
+		},
+	}
+
+	// file-as-parent → os.MkdirAll fails with ENOTDIR (cross-platform, no chmod)
+	_, err := DownloadUpdate(context.Background(), rel, filepath.Join(fileAsParent, "sub"))
+	require.Error(t, err)
+}
+
+//nolint:paralleltest // no global state mutation — file-local fixtures only
+func TestDownloadUpdate_CreateError(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	subAsFile := filepath.Join(dir, "sub")
+	require.NoError(t, os.WriteFile(subAsFile, []byte("x"), 0o600))
+
+	rel := &Release{
+		TagName: "v2.0.0",
+		Assets: []Asset{
+			{
+				// slash inside the matched name, "sub" exists as a file →
+				// os.Create fails with ENOTDIR (cross-platform, no chmod)
+				Name:               "sub/" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz",
+				BrowserDownloadURL: "http://example.invalid/download", // never reached — Create fails first
+			},
+		},
+	}
+
+	_, err := DownloadUpdate(context.Background(), rel, dir)
+	require.Error(t, err)
+}
+
+//nolint:paralleltest // no global state mutation — file-local fixtures only
+func TestDownloadUpdate_DigestMismatch(t *testing.T) {
+	t.Parallel()
+
+	content := []byte("test binary content for download")
+	differentContent := []byte("different content than expected")
+	d := digest.FromBytes(differentContent)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(content)
+	}))
+	defer server.Close()
+
+	rel := &Release{
+		TagName: "v2.0.0",
+		Assets: []Asset{
+			{
+				Name:               "myapp_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz",
+				BrowserDownloadURL: server.URL + "/download",
+				Digest:             d.String(),
+				Size:               len(content),
+			},
+		},
+	}
+
+	dir := t.TempDir()
+
+	filePath, err := DownloadUpdate(context.Background(), rel, dir)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "download failed")
+	// the partial file must be removed on digest mismatch
+	require.NoFileExists(t, filepath.Join(dir, rel.Assets[0].Name))
+	require.Empty(t, filePath)
 }

@@ -28,6 +28,16 @@ jobs:
       - name: Run tests
         run: go test -v ./...
 
+      - name: SQLite two-process E2E
+        run: go test -tags=e2e -run 'TestTwoProcess' ./cache/sqlite/ -v -count=1 -timeout=180s
+
+      # -race requires a C toolchain, which Linux and macOS runners provide
+      # (they satisfy CONC-03). Enabling -race on Windows (mingw setup) is a
+      # reviewer-flagged open question for a future phase.
+      - name: SQLite race detector
+        if: runner.os != 'Windows'
+        run: go test -race ./cache/sqlite/ -count=1 -timeout=180s
+
   coverage:
     name: Go test coverage check
     permissions:
@@ -57,4 +67,3 @@ jobs:
           ## name of branch where badges are stored
           ## ideally this should be orphan branch (see below how to create this branch)
           git-branch: badges
-

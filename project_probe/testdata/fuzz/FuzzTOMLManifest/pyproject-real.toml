@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("[project]\nname = \"acme\"\nversion = \"1.2.3\"\ndescription = \"The acme package\"\n")

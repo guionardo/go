@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <AssemblyName>MyApp</AssemblyName>\n    <Version>1.2.3</Version>\n  </PropertyGroup>\n</Project>\n")

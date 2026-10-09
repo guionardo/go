@@ -1,496 +1,506 @@
-# Domain Pitfalls: Go Utility Library Authors
+# Pitfalls Research
 
-**Domain:** Go utility packages / developer tools
-**Researched:** 2026-07-21
-**Sources:** go.dev/blog, dave.cheney.net, Go skills (code-style, design-patterns, safety, security), Go team talks (Jonathan Amsterdam, Russ Cox)
-**Overall Confidence:** HIGH — authoritative sources (Go team blog, Dave Cheney's established design advice, plus project-specific concerns already validated in CONCERNS.md)
+**Domain:** Adding an embedded SQLite cache provider (`cache/sqlite`) to the existing `github.com/guionardo/go` utility library — multi-process access, TTL cleanup, pure-Go driver, strict CI matrix (Linux/macOS/Windows), coverage gates (package ≥80%, file ≥70%, total ≥75%)
+**Researched:** 2026-10-08
+**Confidence:** HIGH for SQLite semantics (official sqlite.org documentation and forum statements); MEDIUM for `modernc.org/sqlite` version-specific behavior and Windows ecosystem reports (community bug reports, cross-checked across independent incidents)
+**Scope:** Milestone v1.8. Complements `.planning/research/questions.md` — each of its four questions is resolved or refuted below, with the remaining spikes called out.
+
+---
+
+## How to Read This Document
+
+Pitfalls are triaged by severity for **this** milestone:
+
+- **Critical** — causes data loss, silent wrong behavior, corruption risk, CI red across the matrix, or a user-visible product bug. Must be designed against before code is written.
+- **Moderate** — causes flaky behavior, hard-to-cover code, or maintenance problems. Must have a written decision.
+- **Minor** — polish/parity issues; address during normal implementation.
+
+"Phase to address" suggestions map to the natural build order for this milestone and are inputs to ROADMAP.md, not fixed phases:
+
+- **P1 — Provider foundation:** driver pin, DSN construction, open/close lifecycle, location modes (`:memory:`, `UserCacheDir`, explicit), schema bootstrap + `user_version`, pragma verification.
+- **P2 — Core semantics:** Get/Set/Delete, JSON/TTL parity, lazy expiry, sweep-on-open, error mapping (`ErrMiss`/`ErrClosed`).
+- **P3 — Batch + concurrency:** MGet/MSet/MDel, `_txlock`/retry policy, multi-process spike, connection pool tuning.
+- **P4 — Hardening + delivery:** Windows/CI green, coverage gates, docs (`doc.go`/example), e2e/benchmark registration, growth/checkpoint guidance.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, major version bumps, or break downstream consumers.
+Mistakes that cause data loss, corruption risk, rewrite, or a red CI matrix.
 
-### Pitfall 1: Changing Function Signatures Instead of Adding
+### Pitfall 1: `:memory:` + `database/sql` connection pool = multiple separate databases
 
-**What goes wrong:** Adding a required parameter, converting a parameter from positional to variadic, or changing parameter types on an exported function. This breaks all callers at compile time.
+**What goes wrong:** The milestone requires `:memory:` when the path is empty. `sql.Open("sqlite", ":memory:")` looks fine and `New` succeeds. Then `Set` writes through pooled connection A, and a later `Get` is served by pooled connection B, which has its own *empty* database. The key appears to vanish (`cache.ErrMiss` right after a successful `Set`). Worse, the schema created by the first connection (`CREATE TABLE`) does not exist on connection B: `no such table: cache_entries`. Symptoms are flaky and load-dependent — green locally, red in CI or under `-race`.
 
-**Why it happens:** The author needs to pass additional information to a function. It seems "small" so the author changes the existing function rather than adding a new one.
+**Why it happens:** `database/sql` is a pool, not a connection. Every SQLite connection opened with the plain `:memory:` filename creates a **brand-new private database** (sqlite.org/inmemorydb.html: "Every `:memory:` database is distinct from every other"). The pool only opens extra connections when existing ones are busy, so the bug needs concurrency (parallel subtests, `t.Parallel`, concurrent goroutines, `-count`) to surface.
 
-**Consequences:** Every downstream caller stops compiling. In a utility library consumed by many projects, this forces mass updates or pins users to old versions.
+**How to avoid:**
+- For `:memory:` mode, call `db.SetMaxOpenConns(1)` **and** `db.SetMaxIdleConns(1)` so every operation goes through the one connection that owns the database.
+- Do **not** set `SetConnMaxLifetime`/`SetConnMaxIdleTime` in memory mode — retiring the only connection destroys the database and all cached data.
+- Do not silently use `file::memory:?cache=shared` as the fix. Shared cache is a different locking model (table-level locks, `SQLITE_LOCKED`, unlock-notify semantics), is officially discouraged, and the database dies when the last connection closes. If shared memory is ever needed, it must be a deliberate, documented option — not the default.
+- Document in `doc.go` that memory mode serializes all operations through one connection.
+- Add a test that pins two connections (`db.Conn`) and asserts they see the same rows — or simply assert `db.Stats().OpenConnections == 1` after concurrent load.
 
-**Go-specific nuance:** Even adding variadic parameters breaks function type compatibility. `func Run(name string)` has type `func(string)`, but `func Run(name string, opts ...Option)` has type `func(string, ...Option)`. Assignments like `var fn func(string) = Run` break.
+**Warning signs:** `no such table` or `cache.ErrMiss` immediately after `Set` in tests that run in parallel or with `-count=N`; `db.Stats().OpenConnections > 1` in memory mode; a test that passes alone and fails in the full package run.
 
-**Prevention:**
-- Never change an exported function's signature — **add, don't change or remove** (Go team's first rule of compatibility)
-- Use the *add new function* pattern: `Query()` → `QueryContext()` (stdlib pattern)
-- Plan ahead with option structs (`Config` struct with nil-acceptance), functional options (`type Option func(*T)`), or variadic option parameters
-- When adding a feature that needs new params, add a new function with a descriptive name rather than tacking on more arguments
-
-**Detection:**
-- `go vet` catches some type incompatibilities
-- `gorelease` (golang.org/x/exp/cmd/gorelease) detects API changes
-- `go build ./...` on downstream test projects
-- Adding `//go:build api-compat` tests that compile the old API surface
-
-**Phase mapping:** Every phase that adds or modifies exported functions. Enforce during code review — flag ANY change to exported function signatures.
+**Phase to address:** P1 — constructor/open path. The pool configuration decision is part of the location-modes feature.
 
 ---
 
-### Pitfall 2: Forcing Allocation on Callers
+### Pitfall 2: Pragmas applied to one pooled connection only — or silently ignored
 
-**What goes wrong:** An API allocates memory internally and returns it, preventing callers from reusing buffers. Over time this creates GC pressure that can't be eliminated without breaking the API.
+**What goes wrong:** The provider appears to configure `busy_timeout` and WAL, but under contention every write still fails instantly with `database is locked (5) (SQLITE_BUSY)` with zero wait. Two root causes compound:
 
-**Why it happens:** The author optimizes for convenience (returning `[]byte` or `string` from internal allocation) rather than allocation-control. Dave Cheney's example: `func Read() ([]byte, error)` vs `func Read(buf []byte) (int, error)`.
+1. **One-off `db.Exec("PRAGMA busy_timeout = 5000")` configures exactly one connection.** `database/sql` hands it to whichever pooled connection answers the Exec; every other connection — and every connection opened later as the pool grows — runs with `busy_timeout=0`. `synchronous` and `foreign_keys` have the same per-connection nature. (Multiple independent production post-mortems document exactly this: a startup log says "pragmas configured" while 24 of 25 connections run defaults.)
+2. **DSN parameter dialects differ per driver and per version.** Many published examples use `mattn/go-sqlite3` syntax (`?_journal_mode=WAL&_busy_timeout=5000`) against `modernc.org/sqlite`. Older modernc versions silently ignored unknown keys, so the database ran in `delete` journal mode with no busy handler. **Refutation for the pinned version:** `modernc.org/sqlite` v1.60.1 now supports validated mattn-compatible shorthands — `_busy_timeout`/`_timeout`, `_journal_mode`/`_journal`, `_synchronous`/`_sync`, `_auto_vacuum`/`_vacuum`, `_foreign_keys`/`_fk`, `_query_only` — and applies them in a fixed order with `busy_timeout` and `auto_vacuum` first. But `_pragma` values remain **executed verbatim per connection** and unknown keys can still be silently dropped, so "it looks configured" is not evidence.
 
-**Consequences:** Once the API is committed (v1+), the allocation pattern can't be changed without a breaking change. Callers who need performance can't pool or reuse allocations.
+There is a real trade-off the naive fix misses: putting `_journal_mode(WAL)` in the DSN makes **every new pooled connection** re-run the journal-mode change. WAL conversion needs a brief exclusive lock the first time; when the pool grows while another process is writing, a new connection can fail to open with `SQLITE_BUSY`. The safer split, used by several production codebases: DSN carries the per-connection pragmas (`busy_timeout`, `synchronous`, `foreign_keys`); WAL is set **once** on open, verified by read-back, with a bounded retry.
 
-**Prevention:**
-- Accept buffers from callers when the function reads or produces byte data
-- Use `io.Reader`/`io.Writer` patterns instead of returning allocated slices
-- If returning allocated values is necessary, document the allocation behavior
-- For utility functions that transform data, accept the destination as a parameter
+**Why it happens:** Pragmas look global but are not; drivers differ in DSN syntax; `sql.Open` is lazy so misconfiguration is invisible until the first contention or the first new pooled connection.
 
-**Detection:**
-- Benchmark tests with `-benchmem` show allocation counts
-- Review: functions that return `[]byte` or `string` that they created internally
-- Review: methods that allocate without accepting a caller-provided buffer
+**How to avoid:**
+- Build the DSN with per-connection pragmas only, e.g. `file:<path>?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)` (or the validated shorthand equivalents, which guarantee `busy_timeout` first).
+- Set `journal_mode=WAL` exactly once during `New`, on a dedicated connection (`db.Conn`), read the returned mode back, and require `"wal"`:
+  - `PRAGMA journal_mode = WAL` **returns a row**. `Exec` is the wrong verb to trust; use `QueryRow(...).Scan(&mode)` and compare case-insensitively.
+  - If the returned mode is not `wal` (unsupported filesystem, in-memory DB), fail loudly or degrade with an explicit, documented warning — never assume.
+- Retry the WAL switch a bounded number of times (the switch does not always invoke the busy handler; see Pitfall 4).
+- **Verify, don't assume:** add a test that pins several pooled connections concurrently (`db.Conn`, or `SetMaxOpenConns(N)` with N parallel workers) and asserts `PRAGMA busy_timeout` and `PRAGMA journal_mode` on *each* connection. This test is cheap and catches the entire failure class.
+- Force one connection eagerly at `New` (`PingContext` or the pragma verification query) so a bad DSN or bad path fails at construction, not at first `Get`.
 
-**Phase mapping:** New package creation phase. Retrofit requires breaking change (v2). Design for allocation control from day one.
+**Warning signs:** `SQLITE_BUSY` returned in milliseconds while `busy_timeout` is set to seconds; `PRAGMA busy_timeout` returning 0 on a freshly opened connection; `PRAGMA journal_mode` returning `delete`/`truncate`; pragma values set in code but absent in `db.Stats()`-era tests; DSN copied from a mattn example.
 
----
-
-### Pitfall 3: Exporting Interfaces Users Must Implement
-
-**What goes wrong:** An exported interface with public methods that users outside the package implement. Later, adding a method to that interface breaks all external implementations.
-
-**Why it happens:** The author uses interfaces for testability or abstraction, but doesn't anticipate that downstream users will implement them.
-
-**Consequences:** Adding a method to the interface (even a useful one) becomes a breaking change. The author is locked into the interface shape forever.
-
-**Prevention:**
-- **Accept interfaces, return structs** (Jack Lindamood / Dave Cheney rule)
-- If you must export an interface, add an **unexported method** to prevent external implementation (stdlib pattern: `testing.TB` has a `private()` method)
-- Consider whether callers actually need to implement the interface vs. just consume it
-- Prefer returning concrete types from constructors so you can add methods later
-
-**Applied to this project (go):** The `config.Provider` type returns a concrete struct, not an interface — good. The `set.Set[T]` uses concrete methods — good. Avoid creating interfaces consumers would implement.
-
-**Detection:**
-- Dynamic: `gorelease` detects new methods added to exported interfaces
-- Static: grep for `type.*interface` in exported packages — review each for the "can external implement this?" question
-
-**Phase mapping:** API design / new package phase. Retroactively adding a private method to an interface breaks no one, but requires a major version if the interface is already published.
+**Phase to address:** P1 — DSN builder + open sequence. The per-connection verification test belongs in P1 and must stay green for the life of the milestone.
 
 ---
 
-### Pitfall 4: Package-Level Global State (The Logger Anti-Pattern)
+### Pitfall 3: WAL on a network filesystem — corruption risk, and `journal_mode` lies silently
 
-**What goes wrong:** Declaring a package-level variable (logger, config, DB connection) that creates a compile-time dependency on a specific library.
+**What goes wrong:** The user (or the default) points the cache at an NFS/SMB/UNC mount, a Docker volume backed by a network share, or a cloud-synced folder (OneDrive/Dropbox/Google Drive). WAL mode requires a shared-memory wal-index (`.db-shm`) that only works when all processes are on the same host that stores the file. On network filesystems, locking and `fsync` guarantees vary or are broken; the SQLite team states flatly that WAL **does not work** over a network filesystem and that using SQLite on network storage risks corruption. `PRAGMA journal_mode=WAL` does not error in this situation — it **silently returns the previous mode** when shared memory is unavailable. The provider believes WAL is on while the database is unprotected.
 
-**Why it happens:** "Every package needs to log" — the author adds `var log = mylogger.GetLogger(...)` which couples every importer to `mylogger`.
+**Why it happens:** `os.UserCacheDir()` is local on most developer machines, so nobody tests the network case. In enterprise environments home directories (and thus cache directories) are redirected to network storage; macOS network homes and Windows folder redirection do the same. The `journal_mode` fallback is documented but easy to miss.
 
-**Consequences:** All downstream consumers inherit the transitive dependency. Projects composed of multiple utility packages end up coupled to multiple logging/monitoring frameworks. Testing becomes harder because global state is hard to replace.
+**How to avoid:**
+- Default to `os.UserCacheDir()` (local per-user disk) and keep explicit paths an advanced, documented option.
+- **Check the read-back** from `PRAGMA journal_mode=WAL` and return an error (or a loud, documented degradation) if it is not `wal`. This single check converts silent corruption risk into a clear failure.
+- Document in `doc.go` and the package example: "Do not place the database on a network share, network-mounted home directory, or cloud-synced folder." Name the concrete offenders (NFS, SMB/CIFS, UNC paths, OneDrive/Dropbox/Google Drive, Docker bind mounts from Windows drives).
+- When the check fails and the caller still wants a working cache, the only supported fallback is a rollback-journal mode (`DELETE`), which is single-writer but does not depend on shared memory — make it an explicit, documented decision, never an automatic one.
+- Keep in mind `os.UserCacheDir()` can still be on network storage; a "where is the DB" helper/log line during `New` (at debug level) materially helps diagnosis.
 
-**Prevention (from Dave Cheney's advice):**
-- Inject dependencies via struct fields, not package variables
-- Define narrow interfaces in the consuming package (e.g., `type logger interface { Printf(string, ...interface{}) }`)
-- Defer binding to runtime via constructor parameters
-- For configuration, pass it explicitly rather than relying on a global singleton
+**Warning signs:** `PRAGMA journal_mode` read-back differs from `wal`; `SQLITE_IOERR_SHM`, `SQLITE_IOERR_SHMSIZE`, or `disk I/O error` on UNC paths; `.db-shm`/`.db-wal` files left behind unexpectedly on a remote path; corruption reports from a synced folder.
 
-**Applied to this project (go):** The `config` package already uses a `Provider` struct with injection — good. But `config/environment` uses recursive panic-recovery — see CONCERNS.md. Avoid adding more global singletons.
-
-**Detection:**
-- Search for `var (` at package level with dependencies on external packages
-- Search for `init()` functions — almost always wrong in library code
-- `go mod graph` reveals unexpected transitive dependencies
-
-**Phase mapping:** Any phase adding cross-cutting concerns (logging, metrics, tracing). Address early — retrofitting dependency injection is expensive.
+**Phase to address:** P1 — location modes + open verification; P4 — docs.
 
 ---
 
-### Pitfall 5: Semantic Versioning Violations (Breaking Changes Under Same Module Path)
+### Pitfall 4: `busy_timeout` does not cover the failures you think it covers
 
-**What goes wrong:** Publishing a breaking change (removing an exported function, changing a type, modifying a signature) under the same module path without bumping the major version.
+**What goes wrong:** `busy_timeout` is treated as "concurrent writers queue for up to N ms and then succeed." In reality SQLite deliberately **does not invoke the busy handler** in several situations and returns `SQLITE_BUSY` immediately:
 
-**Why it happens:** The author doesn't realize Go's import compatibility rule applies, or thinks "it's a small change."
+- **Deferred read→write upgrade** inside a transaction that started with a `SELECT`: if another connection wrote in the meantime, the upgrade fails at once — in WAL mode as `SQLITE_BUSY_SNAPSHOT` (extended code **517**). Waiting cannot un-stale the snapshot, so no timeout value helps. `BEGIN DEFERRED` (the `database/sql` default) is the trap; `BEGIN IMMEDIATE` takes the write lock up front, where the busy handler *does* apply and writers queue.
+- **`COMMIT` contention** with open readers (SQLite docs: COMMIT can return `SQLITE_BUSY`).
+- **WAL bootstrap / last-close cleanup:** opening a fresh WAL database or switching to WAL needs a short exclusive lock; the busy handler does not always cover the journal-mode switch (multiple production fixes add an application-level retry around exactly this).
+- **Checkpoint locking** and shared-memory lock I/O errors.
 
-**Go's rule (from research.swtch.com/vgo-import):** If an old package and a new package have the same import path, the new package must be backwards compatible with the old package.
+Even with WAL + `_txlock=immediate` + a generous timeout, plain `SQLITE_BUSY` remains possible under load, so a bounded application-level retry is required for a library that promises a clean `Get`/`Set` API.
 
-**Consequences:** When downstream users run `go get -u`, their code breaks silently at compile time. Some may pin to old versions, creating a fractured ecosystem. For pre-v1 (v0.x.x), breaking changes are expected — but for v1+, this breaks Go's compatibility promise.
+**Why it happens:** The `busy_timeout` mental model ("it retries lock contention") is true only for a subset of lock paths; the deadlock-avoidance exception and the snapshot case are documented but widely unknown. See `sqlite.org/c3ref/busy_timeout.html` and the `SQLITE_BUSY_SNAPSHOT` result-code docs.
 
-**Prevention:**
-- Follow semver strictly: breaking change = new major version = new module path with `/v2` suffix
-- Use `gorelease` to detect compatibility before tagging
-- Keep pre-v1 modules in v0 for as long as the API is experimental
-- For breaking internal changes: use `internal/` packages (see Pitfall 6)
-- Document your compatibility promises in your module's README and go.mod
+**How to avoid:**
+- Keep write operations **single-statement/autocommit** wherever possible (upsert, delete): autocommit writes start as writes, so the busy handler applies.
+- If a multi-statement write transaction is ever needed (e.g., a future batch implementation that reads before writing), start it with `BEGIN IMMEDIATE` — via `_txlock=immediate` in the DSN, or by using a dedicated write connection. Never rely on deferred transactions that read first.
+- Add a small bounded retry helper for the provider: 3–5 attempts, ~10–50 ms backoff with jitter, `ctx`-aware, retrying the **whole operation** (not a statement inside a stale snapshot). Detect retryable errors via `errors.As(err, new(*sqlite.Error))` and `Code() & 0xff` ∈ {5 SQLITE_BUSY, 6 SQLITE_LOCKED}; never substring-match only (version-dependent text).
+- Treat `SQLITE_BUSY_SNAPSHOT` (517) as "restart the transaction," never "retry the statement."
+- Sweep-on-open and the WAL switch must be **best-effort resilient**: a busy database during open should be retried briefly, and sweep failure should be logged and skipped (mirroring the postgres provider's best-effort sweep at `cache/postgres/sweeper.go`).
+- **Spike (from questions.md #4):** spawn two processes writing through `modernc.org/sqlite` against one file; measure whether `SQLITE_BUSY` escapes after timeout, and confirm the retry helper absorbs it. Do this before claiming multi-process safety.
 
-**What counts as breaking in Go:**
-- Removing or renaming an exported function, type, or constant
-- Changing a function's signature (add/remove/change params)
-- Adding a method to an exported interface (breaks implementations)
-- Changing a method's receiver from `T` to `*T` (or vice versa)
-- Changing a type from struct to interface (or vice versa)
-- Removing a field from an exported struct
-- Adding a non-comparable field to a previously comparable struct
+**Warning signs:** `database is locked (5)` in ~0 ms despite a 5 s timeout; `database is locked (517)` or `SQLITE_BUSY_SNAPSHOT`; flaky tests under `-race`/`-count`; failures only when two test binaries hit the same file.
 
-**Detection:**
-- Run `gorelease` before tagging — it compares against the last tag
-- `go build ./...` on a known downstream project
-- `go vet ./...` — catches some interface violations
-
-**Phase mapping:** Every release phase. Automate with CI (run `gorelease` as part of pre-tag checks).
+**Phase to address:** P3 — batch/concurrency. The `_txlock`/retry policy and the two-process spike are P3 exit criteria. Single-statement CRUD in P2 should already avoid deferred-then-write shapes.
 
 ---
 
-### Pitfall 6: Failing to Use `internal/` Package Boundaries
+### Pitfall 5: Concurrent first-open schema bootstrap race
 
-**What goes wrong:** Exporting symbols that are only meant for intra-module use, making them part of the public API commitment.
+**What goes wrong:** Two processes start within milliseconds on a fresh database (parallel CLI invocations, two test binaries, a user double-clicking twice) and both bootstrap the schema. Both read `PRAGMA user_version = 0` outside a transaction, both decide to migrate, and the loser dies with `duplicate column name`, `UNIQUE constraint failed`, `table already exists` (for non-idempotent DDL), or `database is locked` while switching to WAL. The error appears only on a cold database, so it survives to production and looks random.
 
-**Why it happens:** The author doesn't know about `internal/` packages, or organizes code into many small packages without visibility boundaries.
+**Why it happens:** `CREATE TABLE IF NOT EXISTS` and `PRAGMA user_version` checks are not atomic across connections. The check-then-act sequence is the classic race. Deferred transactions make it worse: a read (`IF NOT EXISTS` check) followed by a write (DDL) fails with `SQLITE_BUSY_SNAPSHOT`, which `busy_timeout` never retries.
 
-**Consequences:** Every exported name becomes a backward compatibility commitment. The author can't refactor internal helpers without potentially breaking external consumers.
+**How to avoid:**
+- Wrap the **entire** bootstrap (version read, all DDL, version write) in one `BEGIN IMMEDIATE` transaction and **re-read `PRAGMA user_version` inside the lock**; if another process won the race, roll back as a clean no-op.
+- Keep v1 schema bootstrap idempotent: `CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS` + a single `PRAGMA user_version = 1` write. Never split the DDL across separate transactions.
+- Treat a concurrent "already exists" as success (re-check inside the lock).
+- Add bounded retry around `New` because the WAL switch is a second, independent bootstrap hazard (Pitfall 4).
+- Test it: 4 goroutines (and optionally 2 processes) gated on a shared start channel opening the same fresh path; all must succeed and the schema must converge. Many projects document this test reproducing the bug pre-fix and passing 20/20 post-fix.
+- Design `user_version` migration now even though v1 has one version: it is the mechanism future milestones will use, and the correct pattern is much cheaper to install on day one.
 
-**Prevention (from Dave Cheney, Go team):**
-- Use `internal/` directories to hide implementation details from external consumers
-- Packages under `internal/` can only be imported by code sharing a common ancestor
-- Start with more things internal — you can always promote to public later
-- A `pkg/` directory at the project root is often a smell—it's usually an `internal/` opportunity
+**Warning signs:** cold-start failures only; `duplicate column`/`UNIQUE constraint`/`database is locked` on parallel CI; passes with `-p 1` but fails with package parallelism; users reporting "first run after clearing cache fails."
 
-**Applied to this project (go):** The project's packages are all at top level (config, set, fraction, etc.). If cross-package helper functions exist, they should be in `internal/` not exported.
-
-**Detection:**
-- Search for exported functions/types that are only used within the module
-- `gorelease` flags public API that changed — internal packages won't appear
-
-**Phase mapping:** Project layout / initial structure phase. Adding `internal/` boundaries later requires moving code (non-breaking if you keep shims, but messy).
+**Phase to address:** P1 — schema bootstrap and open sequence.
 
 ---
 
-### Pitfall 7: Value Receiver on Structs with Mutex or Slice Fields
+### Pitfall 6: Windows file semantics — leaked handles break `t.TempDir`, CI goes red
 
-**What goes wrong:** Declaring methods with value receivers on structs that contain `sync.Mutex`, slices, maps, or other reference types.
+**What goes wrong:** On Windows a file cannot be deleted while any handle holds it open (`ERROR_SHARING_VIOLATION`, "The process cannot access the file because it is being used by another process"). Tests that open the SQLite cache in a `t.TempDir()` and never call `Close` fail during temp-dir cleanup — but **only on windows-latest**, so the failure appears after the PR is pushed. A pending transaction can also prevent `database/sql` from actually closing the underlying handle (documented in mattn issue #906), and `-wal`/`-shm` sidecar files can keep handles alive briefly after `Close`. Antivirus and Windows Search indexing can hold transient locks, producing intermittent `SQLITE_BUSY` unrelated to application logic.
 
-**Why it happens:** The method doesn't mutate the struct, so the author uses value receivers for "immutability."
+**Why it happens:** Unix permits unlinking open files; Windows does not. The macOS/Linux runs are green, so the leak is invisible locally. The repo targets all three OSes in CI (`go.yml` matrix) and must be Windows-clean.
 
-**Consequences (from Dave Cheney's T vs *T analysis):**
-- Copying a struct with `sync.Mutex` breaks the mutex (it copies lock semantics)
-- Copying a struct with a slice field shares the backing array — mutations by one copy affect others
-- Copying a struct with a map shares the underlying map reference
-- Embedding a value-receiver type in another struct copies the mutex silently
+**How to avoid:**
+- Make `Close()` idempotent, stop the sweeper exactly once (mirroring `cache/postgres/postgres.go` CloseFunc), and close the `*sql.DB`.
+- In tests, `t.Cleanup(func() { _ = c.Close() })` immediately after `New`, so cleanup runs before `t.TempDir` removal (cleanups fire LIFO — register close after TempDir is created, which the pattern does naturally).
+- Never leave transactions open; roll back before returning. If a helper starts a transaction, it must `defer tx.Rollback()`.
+- Do not assert successful file deletion immediately after `Close` — the Go testing package retries sharing violations, but relying on that is fragile; the correct fix is closing handles deterministically.
+- Keep each test's database in its own `t.TempDir()` (never a shared path), including WAL sidecars.
+- Do not test Unix permission bits on Windows (`os.WriteFile` 0755 becomes 0666 there — already documented in the repo's AGENTS.md cross-platform notes).
+- Expect antivirus-induced `SQLITE_BUSY` in the wild as a reason the retry helper (Pitfall 4) is not optional on Windows.
 
-**Prevention:**
-- **Prefer `*T` receivers for all methods unless you have a strong reason** (Dave Cheney's rule)
-- Only use value receivers for small, immutable types (like `time.Time`, small numerical types)
-- For types with any reference field (slice, map, channel, mutex, pointer), use `*T`
-- For types that embed others with mutex fields, also use `*T`
+**Warning signs:** CI failing only in the windows-latest leg with `TempDir RemoveAll cleanup: ... used by another process`; `.db-wal`/`.db-shm` files surviving tests; intermittent `SQLITE_BUSY` on Windows runners only.
 
-**Detection:**
-- `go vet` catches `Assignment: copy lock value to ...` for mutex fields
-- Manual review: check receiver type on methods of structs with reference fields
+**Phase to address:** P4 — CI/test hardening, but the `Close` contract is P1 and the cleanup pattern must be used from the first test.
 
-**Phase mapping:** New type creation phase. Fixing later requires changing all callers from T to *T — a breaking change.
+---
+
+### Pitfall 7: The database file only grows — WAL growth and freelist growth are silent
+
+**What goes wrong:** The milestone's TTL design (lazy delete on read + sweep of expired rows on open) deletes rows forever, but two growth mechanisms are invisible until they hurt: (a) with default `auto_vacuum=NONE`, deleted pages go to a freelist and the **file never shrinks** — it stabilizes at a high-water mark set by peak key churn (a real report: 337 MB file, 88% freelist); (b) under sustained writes with overlapping readers, WAL checkpoint starvation lets the `-wal` file **grow without bound** (measured growth of ~12 MB/s in a lab reproduction), and checkpointing does not truncate the WAL unless `journal_size_limit` is set. A cache that is "correct" can still fill a user's disk.
+
+**Why it happens:** SQLite deletes are logical, not physical; `wal_autocheckpoint=1000` only *schedules* a passive checkpoint and caps nothing. `auto_vacuum` must be chosen **before any table exists** (in WAL mode it can only be changed with a full `VACUUM`), so the decision is a schema-creation-time decision, not something to retrofit. Full `VACUUM` needs an exclusive lock, up to 2× the database size in free disk, and cannot coexist with other processes — hostile to a multi-process cache.
+
+**How to avoid (and document):**
+- Decide now: set `auto_vacuum=INCREMENTAL` when creating the database (before the first table; the validated `_auto_vacuum=INCREMENTAL` shorthand applies before other pragmas). Rails took exactly this decision for its SQLite cache/queue databases. Then have the sweep occasionally issue a **bounded** `PRAGMA incremental_vacuum(N)` (e.g., a few hundred pages) so space is returned gradually without a second file copy and without an exclusive lock.
+  - Trade-off: pointer-map pages and relocation writes add ~0.1% storage and some write cost. For a cache with TTL churn this is usually worth it; if not, keep `NONE` and document the high-water-mark behavior explicitly.
+  - If `NONE` is chosen, never retrofit without an offline `VACUUM`; changing modes later is inert until a `VACUUM` runs.
+- Set `PRAGMA journal_size_limit` (e.g., 4–8 MB) so the `-wal` file is truncated on the next rewind after a checkpoint. It does **not** prevent starvation; it caps the disk cost.
+- Keep read transactions short: `database/sql` closes `Rows` when fully consumed, so always fully scan/close `Rows` (MGet must not leave a query half-read), and never hold a transaction across user code.
+- Never run a full `VACUUM` automatically from the provider — in multi-process use it will fail or block everyone. If a maintenance hook is desired, expose it as an explicit, documented, caller-invoked operation and skip it when other connections exist.
+- Document the expected steady state: "file size stabilizes near the peak working set; WAL stays under `journal_size_limit` once writes pause; deleting the cache directory resets it."
+
+**Warning signs:** `PRAGMA freelist_count` high relative to `page_count`; database file ⟫ live rows; `-wal` larger than a few MB after writes stop; long-lived readers preventing checkpoints; CI temp dirs filling up.
+
+**Phase to address:** P2 (sweep) and P4 (documented growth guidance). The `auto_vacuum` decision, however, is made in P1 because it must precede table creation.
 
 ---
 
 ## Moderate Pitfalls
 
-### Pitfall 8: Package Naming and Organization (base, util, common)
+### Pitfall 8: Error mapping — never turn a database error into `ErrMiss`, and decide `ErrClosed`
 
-**What goes wrong:** Creating catch-all packages named `utils`, `helpers`, `common`, `base`, or `misc`.
+**What goes wrong:** `Get` uses `QueryRow(...).Scan(...)`; the implementation maps *any* error to `cache.ErrMiss`, so a corrupted database, a permission failure, or a `SQLITE_BUSY` surfaces to callers as "key not found" — silently defeating the cache. The reverse mistake: returning `sql.ErrNoRows` unwrapped, so `errors.Is(err, cache.ErrMiss)` fails and consumers' miss handling breaks. A third variant: after `Close`, operations return raw `sql.ErrConnDone` with no `cache.ErrClosed` mapping (the sentinel exists in `cache/errors.go` but no provider currently returns it).
 
-**Why it happens:** Import loops force extracting unrelated functions into a shared package. The package name reflects what it *contains* rather than what it *provides*.
+**Why it happens:** `ErrMiss` is the common path and gets tested; the error taxonomy is an afterthought. `database/sql` returns `sql.ErrNoRows` from `Scan`, not a sentinel.
 
-**Consequences:** These packages accumulate unrelated functions, have no cohesive purpose, change frequently and for many reasons, and tell consumers nothing about what they do.
+**How to avoid:**
+- Map **only** `errors.Is(err, sql.ErrNoRows)` to a wrapped `cache.ErrMiss` (`fmt.Errorf("cache/sqlite: %w", cache.ErrMiss)` — match the postgres provider's pattern; tests use `require.ErrorIs`).
+- Lazy expiry must be distinguishable: fetch the row, compare `expires_at` in Go (or filter in SQL), delete the expired row best-effort, and return `ErrMiss`. Never conflate "expired" with "query failed".
+- Default-TTL semantics must match `mem`/`postgres` exactly (see Pitfall 15).
+- Decide closed-cache behavior explicitly: validate against existing provider behavior — `mem` does not return `ErrClosed` today, so returning it from sqlite would be a behavioral divergence. If the provider tracks a closed flag (recommended for the sweeper), document whether operations after `Close` return `ErrClosed` or the driver's error, and add tests either way. Do not let `sql.ErrConnDone` leak as "miss".
+- Add a test asserting that a corrupted/unavailable DB does **not** produce `ErrMiss`.
 
-**Prevention (from Dave Cheney, Go team):**
-- Name packages after what they *provide*, not what they *contain*
-- A package's name should be a description of its purpose and a namespace prefix
-- Good examples: `net/http`, `encoding/json`, `os/exec`
-- Instead of `utils`, split into multiple packages with descriptive names (e.g., `strutil`, `fileutil` only if they have a focused purpose)
-- To break import loops, prefer duplicating a small amount of code over creating a `common` package
+**Warning signs:** `errors.Is(err, cache.ErrMiss)` true for non-miss failures; `sql.ErrNoRows` visible in caller-facing errors; provider error text missing the `cache/sqlite:` prefix; no test for a broken DB.
 
-**Applied to this project (go):** The project has `path_tools`, `shell_tools`, `time_tools`, `reflect_tools` — acceptable because each is focused on a specific domain. If any were named just `tools` or `utils`, that would be a problem.
-
-**Detection:**
-- Search for directory/package names: `util`, `utils`, `helper`, `helpers`, `common`, `base`, `misc`
-
-**Phase mapping:** Project initialization / new package phase. Renaming after publication breaks import paths.
+**Phase to address:** P2 — error taxonomy, with tests.
 
 ---
 
-### Pitfall 9: Orphaned Exported Symbols (Over-Exporting)
+### Pitfall 9: DSN construction from a user path — escaping and SQL injection
 
-**What goes wrong:** Exporting types, functions, and constants that are no longer needed or should be private.
+**What goes wrong:** The DSN is assembled with string concatenation (`"file:" + path + "?_pragma=..."`). A path containing `?`, `&`, `#`, a space, or `%` is silently misparsed (Windows paths with backslashes and UNC paths are especially exposed). Worse, modernc's `_pragma` values are **executed verbatim as SQL text**, not validated: the driver docs explicitly warn that anything after a `;` also runs (`_pragma=foreign_keys(1);ATTACH 'x.db' AS x`), so any user-controlled fragment that reaches the DSN carries SQL authority and file-path authority. While this milestone controls its own pragma strings, the *cache name* feeds the default file path, and the explicit path is user input.
 
-**Why it happens:** The author exports everything "just in case" or doesn't clean up when refactoring. Also, v0 APIs that are expanded prematurely.
+**Why it happens:** Every blog example builds DSNs by concatenation because it works for simple paths. The injection surface only appears when values are interpolated rather than fixed.
 
-**Consequences:** Every exported symbol is a permanent commitment. Over-exporting bloats the API surface, increases documentation burden, and makes future breaking changes more painful.
+**How to avoid:**
+- Construct the DSN with `net/url.Values` (or `url.URL`) and `filepath.ToSlash`; percent-encode the path component. Never concatenate `?`/`&`/`#`-bearing values.
+- Treat all pragma values as compile-time constants. Never interpolate caller-provided values into `_pragma`.
+- If the driver version supports it, enable `StrictPragmas(true)` as defense in depth (rejects multi-statement `_pragma` values).
+- Sanitize the cache **name** before deriving the default file path: reject or replace path separators and `..` (path traversal — a name like `../../.ssh/authorized_keys` must not escape the cache directory); prefer an explicit allow-list (`[A-Za-z0-9._-]`) and append `.db` yourself.
+- Validate the resolved path with `filepath.Clean` and, for the default mode, verify it is still under `os.UserCacheDir()` after joining.
 
-**Prevention:**
-- **Unexport aggressively** — you can always export later; unexporting is a breaking change (Go code style skill)
-- After refactoring, review what's actually used outside the package
-- Use `internal/` to prevent external access to intra-module symbols
-- Mark unstable APIs with documentation comments (`// Deprecated:` or experimental package doc)
-- Use the `// Deprecated:` convention when you want to signal removal intent
+**Warning signs:** DSN built with `+`; names with `/` producing nested paths; tests only using alphanumeric temp paths (this is exactly why such bugs ship); missing test for `?`/`#`/space in the path.
 
-**Detection:**
-- Tools like `staticcheck` detect unused exported symbols
-- `gorelease` shows all exported symbols and flags removals
-- `go list -u -m` can help identify what symbols are imported downstream
-
-**Phase mapping:** Every phase. Enforce in code review: "Is this export necessary?"
+**Phase to address:** P1 — DSN builder + name sanitization, with adversarial-path tests.
 
 ---
 
-### Pitfall 10: Error Handling — Wrapping Implementation Details
+### Pitfall 10: Default location failures — `os.UserCacheDir` errors, missing directories, silent path surprises
 
-**What goes wrong:** Wrapping errors from dependencies (especially database, network, or third-party libraries) with `%w`, making those errors part of the library's API contract.
+**What goes wrong:** `os.UserCacheDir()` fails when it cannot determine a directory (notably `HOME`/`XDG_CACHE_HOME` unset on Linux — containers, CI, some daemons). The returned directory may not exist yet, so opening the DB fails unless the provider creates it. Symlink/network redirection of the cache directory silently changes the storage class (ties into Pitfall 3). And callers cannot discover which file the cache actually uses.
 
-**Why it happens:** The author uses `fmt.Errorf("context: %w", err)` without considering that `err` is from an underlying dependency.
+**Why it happens:** The happy path (developer laptop) always works; the failure modes appear in containers and enterprise fleets.
 
-**Consequences (from Go 1.13 errors post, Damien Neil / Jonathan Amsterdam):**
-- Downstream callers can use `errors.Is(err, sql.ErrNoRows)` on your error — if you switch databases or the dependency's error changes, your callers break
-- The wrapped error becomes part of your API commitment
-- Violates abstraction — callers shouldn't need to know about your dependencies' errors
+**How to avoid:**
+- Treat `os.UserCacheDir()` failure as a construction error (`New` returns `(cache.BatchCache, error)` like postgres), not a panic.
+- `os.MkdirAll(dir, 0o700)` before opening the DB; handle the "path exists but is a file" error clearly.
+- Keep `:memory:` (empty path), default (`UserCacheDir` + package/cache-name), and explicit path as three distinct, documented modes; the zero value must be deterministic.
+- Consider exposing the resolved path (e.g., a `Path()` method or returned `Options`) so users and bug reports can answer "where is my cache?" without guessing.
+- On macOS, `UserCacheDir` is `~/Library/Caches`; on Windows `%LocalAppData%`; on Linux `$XDG_CACHE_HOME` or `~/.cache` — document that OS cleanups may delete these files (cache semantics allow it).
 
-**Prevention:**
-- Use `%v` (not `%w`) when the error is from an implementation detail
-- Only use `%w` for errors that are part of your documented contract
-- Define your own sentinel errors or error types instead of exposing dependency errors
-- For utility libraries wrapping external APIs (like `release/release.go`), return your own error types
+**Warning signs:** `os.UserCacheDir: $HOME is not defined` in CI/containers; test failures when `HOME` is unset; DB file created in unexpected directories; no way to discover the path.
 
-**Applied to this project (go):** The `config` package wraps `yaml.Unmarshal` errors — currently using `fmt.Errorf` which is good. The `release` package calls GitHub API — should use its own error types, not propagate HTTP errors.
-
-**Detection:**
-- Search for `%w` in error formatting — review each one: "Is this error part of my API?"
-- Search for `errors.Is` or `errors.As` in tests — these lock in specific error values
-
-**Phase mapping:** Error handling pattern phase. Can be retrofitted if errors were never exposed (wrapping with `%v` instead of `%w`).
+**Phase to address:** P1 — location modes.
 
 ---
 
-### Pitfall 11: Ignoring Zero-Value Design
+### Pitfall 11: Batch operations — SQLite variable limits, transaction shape, and best-effort semantics
 
-**What goes wrong:** Exporting types whose zero value is not useful (nil maps that panic on write, uninitialized fields that should have defaults).
+**What goes wrong:** `MGet(keys...)` with thousands of keys builds one `IN (?,?,...)` query and dies with `too many SQL variables` (`SQLITE_MAX_VARIABLE_NUMBER` is 32,766 in modern SQLite, 999 in older builds). `MSet`/`MDel` run in a single deferred transaction that reads before writing, reintroducing `SQLITE_BUSY_SNAPSHOT`. Error semantics diverge from the contract established in v1.6: `MGet` must return only found keys (silently absent), `MDel` must be idempotent, `MSet` must use one TTL for all items.
 
-**Why it happens:** The author assumes every consumer will use the constructor function, forgetting that struct literals bypass it.
+**Why it happens:** Existing providers (postgres `SendBatch`, redis pipelines) hide the parameter-count constraint; SQLite is the first provider where a naive `IN` list hits a hard limit. Batch code is also the first place a multi-statement transaction appears.
 
-**Consequences:** Users who declare `var t MyType` get a broken value. Maps panic, channels block, nil pointers crash.
+**How to avoid:**
+- Chunk `MGet`/`MSet`/`MDel` at a conservative size (e.g., 500–900 keys per statement/transaction) — safe across SQLite versions and keeps transaction size bounded.
+- Implement `MGet` with `SELECT key, value FROM cache_entries WHERE cache_key IN (...) AND (expires_at IS NULL OR expires_at > ?)`; map rows back to the original `K` values (remember `fmt.Sprint` key conversion — Pitfall 14), and include only found keys.
+- For `MSet`, either loop upserts in autocommit (simplest, contention-resilient) or use a single `BEGIN IMMEDIATE` transaction per chunk; do not use a deferred transaction that reads first. For `MDel`, a single bounded `DELETE ... WHERE key IN (...)` per chunk is idempotent by nature.
+- Match the provider error philosophy: postgres `MGet` skips per-key errors (best-effort, D-06) while `MSet` returns `errors.Join` of accumulated errors; choose and document the sqlite equivalents (single-statement batch means one error per chunk — wrap with the provider prefix).
+- Always fully consume `*sql.Rows` (and close) before returning, or an open cursor pins the read snapshot and starves checkpoints (Pitfall 7).
 
-**Prevention:**
-- **Design useful zero values** — `var buf bytes.Buffer` is the gold standard
-- Use lazy initialization for nil-unsafe fields (check-nil-and-init in methods)
-- Use `sync.Once` for lazily-initialized fields
-- For types that can't have a useful zero value, make the constructor mandatory and document it
-- Add `// zero value is not safe to use` to the type doc if necessary
+**Warning signs:** `too many SQL variables` in batch tests; batch tests using three keys only; a batch transaction that starts with a `SELECT`; `MGet` results containing missing keys; partially-applied `MSet` without documentation.
 
-**Examples of good zero-value design:**
-- `sync.Mutex` — unlocked and ready
-- `bytes.Buffer` — empty buffer ready for writing
-- `net/http.Client` — default timeout and transport
-
-**Detection:**
-- Look for exported structs with map, slice, or channel fields that aren't initialized in methods
-- Test: `var x MyType; x.DoSomething()` should not panic
-- Test with `go test -fuzz`
-
-**Phase mapping:** New type creation phase. Fixing zero-value unsafety after release requires migration.
+**Phase to address:** P3 — batch operations.
 
 ---
 
-### Pitfall 12: No Example Tests or Documentation Tests
+### Pitfall 12: Driver dependency, toolchain, and CI fallout
 
-**What goes wrong:** Publishing packages without `Example` tests or runnable documentation that demonstrates API usage.
+**What goes wrong:** Choosing the CGO driver (`mattn/go-sqlite3`) requires `CGO_ENABLED=1` plus a working C compiler on every CI leg (Linux, macOS, Windows) and complicates cross-compilation; the repo's pure-Go posture and `go test ./...` matrix make that a poor fit. Modernc is pure Go, cross-compiles trivially, and works with `CGO_ENABLED=0`, but it pulls a large dependency tree (`modernc.org/libc`, `modernc.org/memory`, `modernc.org/mathutil`, `modernc.org/fileutil`, `github.com/google/pprof` as a direct dependency) — increasing `go mod tidy` churn, build time, and `govulncheck` surface. Version pinning matters: driver behavior changed across releases (DSN shorthand keys, prepared-statement re-preparation fixed around v1.46, context-interrupt fixes in 2025/2026).
 
-**Why it happens:** The author considers tests a separate concern from documentation, or finds example tests verbose.
+**Why it happens:** Driver choice is made once at milestone start; its CI/dependency consequences surface later in `vulncheck`/coverage/report jobs.
 
-**Consequences:**
-- Consumers can't see how the API is intended to be used
-- `go doc` output is minimal
-- Breaking changes to behavior may go undetected (example tests verify they compile and produce expected output)
-- Lower discoverability on pkg.go.dev (example tests are surfaced prominently)
+**How to avoid:**
+- Pin `modernc.org/sqlite` to a specific recent version (research-time current: **v1.60.1**, published 2026-09-29, requires Go ≥1.26.0 — compatible with the repo's Go 1.26.4). Record the pin as a milestone decision.
+- Run `go mod tidy` and inspect the diff; the indirect dependency list will grow substantially. Confirm the repo's "minimal external dependencies" posture is consciously traded for a zero-CGO build (pure-Go wins for this library).
+- Run `govulncheck` early (the repo has a `make quality-report` / tool dependency) rather than discovering a transitive advisory in the tag pipeline.
+- If `-race` is ever added to CI, note that modernc supports it but the race detector itself requires CGO toolchains; keep that separate from the driver choice.
+- Context-cancellation poisoning is a real modernc risk: issues (cznic/sqlite #198, #241) show that cancelling a query can leave a pooled connection returning `interrupted (9)` for later operations, occasionally even for unrelated queries. Pin a version that includes the interrupt-race fixes, keep the retry helper's error classification able to recognize `interrupted`, and consider treating `interrupted` as retryable rather than fatal.
+- Avoid `ncruces/go-sqlite3` for this milestone unless a spike proves otherwise: it had a Windows-only WAL corruption bug with pooled concurrent writers (fixed later), and it omits shared cache — an extra risk on the exact OS that already causes trouble.
 
-**Prevention:**
-- Write Example tests for every exported type and significant function
-- Example tests are compiled and run as part of `go test` — they verify API correctness
-- They double as documentation — `go doc` and pkg.go.dev display them
+**Warning signs:** `go.mod` growing without review; `govulncheck` failing on a transitive advisory; flaky `interrupted (9)` or `SQLITE_PROTOCOL` errors under load; unexplained compile-time increases in the coverage job.
 
-**Applied to this project (go):** Check if packages like `set`, `fraction`, `flow` have Example tests. If not, add them.
-
-**Detection:**
-- `go doc -all | grep "Example"` or grep for `func Example` in `_test.go` files
-- Check pkg.go.dev page for the module
-
-**Phase mapping:** Test/documentation phase for each package. Should be part of the acceptance criteria.
+**Phase to address:** P1 — driver pin decision (record in PROJECT.md Key Decisions); P4 — quality-report check.
 
 ---
 
-### Pitfall 13: Not Handling Context in Blocking Operations
+### Pitfall 13: Coverage gates — `cache/sqlite` gets no E2E override, but has hard-to-cover paths
 
-**What goes wrong:** Utility functions that perform I/O, network calls, or blocking operations without accepting a `context.Context`.
+**What goes wrong:** `.testcoverage-quick.yml` zeroes the thresholds for `cache/memcache`, `cache/postgres`, `cache/redis`, `cache/valkey`, and other packages because they are exercised through Docker E2E tests. A new `cache/sqlite` package will **not** get such an override — it is embedded and must meet the full thresholds (package ≥80%, file ≥70%, total ≥75%). Provider code traditionally contains un-coverable branches (driver open failures, OS-specific behavior, background sweep errors), and multi-process tests implemented as subprocess helpers **do not contribute coverage** to the parent `go test -cover` run unless GOCOVERDIR instrumentation is wired up. The result: `make coverage-quick` fails at commit time and the author starts deleting error handling or adding threshold overrides instead of tests.
 
-**Why it happens:** The function "doesn't need cancellation" in its initial use case.
+**Why it happens:** Coverage gates are enforced locally per commit (AGENTS.md: "Do not commit if it fails"), while E2E providers were already excused. Embedded providers have no such excuse, and multi-process verification is naturally subprocess-based.
 
-**Consequences:** Adding context support later requires either adding a new function (e.g., `Do` → `DoContext`) or a breaking change. Callers who need to set deadlines or cancel operations can't use the library.
+**How to avoid:**
+- Design for testability on day one: inject the DSN/path (tests use `t.TempDir()`), keep filesystem error paths reachable (nonexistent parent that is actually a file, directory path passed as DB path, unwritable location skipped on Windows/root), and keep OS-conditional code out of the package entirely (use stdlib).
+- Cover the error taxonomy with tests rather than `//nolint`/exclusions: bad DSN, open failure, marshal failure, `sql.ErrNoRows`, closed-cache behavior, sweep error (close the DB handle from under the sweeper or use a canceled context), context cancellation.
+- Keep the **unit** suite (no build tags, no Docker) the coverage contributor. Put the two-process race/spike test in a clearly separated helper; do not rely on it for coverage. If multi-process testing becomes permanent, either run it under `go test -tags=e2e` (like `cache_e2e_test.go`) or use Go's coverage-in-child instrumentation deliberately.
+- Re-check both configs: `make coverage-quick` (unit-only) and the merged `make coverage` (E2E + unit) must both pass. SQLite tests should pass in both.
+- Watch total coverage: adding a dependency-heavy package with moderate coverage can drag the repo-wide total toward the 75% floor even if the package itself passes.
+- Flaky `busy` tests are a coverage risk (retried CI jobs, `-count=1`); make concurrency tests deterministic (barriers, generous timeouts, no assertions that `SQLITE_BUSY` is observed).
 
-**Go team guidance (from module-compatibility post):** The stdlib added `QueryContext`, `ReadContext`, etc. because changing the original signature was impossible.
+**Warning signs:** considering a `cache/sqlite` override in `.testcoverage-quick.yml`; `//nolint:exhaustruct`-style suppressions around error returns; subprocess test helpers claimed as coverage; coverage job time ballooning from modernc compilation.
 
-**Prevention:**
-- Accept `context.Context` as the first parameter for any function that does I/O, calls external APIs, or could block
-- For functions that don't block, no context needed
-- Plan for the `Do` / `DoContext` pattern if you must offer a convenience version without context
-
-**Applied to this project (go):** The `release` package's `GetLatestRelease()` and `Asset.Download()` don't accept context — already identified in CONCERNS.md (no timeout). Add `GetLatestReleaseContext(ctx)`.
-
-**Detection:**
-- Search for functions that call `http.Get`, `http.Post`, `os.Open`, `exec.Command`, or any blocking operation — check if they accept context
-- Linter: `contextcheck` / `noctx`
-
-**Phase mapping:** New function creation phase. Retrofitting requires the `Do + DoContext` pattern.
+**Phase to address:** P4 — CI/coverage hardening, with testability review during P1 design.
 
 ---
 
 ## Minor Pitfalls
 
-### Pitfall 14: Missing Example Tests for API Evolution
+### Pitfall 14: Key/value parity drift (`fmt.Sprint` keys, JSON values)
 
-**What goes wrong:** Not having a test that explicitly verifies the API hasn't changed incompatibly.
+**What goes wrong:** The established provider contract serializes keys with `fmt.Sprint(key)` and values with `encoding/json`. Drift breaks compatibility: storing raw keys, using a different key type coercion, or handling `[]byte` values differently means the same logical key maps to different rows across providers and breaks the shared e2e conformance expectations. Edge cases: empty-string key (`""`), `nil` pointer keys (`"<nil>"`), integer keys (`"1"`), and keys whose string forms collide across types (int `1` vs string `"1"`) — the latter is an accepted cross-provider property, but it must be deliberate and tested.
 
-**Why it happens:** The author relies on manual review or "just being careful."
+**How to avoid:** Reuse the exact `fmt.Sprint(key)` + `json.Marshal`/`Unmarshal` pattern from `cache/postgres/postgres.go`; test empty string, unicode, spaces, JSON-hostile values, and non-JSON-marshalable values (channels/functions must return an error, not store garbage). Store keys in a `TEXT PRIMARY KEY` column.
 
-**Consequences:** Incompatible changes slip through code review. By the time they're found, they've been published.
+**Warning signs:** tests that only use `"key"`/`"value"`; a `Set` that succeeds for a channel value; different key normalization from postgres.
 
-**Prevention:**
-- Use `gorelease` in CI to compare API against the last published tag
-- Add a test file that explicitly asserts expected API shape (golden file of exported symbols)
-- For utility libraries, `gorelease` CI step should block PRs with incompatible changes
-
-**Detection:**
-- CI pipeline doesn't have `gorelease` step → add it
-
-**Phase mapping:** CI setup phase. Add before first v1 release.
+**Phase to address:** P2 — CRUD.
 
 ---
 
-### Pitfall 15: Confusing Receiver Choice Inconsistency
+### Pitfall 15: TTL semantics drift (zero/negative TTL, default TTL, expiry encoding)
 
-**What goes wrong:** Mixing value and pointer receivers inconsistently within the same type.
+**What goes wrong:** `mem` and `postgres` implement a specific resolution order in `resolveTTL`: explicit `ttl > 0` wins; otherwise the provider default applies; a non-positive explicit TTL means **never expires**. A sqlite implementation that "obviously" treats `ttl=0` as "use default" or stores expiry in local time will diverge. Storage encoding is also a trap: storing RFC3339 text with timezone or SQLite `datetime()` strings invites comparison bugs; integers are unambiguous.
 
-**Why it happens:** Some methods don't mutate the receiver (value receiver used), others do (pointer receiver used).
+**How to avoid:** Copy the `resolveTTL` semantics exactly and test the matrix (`no ttl`, `ttl>0`, `ttl==0`, `ttl<0`, default set/unset). Store `expires_at` as an INTEGER Unix nanoseconds (or milliseconds) column, `NULL` = no expiry; compare against `time.Now().UnixNano()` passed as a parameter, not `datetime('now')`, so tests are deterministic and clock handling is one place. Add a partial index on `expires_at` (mirroring `cache/postgres/schema.go`). Delete expired rows lazily on `Get`; on `MGet`, filter them out and optionally delete best-effort.
 
-**Consequences:** The type doesn't satisfy interfaces consistently. Callers can't predict whether a method modifies the receiver. A type that has both value and pointer receivers is partially usable via values but not consistently.
+**Warning signs:** an expiry helper named differently from `resolveTTL`; TEXT dates; tests using `time.Sleep` for expiry (prefer injecting a clock into the row or a tiny TTL with a generous margin — existing e2e uses `2s` TTL + `3s` sleep, acceptable at e2e level only).
 
-**Prevention:**
-- Be consistent: all methods on a type should use the same receiver type
-- When in doubt, use `*T` for all receivers (Dave Cheney's recommendation)
-- Only use value receivers for small (~<=4 fields), immutable types with no reference fields
-
-**Detection:**
-- `go vet` — catches some cases
-- Manual review: check consistency of `func (t T)` vs `func (t *T)` on the same type
-
-**Phase mapping:** Type creation phase. Fixing is a breaking change.
+**Phase to address:** P2 — TTL core.
 
 ---
 
-### Pitfall 16: init() Functions in Library Code
+### Pitfall 16: Not registering the provider in the shared conformance/benchmark surfaces
 
-**What goes wrong:** Using `init()` functions to set up global state, register drivers, or validate configuration.
+**What goes wrong:** `cache/cache_e2e_test.go` runs a parametrized provider contract (`providerCase`) over mem/redis/valkey/memcache/postgres, and `cache/bench_test.go` benchmarks all providers. If `cache/sqlite` is not added, the provider silently lacks the shared contract checks (`set_and_get`, `get_miss`, TTL expiry, batch semantics, close) and the benchmark comparison. The milestone's target explicitly requires the `c.BatchCache` surface; conformance is how that is proven.
 
-**Why it happens:** Convenience — global registration runs automatically when the package is imported.
+**How to avoid:** Add a non-Docker `providerCase` for sqlite to the e2e suite (it needs no container; it can live alongside `TestCacheE2E_Mem`) and a benchmark entry. Run the e2e suite (`make test-e2e` needs Docker on this machine, but the sqlite case should also be runnable under `-tags=e2e` without Docker). Keep `Close()` in each case so temp files are released.
 
-**Consequences (from Go design patterns skill and Dave Cheney):**
-- `init()` cannot return errors — failures must panic or `log.Fatal`
-- Multiple `init()` functions run in declaration order across files in filename alphabetical order — fragile
-- Runs before `main()` and tests — side effects make tests unpredictable
-- Makes testing harder (global state persists across test cases)
+**Warning signs:** `cache/sqlite` absent from `cache_e2e_test.go` and `bench_test.go`; provider tested only by bespoke tests that duplicate the shared ones.
 
-**Prevention:**
-- Use explicit constructors instead of `init()`
-- For registration patterns (e.g., SQL drivers), accept that `init()` is the convention but keep its scope minimal
-- Never use `init()` for logic that could fail — there's no way to signal failure to the caller
-
-**Detection:**
-- `grep -r 'func init()' .` — every result needs justification
-
-**Phase mapping:** Every phase. Ban `init()` in code review (except for `database/sql` driver registration or similar established patterns).
+**Phase to address:** P4 — test integration (can be added as soon as the constructor is stable).
 
 ---
 
-### Pitfall 17: Relying on File System State in Library Code
+### Pitfall 17: WAL sidecar files surprise users and tools
 
-**What goes wrong:** Utility functions that depend on specific file paths, environment variables, or system state without making them configurable.
+**What goes wrong:** In WAL mode the database is three files while open (`db`, `db-wal`, `db-shm`). After the last connection closes cleanly, SQLite checkpoints and **deletes** the `-wal`/`-shm` files — so a user who inspects the directory before/after `Close` sees different files. Users may try to copy the DB while open (getting an inconsistent snapshot without the WAL), or "clean up" by deleting the sidecars (which can corrupt committed-but-not-checkpointed transactions). A crashed process leaves the sidecars behind; the next open recovers automatically — unless someone deleted them.
 
-**Why it happens:** The function "just needs to read this one file."
+**How to avoid:** Document the open-file set and the last-close cleanup in `doc.go`; state explicitly that `-wal`/`-shm` must never be deleted manually while any process has the DB open (the correct recovery is opening the DB and letting SQLite checkpoint, or `PRAGMA wal_checkpoint(TRUNCATE)` with no other connections). Do not treat the presence of sidecars as an error. Do not add cleanup code that removes them — only `Close` (via SQLite) should.
 
-**Consequences:** Testing becomes environment-dependent. Other users' systems may have different file layouts. The function is not portable.
+**Warning signs:** users filing "extra files appeared next to my cache"; provider code attempting `os.Remove` on sidecars; backup logic copying only `*.db`.
 
-**Prevention:**
-- Accept `io.Reader` or `io.Writer` instead of file paths when possible (interface segregation)
-- Make file paths or environment variables configurable parameters
-- Document the assumptions about file system state
-- For platform-specific paths (like `mid/machineid_linux.go`), document the lookup strategy and fallbacks
-
-**Applied to this project (go):** The `mid` package reads `/var/lib/dbus/machine-id` and `/etc/machine-id` — already flagged in CONCERNS.md for fragile parsing (trailing whitespace not trimmed). The `config` package reads profile files from configurable paths — good.
-
-**Detection:**
-- Search for `/etc/`, `/var/`, `/usr/` or hardcoded absolute paths
-- Search for `os.Getenv` — is it configurable?
-
-**Phase mapping:** Platform-specific package creation phase. Document system assumptions alongside the code.
+**Phase to address:** P4 — docs.
 
 ---
 
-## Already Present in CONCERNS.md
+## Technical Debt Patterns
 
-These pitfalls are already manifest in the codebase. Each maps to a specific issue documented in `.planning/codebase/CONCERNS.md`:
+Shortcuts that look reasonable now and cost later.
 
-| CONCERNS.md Issue | Pitfall | Severity | Priority |
-|---|---|---|---|
-| `release/release.go` — unused HTTP request, lost headers | Pitfall 9 (orphaned exports) + Pitfall 13 (no context) | Critical | Immediate |
-| `release/release.go` — response body not closed | Resource leak (general Go safety, covered by golang-safety skill) | High | Immediate |
-| `config/provider.go` — silent error swallowing | Pitfall 10 (error handling) variant — errors should be returned | High | Next |
-| `release/release.go` — no HTTP timeouts | Pitfall 13 (no context) | Medium | Next |
-| Duplicate `GetEnv` functions | Pitfall 8 (poor naming/org) + code duplication | Low | Soon |
-| `mid/machineid_linux.go` — whitespace not trimmed | Pitfall 17 (filesystem assumptions) | Medium | Soon |
-| `config/environment` — panic-recovery instead of errors | Pitfall 16 (init-like patterns) + unsafe error handling | Medium | Next |
-| `time_tools/parser.go` — global lock contention | Pitfall 4 (global state) — performance variant | Low | Later |
-| `config/provider.go` — lock double-fetch race | Pitfall 4 (global state) — concurrency variant | High | Next |
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| `SetMaxOpenConns(1)` for **all** modes (not just `:memory:`) to dodge `SQLITE_BUSY` entirely | Trivial correctness; no retry policy needed in-process; data can never be split across conns | Serializes all reads behind one connection; a slow op blocks everything; cross-process `SQLITE_BUSY` still possible; hides the need for the retry helper | Acceptable for v1.8 MVP **only if** documented as a deliberate limitation and a follow-up (separate read pool) is scheduled. Not acceptable to then claim WAL read concurrency |
+| `_pragma` DSN assembled by string concatenation | Matches every blog example; works on simple paths | Escaping bugs for `?& #%` and spaces; potential SQL authority if a value is ever caller-supplied | Never for user-influenced values; acceptable only for fully constant DSNs with a hard-coded path |
+| Skipping `PRAGMA journal_mode` read-back | One less query and error path | WAL silently off on unsupported filesystems; multi-process promises become false | Never |
+| Deferring `auto_vacuum` "until growth becomes a problem" | Avoids a creation-time decision and pointer-map overhead | Mode change later is inert without a full offline `VACUUM` (exclusive lock, 2× disk); users discover multi-GB cache files first | Acceptable only with explicit docs stating the file stabilizes at the high-water mark and will not shrink |
+| Relying on a retry loop as the only `SQLITE_BUSY` strategy | Absorbs transient contention | Does not fix deferred-upgrade (`_txlock`), long transactions, or checkpoint starvation; hides design problems; latency tails | Retry is a **backstop** on top of autocommit/`IMMEDIATE` + short transactions, never the primary mechanism |
+| Using a deferred transaction that reads before writing | `database/sql` default; familiar | `SQLITE_BUSY_SNAPSHOT` (517) bypasses `busy_timeout`; flaky under any concurrency | Never for write transactions |
+| Passing a caller's tainted path straight into the DSN | Fewer validation branches | Escaping/misparse bugs; path traversal via cache name; possible PRAGMA injection | Never |
 
 ---
 
-## Phase-Specific Warnings
+## Integration Gotchas
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|---|---|---|
-| New package creation | Pitfall 5 (wrong major version), Pitfall 8 (bad naming) | Start at v0.x.x, choose a descriptive name, use functional options from day one |
-| API extension (new features) | Pitfall 1 (changing signatures), Pitfall 3 (interface pollution) | Add new functions, prefer config structs, keep interfaces minimal |
-| Error handling design | Pitfall 10 (wrapping implementation errors) | Use `%v` for dependency errors, define your own sentinels |
-| Concurrency support | Pitfall 13 (no context), Pitfall 7 (value receivers on mutex structs) | Accept `context.Context` first param, use `*T` receivers |
-| Testing and documentation | Pitfall 12 (no example tests), Pitfall 14 (no API compat tests) | Write Example tests, add `gorelease` to CI |
-| Cross-platform support | Pitfall 17 (filesystem assumptions) | Use build tags, accept io.Reader, document platform assumptions |
-| v1 stable release | Pitfall 5 (semver violations) | Run `gorelease` before tagging, audit exported surface |
-| Dependency management | Pitfall 4 (global state coupling) | Prefer interfaces over concrete logger/metrics types |
+Common mistakes when wiring SQLite into this specific codebase and toolchain.
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| `database/sql` pool | Assuming one connection; setting pragmas once with `db.Exec` | Per-connection pragmas via DSN (or connection hook); pin-pool verification test; `:memory:` requires `MaxOpenConns(1)` + `MaxIdleConns(1)` |
+| `cache.BatchCache` (`NewConcreteCache`) | Implementing only `cacher` CRUD; forgetting `MGetFunc/`MSetFunc/MDelFunc` are part of the interface | Implement all seven `cacher` methods (see `cache/concrete_cache.go`); use a compile-time assertion `var _ cache.BatchCache[string, string] = ...` in tests |
+| `cache.ErrMiss` contract | Returning raw `sql.ErrNoRows` or mapping every error to miss | Wrap `ErrMiss` with the `cache/sqlite:` prefix; `require.ErrorIs` tests copy the postgres provider pattern |
+| TTL resolution | New `resolveTTL` that disagrees with mem/postgres | Copy `resolveTTL` semantics verbatim (explicit ttl>0 > default > never); test the full matrix |
+| `Close()` lifecycle | Non-idempotent close; sweeper leak; pending transaction blocks close on Windows | Stop sweeper exactly once (postgres CloseFunc pattern), close `*sql.DB`, `t.Cleanup(close)` in every test |
+| E2E/bench suites | Provider not added to `providerCase`/benchmark registries | Register a non-Docker provider case and benchmark entry |
+| `go.yml` matrix | Code green on Linux/macOS, broken on Windows | Per-test temp dirs, deterministic close, no permission assertions on Windows, retry helper for AV-induced `BUSY` |
+| Coverage config | Adding a `cache/sqlite` threshold override like the Docker providers | No override: unit-test the provider to ≥80% package / ≥70% file; keep subprocess tests out of the coverage calculation |
+| `govulncheck`/`go mod tidy` | Vendoring a large pure-Go dependency without review | Pin v1.60.1+, run `go mod tidy` + `govulncheck` early, record the dependency decision in PROJECT.md |
+| `os.UserCacheDir` | Assuming `HOME` is set and the directory exists | Handle the error, `MkdirAll(0o700)`, expose/inspect the resolved path |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Unbounded connection pool + `journal_mode(WAL)` in DSN | New pooled connections contend on the WAL switch under load; intermittent open-time `SQLITE_BUSY` | Cap the pool (small fixed number, or 1 for memory); set WAL once + verify; keep only per-conn pragmas in DSN | As soon as pool grows concurrently with a cross-process writer |
+| `synchronous=FULL` (default pairing concerns) on every commit | Commit latency dominated by fsync; cache slower than expected | Set `synchronous=NORMAL` in WAL mode (documented-safe trade-off: may lose the last transactions on power loss, no corruption); acceptable for a cache | At any write rate; laptop/CI disk-bound |
+| Re-preparing every statement per call | CPU-bound Get/Set slower than the other providers; profiles show prepare overhead | modernc fixed re-preparation around v1.46 — pin ≥1.46 (v1.60.1); keep pool stable (`MaxIdleConns`) so prepared statements can be reused; avoid opening/closing DB per operation | Benchmarks vs mem/postgres; batch-heavy workloads |
+| SQLite JSON encode/decode per Get/Set | CPU floor higher than mem; acceptable but measurable | Expected cost; document it; consider `json.RawMessage` fast paths only if benchmarks justify | Large values, high QPS |
+| MGet one query per key | N round trips per batch | Single `IN` query chunked below the variable limit (Pitfall 11) | Batches > ~100 keys |
+| Full `VACUUM`/unbounded `incremental_vacuum` | Writers blocked for seconds; failures with other connections; 2× disk | Bounded `incremental_vacuum(N)` in the sweep; never auto-`VACUUM` in multi-process | Any multi-process deployment; large freelists |
+| Long-lived read snapshot (unclosed `Rows`, open tx) | `-wal` grows without bound; `wal_checkpoint(PASSIVE)` shows `checkpointed < log` | Always fully consume/close `Rows`; no transactions across user code; `journal_size_limit` as a cap | Under sustained write load with an overlapping reader |
+| `:memory:` with `MaxOpenConns(1)` under heavy parallel tests | Tests serialize; suite slows | Acceptable; use file-backed temp DBs for concurrency tests that need parallelism | Large test suites only |
+
+---
+
+## Security Mistakes
+
+Beyond generic web security, specific to an embedded cache DB on user machines.
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Interpolating caller input into `_pragma` DSN values | SQL injection via a DSN that is executed as SQL text (`; ATTACH '...'`); arbitrary file access | Pragma values are compile-time constants; `StrictPragmas(true)` when available; never build `_pragma` from user data |
+| Cache name used as a raw path segment | Path traversal (`../../...`) writes a `.db` outside the cache directory; on multi-user systems files may be picked up by other tooling | Allow-list characters, reject `.`/`..`/separators, join with `filepath.Clean` and verify containment under `os.UserCacheDir()` |
+| World-readable DB / directory | Cached values may contain secrets/tokens; other local users read them | `MkdirAll(dir, 0o700)`, create DB with restrictive mode where the OS supports it (skip assertions on Windows); document that the default location is per-user |
+| Manually deleting `-wal`/`-shm` to "fix a lock" | Losing committed transactions → corruption, especially with other processes attached | Never delete sidecars while any process has the DB open; recover by opening the DB (checkpoint) or `wal_checkpoint(TRUNCATE)` when alone |
+| DSN/user path on a network or synced folder treated as safe | Cross-host WAL is corruption-prone; sync engines rewrite files out from under locks | Read-back `journal_mode` check; documented prohibition; default to local `UserCacheDir` |
+| Logging full DSNs/paths or values at info level | Path disclosure; cached values in logs | Log at debug only; never log values; error messages carry the path only where already caller-known |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **WAL verified, not assumed:** `PRAGMA journal_mode` read-back equals `wal` on open, with a bounded retry for the switch. Test a fresh file and a pre-existing non-WAL file.
+- [ ] **`busy_timeout` on every connection:** pin N pooled connections concurrently and assert `PRAGMA busy_timeout` and `synchronous` on each — not just the first.
+- [ ] **`:memory:` mode pinned:** `MaxOpenConns(1)` + `MaxIdleConns(1)`; a test proves Set→Get works with concurrent goroutines and that `db.Stats().OpenConnections == 1`.
+- [ ] **Cold-start race tested:** 4+ goroutines (ideally 2 processes) opening the same fresh path simultaneously; all succeed; schema/version converge; pre-fix code demonstrably fails the test.
+- [ ] **Two-process `SQLITE_BUSY` behavior spiked (questions.md #4):** observable behavior documented; retry helper absorbs the residual; outcomes recorded in the phase notes.
+- [ ] **TTL semantics match mem/postgres:** explicit ttl>0, default TTL, ttl=0/negative (never expire) all tested; expired `Get` returns wrapped `ErrMiss` and deletes the row best-effort.
+- [ ] **Sweep-on-open bounded and safe:** expired rows removed; failure logged and skipped (not fatal); no full-table lock held.
+- [ ] **Error taxonomy:** `sql.ErrNoRows` → `ErrMiss` only; DB failures are not misses; closed-cache behavior decided and tested; provider prefix `cache/sqlite:` on wrapped errors.
+- [ ] **Batch limits:** `MGet/MSet/MDel` tested at >1,000 keys; chunking verified; only found keys returned; MDel idempotent; MSet single TTL.
+- [ ] **Close is idempotent, sweeper stopped, no leaked handles:** tests pass on Windows temp-dir cleanup; `Close` twice returns without panic.
+- [ ] **Growth guidance:** `auto_vacuum` decision recorded (INCREMENTAL vs NONE); `journal_size_limit` set; docs explain high-water-mark and sidecar lifecycle.
+- [ ] **Windows matrix green:** full `go test ./...` passes on windows-latest (no permission assertions, unique temp dirs, deterministic close).
+- [ ] **Coverage green with no override:** `make coverage-quick` passes with `cache/sqlite` meeting 80/70; no new exclusions in `.testcoverage-quick.yml`.
+- [ ] **Quality gates:** `go mod tidy` reviewed; `govulncheck` clean; lint clean; benchmark/e2e registrations added.
+- [ ] **Docs:** `doc.go`, package example, and the network-filesystem warning ship with the provider.
+- [ ] **No committed artifacts:** test DBs/WAL files are only in temp dirs; nothing new needs `.gitignore`.
+
+---
+
+## Recovery Strategies
+
+When a pitfall slips through despite prevention.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| `:memory:` split databases (P1) | LOW | Set `MaxOpenConns(1)`/`MaxIdleConns(1)`; add the pin test; no data migration needed (memory data is ephemeral by definition) |
+| Pragma misconfiguration shipped (P2/3/4) | LOW–MEDIUM | Add read-back verification + per-connection test; hot fix release; for WAL-fallback cases check whether the DB ran in rollback mode (data itself is intact) |
+| WAL on network share / corruption suspicion (P3) | HIGH | Stop all writers; copy the three files to local disk **while no process is attached**; run `PRAGMA integrity_check`; if ok, move the cache to local storage and document; if corrupt, delete the cache (it is disposable) and rebuild |
+| Deferred-upgrade `SQLITE_BUSY_SNAPSHOT` flakes (P4) | MEDIUM | Audit every `BeginTx`: switch write transactions to `_txlock=immediate`; add retry backstop; add a contention regression test |
+| Cold-start migration race (P5) | MEDIUM | Wrap bootstrap in `BEGIN IMMEDIATE` + re-read version; ship retry; add concurrent-open test; affected users' DBs converge on next open (no manual repair if DDL was idempotent) |
+| Windows temp-dir CI failures (P6) | LOW | Add `t.Cleanup(close)`; ensure transactions rolled back; rerun; no production impact |
+| Unbounded DB growth (P7) | MEDIUM–HIGH | If created without `auto_vacuum`: choose `NONE` + document, or schedule an offline `VACUUM` (exclusive, 2× disk) to switch to `INCREMENTAL`; if WAL growth: set `journal_size_limit`, remove long readers, add bounded `incremental_vacuum` to sweep |
+| Error taxonomy leak (P8) | LOW–MEDIUM | Fix mapping; add contract tests; callers that consumed "miss" for errors need a patch release note |
+| DSN injection/traversal (P9) | HIGH (security) | Validate/sanitize names, switch to `url.Values` + `filepath.ToSlash`, adopt `StrictPragmas(true)`; audit for any other interpolated DSN values; advisory if a released version accepted tainted names |
+| Coverage gate failing at commit (P13) | LOW | Add the missing error-path tests; do not add a threshold override for an embedded provider |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+Suggested roadmap phases for this milestone; each critical pitfall must have an owning phase and a verification.
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| 1 — `:memory:` pool split | P1 (constructor) | Pin test: concurrent Set/Get in memory mode; `db.Stats().OpenConnections == 1` |
+| 2 — Per-connection pragmas / silent ignore | P1 (DSN + open) | Read-back of `journal_mode == wal`; multi-pin test asserting `busy_timeout`/`synchronous` on N connections |
+| 3 — Network filesystem + silent WAL fallback | P1 (open check) + P4 (docs) | Test forcing a non-WAL return (e.g., memory/unsupported path) produces the documented behavior; docs mention network/synced folders |
+| 4 — `busy_timeout` blind spots + deferred upgrades | P3 | `_txlock`/autocommit audit; retry helper unit tests (primary codes 5/6, 517); two-process spike per questions.md #4 |
+| 5 — Cold-start schema race | P1 (schema) | Concurrent-open test: 4 goroutines (and 2 processes) on one fresh path; schema/version converge; test fails against a naive implementation |
+| 6 — Windows handles / CI | P1 (Close contract) + P4 (tests) | windows-latest leg green; repeated temp-dir cleanup with no sharing violations; Close idempotence test |
+| 7 — DB/WAL growth | P1 (`auto_vacuum` decision) + P2 (sweep) + P4 (docs) | Test: with `INCREMENTAL`, sweep issues bounded `incremental_vacuum`; `journal_size_limit` set; docs state high-water-mark behavior |
+| 8 — Error mapping / `ErrClosed` | P2 | `require.ErrorIs(err, cache.ErrMiss)` for misses; non-miss DB failure not `ErrMiss`; closed-cache behavior tested |
+| 9 — DSN escaping/injection/traversal | P1 | Adversarial path tests (`?`, `#`, space, `..`, separators in name); DSN built via `url.Values` |
+| 10 — UserCacheDir/default location | P1 | Tests with `HOME`/`XDG_CACHE_HOME` unset (construction error, no panic); MkdirAll path created; resolved path discoverable |
+| 11 — Batch limits/semantics | P3 | MGet/MSet/MDel at >1,000 keys; only-found-keys; idempotent MDel; chunks documented |
+| 12 — Driver dependency/CI/toolchain | P1 (pin) + P4 (quality) | Pinned version in `go.mod`; `go mod tidy` diff reviewed; `govulncheck` clean; context-interrupt behavior accounted for in retry classification |
+| 13 — Coverage gates | P4 | `make coverage-quick` passes with no `cache/sqlite` override; merged `make coverage` passes; no flaky retries |
+| 14 — Key/value parity | P2 | Edge-key/value table test identical to other providers' expectations |
+| 15 — TTL semantics | P2 | Full TTL matrix test; expired `Get` returns `ErrMiss`; row deleted |
+| 16 — Conformance registration | P4 | `cache/sqlite` present in `cache_e2e_test.go` provider cases and `bench_test.go` |
+| 17 — Sidecar file lifecycle | P4 | `doc.go` documents the three files and never-delete rule |
+
+---
+
+## Verification Gaps (Honest Unknowns)
+
+These were not fully resolved by desk research and should be answered by the two-process spike or during implementation:
+
+1. **Residual `SQLITE_BUSY` probability with the chosen pragma set under two-process contention** — desk research confirms it is possible even with `busy_timeout`; only the spike can quantify it for this provider. (questions.md #4)
+2. **Context-cancellation interrupt behavior on the pinned modernc version** — issues #198/#241 show connection poisoning in older releases; confirm the pinned version's behavior under `-race` stress, or classify `interrupted` as retryable.
+3. **WAL + `auto_vacuum=INCREMENTAL` interaction under real multi-process churn on Windows NTFS** — semantics are documented, but `incremental_vacuum` write-lock duration and sidecar behavior should be measured before shipping sweep-time vacuum.
+4. **Exact modernc DSN shorthand behavior across future minor upgrades** — the shorthand-key set is a newer compatibility feature; the pin and the read-back verification test are the guard, not assumptions from blog posts.
+5. **Whether the repo wants `SetMaxOpenConns(1)` for file-backed mode as well** — a design decision trading read concurrency for simplicity; recommendation is to decide consciously in P1 and document it.
 
 ---
 
 ## Sources
 
-- [Go Blog: Keeping Your Modules Compatible](https://go.dev/blog/module-compatibility) — HIGH confidence, official Go team guidance
-- [Go Blog: Go Modules: v2 and Beyond](https://go.dev/blog/v2-go-modules) — HIGH confidence
-- [Go Blog: Working with Errors in Go 1.13](https://go.dev/blog/go1.13-errors) — HIGH confidence
-- [Go Blog: Module Version Numbering](https://go.dev/doc/modules/version-numbers) — HIGH confidence
-- [Dave Cheney: Functional Options for Friendly APIs](https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis) — HIGH confidence, established Go design pattern
-- [Dave Cheney: SOLID Go Design](https://dave.cheney.net/2016/08/20/solid-go-design) — HIGH confidence
-- [Dave Cheney: Avoid Package Names Like base, util, or common](https://dave.cheney.net/2019/01/08/avoid-package-names-like-base-util-or-common) — HIGH confidence
-- [Dave Cheney: Use Internal Packages to Reduce Public API Surface](https://dave.cheney.net/2019/10/06/use-internal-packages-to-reduce-your-public-api-surface) — HIGH confidence
-- [Dave Cheney: Don't Force Allocations on the Callers of Your API](https://dave.cheney.net/2019/09/05/dont-force-allocations-on-the-callers-of-your-api) — HIGH confidence
-- [Dave Cheney: Should Methods Be Declared on T or *T](https://dave.cheney.net/2016/03/19/should-methods-be-declared-on-t-or-t) — HIGH confidence
-- [Dave Cheney: Package Level Logger Anti-Pattern](https://dave.cheney.net/2017/01/23/the-package-level-logger-anti-pattern) — HIGH confidence
-- [Go Code Style skill](/.agents/skills/golang-code-style/SKILL.md) — Community best practice
-- [Go Design Patterns skill](/.agents/skills/golang-design-patterns/SKILL.md) — Community best practice
-- [Go Safety skill](/.agents/skills/golang-safety/SKILL.md) — Community best practice
-- [Go Security skill](/.agents/skills/golang-security/SKILL.md) — Community best practice
-- [CONCERNS.md](/.planning/codebase/CONCERNS.md) — Project-specific verified issues
+- SQLite official documentation: [Write-Ahead Logging](https://sqlite.org/wal.html) (checkpointing, checkpoint starvation, last-close cleanup, network filesystem constraint, `journal_mode` fallback); [In-Memory Databases](https://sqlite.org/inmemorydb.html) (`:memory:` semantics); [PRAGMA reference](https://sqlite.org/pragma.html) (`auto_vacuum`, `incremental_vacuum`, `journal_size_limit`, `busy_timeout`); [VACUUM](https://sqlite.org/lang_vacuum.html); [Transaction](https://sqlite.org/lang_transaction.html) (DEFERRED/IMMEDIATE, upgrade failures); [How To Corrupt An SQLite Database File](https://sqlite.org/howtocorrupt.html); [SQLite Over a Network, Caveats and Considerations](https://sqlite.org/useovernet.html); [Result codes](https://sqlite.org/rescode.html) and [busy_timeout C API](https://sqlite.org/c3ref/busy_timeout.html) (busy handler not invoked on deadlock risk).
+- `modernc.org/sqlite` official package docs (v1.60.1, 2026-09-29): DSN parameters (`_pragma`, `_txlock`, `_time_format`, `_dqs`, `_defensive`, validated mattn-compatible shorthands and their fixed application order), `*sqlite.Error.Code()`, `NewConnector`, `RegisterConnectionHook`, `StrictPragmas`.
+- Driver/concurrency field reports (cross-checked): opentalon PR #314 and MaorBril/clauder PR #24 (mattn-style DSN silently ignored by modernc; per-connection pragma traps); trip2g "blaming SQLite for my own bug" (517 `SQLITE_BUSY_SNAPSHOT`, `_txlock=immediate`, pooled-connection pragmas); SQLite forum threads on `BUSY_SNAPSHOT` and network storage; mattn/go-sqlite3 FAQ #204/#511/#1205 (`:memory:` pooling, shared cache); Go issue #50510 / #51442 (`t.TempDir` Windows sharing violations); openzro commit (leaked SQLite handle failing Windows temp cleanup); Rails PR #57076 (`auto_vacuum=incremental` for SQLite cache databases); NetBird discussion #6701 (monotonic file growth, freelist); "Why your SQLite WAL file never shrinks" (checkpoint starvation lab measurements); babs/claude-quota and korinfra commits (concurrent migration races, `BEGIN IMMEDIATE` + re-read, WAL bootstrap retries); cvilsmeier/go-sqlite-bench and lbe/sqlite-read-benchmark (driver performance); ncruces PR #405 (Windows WAL-index corruption in the WASM driver).
+- Local repo context: `cache/cache.go`, `cache/errors.go`, `cache/concrete_cache.go`, `cache/mem/*`, `cache/postgres/*`, `cache/cache_e2e_test.go`, `cache/bench_test.go`, `.testcoverage-quick.yml`, `.github/workflows/go.yml`, `go.mod`, `AGENTS.md`.
+
+---
+
+*Pitfalls research for: adding an embedded SQLite cache provider (v1.8) to github.com/guionardo/go*
+*Researched: 2026-10-08*
+

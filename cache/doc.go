@@ -22,6 +22,7 @@
 //	cache/valkey    — Valkey (valkey-go, eager connect)
 //	cache/memcache  — Memcache (gomemcache, lazy connect)
 //	cache/postgres  — PostgreSQL (pgx/v5, pgxpool, eager connect)
+//	cache/sqlite    — embedded SQLite (modernc.org/sqlite, pure Go, durable file or :memory:)
 //
 // The BatchCache[K, V] interface extends Cache with batch operations (all
 // providers implement it via their New constructor — cast to BatchCache to
@@ -37,7 +38,8 @@
 //	MDel(ctx, keys ...K)                 — delete multiple keys (idempotent)
 //
 // Each provider uses an optimal strategy: mem uses a single lock acquisition,
-// redis/valkey use pipelines, memcache uses GetMulti, postgres uses SendBatch.
+// redis/valkey use pipelines, memcache uses GetMulti, postgres uses SendBatch,
+// sqlite uses chunked IN queries and a single-transaction prepared upsert.
 // BatchCache[K,V] embeds Cache[K,V] for full backward compatibility.
 //
 // Configuration via functional options:

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("<project>\n  <modelVersion>4.0.0</modelVersion>\n  <parent>\n    <groupId>com.acme</groupId>\n")

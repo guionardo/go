@@ -19,6 +19,7 @@ Golang tools, examples, and packages
 | [valkey](#package-cache) | `cache/valkey` | Valkey cache backend |
 | [memcache](#package-cache) | `cache/memcache` | Memcache cache backend |
 | [postgres](#package-cache) | `cache/postgres` | PostgreSQL cache backend |
+| [sqlite](#package-cache) | `cache/sqlite` | SQLite cache backend (embedded, survives restarts) |
 | [config](#package-config) | `config` | Typed configuration provider (YAML + env + validation) |
 | [environment](#package-config) | `config/environment` | Environment variable parsing |
 | [profile](#package-config) | `config/profile` | YAML profile loading and merging |
@@ -29,6 +30,7 @@ Golang tools, examples, and packages
 | [httptestmock](#package-httptest_mock) | `httptest_mock` | HTTP mock server framework for tests |
 | [mid](#package-mid) | `mid` | Cross-platform machine ID retrieval |
 | [pathtools](#package-path_tools) | `path_tools` | File and directory path utilities |
+| [projectprobe](#package-project_probe) | `project_probe` | Best-effort project detection across 7 languages (manifest-first, stdlib-only, never fails) |
 | [reflecttools](#package-reflect_tools) | `reflect_tools` | Reflection utilities (zero-value check) |
 | [release](#package-release) | `release` | Self-update mechanism via GitHub Releases |
 | [set](#package-set) | `set` | Generic set with algebra, JSON, SQL support |
@@ -67,7 +69,7 @@ The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Clo
 
 All providers share a common `cache.NewConcreteCache` adapter. `GetOrSet` is deduplicated via `SingleflightGetOrSet` (concurrent misses on the same key run the setter exactly once).
 
-All providers also implement `BatchCache[K, V]` (embedded in `Cache`), exposing `MGet`, `MSet`, and `MDel` with provider-optimal strategies: single-lock for in-memory, GetMulti for memcache, pipelines for redis/valkey, and SendBatch for postgres.
+All providers also implement `BatchCache[K, V]` (embedded in `Cache`), exposing `MGet`, `MSet`, and `MDel` with provider-optimal strategies: single-lock for in-memory, GetMulti for memcache, pipelines for redis/valkey, chunked IN queries + single-transaction upsert for sqlite, and SendBatch for postgres.
 
 #### Providers
 
@@ -80,6 +82,12 @@ Each provider lives in its own sub-package and is independently importable:
 | `cache/valkey` | Valkey | valkey-go | Eager — dials at construction |
 | `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
 | `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
+| `cache/sqlite` | SQLite (embedded) | modernc.org/sqlite | Eager — local file, lazy errors |
+
+`cache/sqlite` is pure-Go embedded SQLite with no server to run: the zero-value
+configuration opens an in-memory cache, `WithPath`/`WithName` open a durable
+WAL-mode file that survives restarts, and the same file can be shared by
+multiple processes on one host (a 5 s busy timeout bounds write contention).
 
 #### Interfaces
 
@@ -148,7 +156,7 @@ fmt.Println(results["a"]) // "alpha"
 _ = bc.MDel(ctx, "a", "b")
 ```
 
-Each provider uses an optimal batching strategy: single lock (in-memory), GetMulti (memcache), pipelines (redis/valkey), or SendBatch (postgres).
+Each provider uses an optimal batching strategy: single lock (in-memory), GetMulti (memcache), pipelines (redis/valkey), chunked IN queries + single-transaction upsert (sqlite), or SendBatch (postgres).
 
 #### Benchmark Results
 
@@ -306,6 +314,22 @@ func CreatePath(path string) error
 func FileExists(fileName string) bool
 func FindFileInPath(filename string) (string, error)
 func GetRootFolder(base string) (string, error)
+```
+
+### Package project_probe
+
+Import `github.com/guionardo/go/project_probe`
+
+Best-effort project detection across 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP). `Probe` never fails on content: unknown folders return `LanguageUnknown` with a nil error — errors are reserved for hard folder-level I/O failures. Detection runs a manifest-first cascade (go.mod → pyproject.toml → .csproj → package.json → Cargo.toml → pom.xml → composer.json) with first-match-wins ordering, stdlib-only parsing, and a never-fail read path.
+
+```go
+import "github.com/guionardo/go/project_probe"
+
+data, err := projectprobe.Probe("/path/to/project")
+if err != nil {
+    // hard folder-level I/O failure (missing, not a directory, permission)
+}
+// data.Language is LanguageUnknown when the content is unrecognized
 ```
 
 ### Package reflect_tools

@@ -8,7 +8,7 @@ This document describes every configuration surface in the `go` utility monorepo
 Two distinct configuration mechanisms exist:
 
 - **`config` package** — a typed `Provider[T]` that loads configuration from YAML scope profiles, overlays environment-variable overrides (via struct tags), and validates the result. See `config/provider.go`, `config/options.go`, and the sub-packages `config/environment`, `config/profile`, `config/merger`, and `config/validation`.
-- **`cache` package** — each provider (`mem`, `redis`, `valkey`, `memcache`, `postgres`) exposes functional options plus a `Config` struct. The `mem` provider uses a `ConfigFunc`-based option list (`WithDefaultTTL`, `WithMaxEntries`, `WithSweepInterval`).
+- **`cache` package** — each provider (`mem`, `redis`, `valkey`, `memcache`, `postgres`, `sqlite`) exposes functional options plus a `Config` struct. The `mem` provider uses a `ConfigFunc`-based option list (`WithDefaultTTL`, `WithMaxEntries`, `WithSweepInterval`).
 
 ## Config provider: environment variables
 
@@ -129,6 +129,10 @@ Defaults come from three layers: struct tags, provider code, and cache provider 
 | `postgres`    | `TableName`            | `cache_entries`            |
 | `postgres`    | `PoolSize`             | `5`                        |
 | `postgres`    | `SweepInterval`        | `1m`                       |
+| `sqlite`      | `Memory`               | `true` (zero value = `:memory:`) |
+| `sqlite`      | `DefaultTTL`           | *(zero — no TTL)*          |
+| `sqlite`      | `SweepInterval`        | *(zero — no sweeper)*      |
+| `sqlite`      | `AutoCheckpoint`       | `0` (SQLite default, 1000 pages) |
 
 A provider `DefaultTTL` is only used when a call does not supply an explicit TTL; a zero value disables expiry. The `mem` provider applies its defaults in `New(...)` (`cache/mem/mem.go`), which also starts a background sweep goroutine when `SweepInterval` is configured (unless a nil `ctx` is passed).
 
@@ -142,6 +146,7 @@ Each cache provider exposes typed functional options:
 - **`valkey`:** `WithAddr`, `WithPassword`, `WithDB(db)`, `WithPoolSize(n)`, `WithDefaultTTL` — `cache/valkey/options.go`.
 - **`memcache`:** `WithServers(servers...)`, `WithTimeout`, `WithDefaultTTL`, `WithMaxIdleConns(n)` — `cache/memcache/options.go`.
 - **`postgres`:** `WithConnString`, `WithTableName`, `WithPoolSize(n)`, `WithSweepInterval(d)`, `WithDefaultTTL` — `cache/postgres/options.go`.
+- **`sqlite`:** `WithName(name)`, `WithPath(path)`, `WithMemory()`, `WithDefaultTTL`, `WithSweepInterval(d)`, `WithAutoCheckpoint(pages)` — `cache/sqlite/options.go`. The zero-value config is an in-memory cache; file mode (`WithPath`/`WithName`) opens WAL-mode SQLite with a single pooled connection and a 5 s busy timeout, capable of same-host multi-process sharing.
 
 ### Example
 

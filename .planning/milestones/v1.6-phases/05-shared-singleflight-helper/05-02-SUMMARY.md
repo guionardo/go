@@ -166,4 +166,3 @@ None - no external service configuration required.
 - `make coverage-quick`: file ≥70% / package ≥80% / total 78.3% — PASS
 - No stub patterns found in modified source files
 - No new threat surface beyond the plan's threat register (T-05-06/07/08/09/13)
-
