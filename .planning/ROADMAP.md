@@ -96,7 +96,7 @@ Plans:
   4. Contention surfaces at `BEGIN` within `busy_timeout` as a bounded error (immediate transaction lock mode; no unbounded auto-retry), the provider passes `go test -race` under concurrent goroutines on the pinned single-connection pool, and package docs state WAL's constraints (local storage only, same-host sharing).
   5. A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
 
-**Plans:** 4/4 plans executed
+**Plans:** 4/4 executed + 1 gap-closure plan pending (UAT G-16-1)
 
 Plans:
 **Wave 1**
@@ -111,6 +111,10 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 16-04-PLAN.md — Two-process E2E (contention + crash arms), 3-OS CI steps + race gate (D-09/D-10, CONC-05), CONC-04 docs
+
+**Gap Closure** *(UAT G-16-1 — out-of-phase release-package Windows leak)*
+
+- [ ] 16-05-PLAN.md — Close-before-remove + surfaced cleanup error in `release/update.go` DownloadUpdate (G-16-1)
 
 ### Phase 17: Delivery Hardening
 
