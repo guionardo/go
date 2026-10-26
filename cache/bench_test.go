@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -20,8 +21,13 @@ import (
 	"github.com/guionardo/go/cache/memcache"
 	"github.com/guionardo/go/cache/postgres"
 	"github.com/guionardo/go/cache/redis"
+	"github.com/guionardo/go/cache/sqlite"
 	"github.com/guionardo/go/cache/valkey"
 )
+
+// primitiveKeyRing bounds key growth during timed loops so file-mode Set
+// measures overwrite cost, not b-tree growth.
+const primitiveKeyRing = 1024
 
 // skipIfNoDocker skips the benchmark if Docker is not available.
 // Used by Docker-backed provider subtests.  Checks both the Docker CLI
@@ -529,6 +535,25 @@ func BenchmarkBatch(b *testing.B) {
 		}
 	})
 
+	// ---- SQLite provider batch subtests (always run, no Docker) ----
+
+	b.Run("sqlite", func(b *testing.B) {
+		b.Run("Memory", func(b *testing.B) {
+			c := sqlite.New[string, string](sqlite.WithMemory())
+
+			b.Cleanup(func() { _ = c.Close() })
+			runBatchBenchmarks(b, c, "sqlite_memory")
+		})
+
+		b.Run("File", func(b *testing.B) {
+			path := filepath.Join(b.TempDir(), "batch.db")
+			c := sqlite.New[string, string](sqlite.WithPath(path))
+
+			b.Cleanup(func() { _ = c.Close() })
+			runBatchBenchmarks(b, c, "sqlite_file")
+		})
+	})
+
 	// ---- Docker-backed provider batch subtests (gated by skipIfNoDocker) ----
 
 	type dockerProvider struct {
@@ -679,4 +704,110 @@ func BenchmarkBatch(b *testing.B) {
 			runBatchBenchmarks(b, c, p.name)
 		})
 	}
+}
+
+// requireNoErr fails the benchmark on the first error, so a provider that stops
+// working mid-run is reported instead of silently measuring an error return.
+// Healthy providers never take this branch, so it costs one predictable check.
+func requireNoErr(b *testing.B, err error) {
+	b.Helper()
+
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
+// requireUsable probes the provider once before any timing starts. sqlite
+// defers open/validation errors to the first operation (New stores them in
+// initErr), so without this probe a broken cache would report fabricated ns/op.
+func requireUsable(b *testing.B, c cache.BatchCache[string, string]) {
+	b.Helper()
+
+	const probeKey = "prim_smoke"
+
+	err := c.Set(b.Context(), probeKey, "v")
+	if err != nil {
+		b.Fatalf("provider unusable: Set failed: %v", err)
+	}
+
+	_, err = c.Get(b.Context(), probeKey)
+	if err != nil {
+		b.Fatalf("provider unusable: Get failed: %v", err)
+	}
+}
+
+// runPrimitiveBenchmarks measures the single-key operations (Get/Set/Delete/
+// GetOrSet) against one provider. Keys are bounded by primitiveKeyRing so a
+// file-backed provider measures the operation instead of database growth.
+//
+// Every operation is error-checked, matching the b.Fatal pattern
+// runBatchBenchmarks already uses.
+func runPrimitiveBenchmarks(b *testing.B, c cache.BatchCache[string, string]) {
+	requireUsable(b, c)
+
+	b.Run("Get", func(b *testing.B) {
+		keys := prePopulateKeys(b, c, 1, "prim_get")
+
+		for i := 0; i < b.N; i++ {
+			_, err := c.Get(b.Context(), keys[0])
+			requireNoErr(b, err)
+		}
+	})
+
+	b.Run("Set", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			err := c.Set(b.Context(), fmt.Sprintf("prim_set_%d", i%primitiveKeyRing), "v")
+			requireNoErr(b, err)
+		}
+	})
+
+	b.Run("Delete", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("prim_del_%d", i%primitiveKeyRing)
+
+			err := c.Set(b.Context(), key, "v")
+			requireNoErr(b, err)
+
+			err = c.Delete(b.Context(), key)
+			requireNoErr(b, err)
+		}
+	})
+
+	b.Run("GetOrSet", func(b *testing.B) {
+		setter := func(context.Context) (string, error) { return "v", nil }
+
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("prim_gos_%d", i%primitiveKeyRing)
+
+			_, err := c.GetOrSet(b.Context(), key, setter)
+			requireNoErr(b, err)
+		}
+	})
+}
+
+// BenchmarkPrimitives compares the primitive cache operations across the mem
+// baseline and both sqlite modes, so the durable path is measured against the
+// in-memory one. Every provider is always-run (no Docker gate).
+func BenchmarkPrimitives(b *testing.B) {
+	b.Run("mem", func(b *testing.B) {
+		c := mem.New[string, string](b.Context())
+
+		b.Cleanup(func() { _ = c.Close() })
+		runPrimitiveBenchmarks(b, c)
+	})
+
+	b.Run("sqlite/Memory", func(b *testing.B) {
+		c := sqlite.New[string, string](sqlite.WithMemory())
+
+		b.Cleanup(func() { _ = c.Close() })
+		runPrimitiveBenchmarks(b, c)
+	})
+
+	b.Run("sqlite/File", func(b *testing.B) {
+		path := filepath.Join(b.TempDir(), "primitives.db")
+		c := sqlite.New[string, string](sqlite.WithPath(path))
+
+		b.Cleanup(func() { _ = c.Close() })
+		runPrimitiveBenchmarks(b, c)
+	})
 }

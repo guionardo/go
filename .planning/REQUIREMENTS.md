@@ -48,10 +48,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Delivery & Quality
 
-- [ ] **QUAL-01**: The package builds and tests with `CGO_ENABLED=0` on Linux, macOS, and Windows; `modernc.org/sqlite` is pinned (v1.60.1) together with the exact `modernc.org/libc` pin required by its `go.mod`.
-- [ ] **QUAL-02**: Tests cover unit, `:memory:`, reopen/persistence, concurrent, and sweep scenarios; coverage gates pass with no `.testcoverage-quick.yml` override (package ≥80%, file ≥70%, total ≥75%).
-- [ ] **QUAL-03**: `doc.go` documents the provider (TTL, reopen persistence, `:memory:`, multi-process constraints) and a runnable example exists; the README package index is updated.
-- [ ] **QUAL-04**: Benchmark entries measure the sqlite backend against mem and per-key loops, following the v1.6 benchmark suite conventions.
+- [x] **QUAL-01**: The package builds and tests with `CGO_ENABLED=0` on Linux, macOS, and Windows; `modernc.org/sqlite` is pinned (v1.60.1) together with the exact `modernc.org/libc` pin required by its `go.mod`.
+- [x] **QUAL-02**: Tests cover unit, `:memory:`, reopen/persistence, concurrent, and sweep scenarios; coverage gates pass with no `.testcoverage-quick.yml` override (package ≥80%, file ≥70%, total ≥75%).
+- [x] **QUAL-03**: `doc.go` documents the provider (TTL, reopen persistence, `:memory:`, multi-process constraints) and a runnable example exists; the README package index is updated.
+- [x] **QUAL-04**: Benchmark entries measure the sqlite backend against mem and per-key loops, following the v1.6 benchmark suite conventions.
 
 ## v2 Requirements
 
@@ -118,10 +118,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONC-03 | Phase 16 | Complete |
 | CONC-04 | Phase 16 | Complete |
 | CONC-05 | Phase 16 | Complete |
-| QUAL-01 | Phase 17 | Pending |
-| QUAL-02 | Phase 17 | Pending |
-| QUAL-03 | Phase 17 | Pending |
-| QUAL-04 | Phase 17 | Pending |
+| QUAL-01 | Phase 17 | Complete |
+| QUAL-02 | Phase 17 | Complete |
+| QUAL-03 | Phase 17 | Complete |
+| QUAL-04 | Phase 17 | Complete |
 
 **Coverage:**
 
