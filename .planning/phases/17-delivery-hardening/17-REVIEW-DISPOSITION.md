@@ -5,7 +5,7 @@ titles: json
 findings:
   - id: CR-01
     severity: critical
-    disposition: open
+    disposition: fixed
     title: "Primitive benchmark arms swallow every error, so a broken cache reports fast fake numbers"
   - id: WR-01
     severity: warning
@@ -17,7 +17,7 @@ findings:
     title: "\"GetOrSet\" silently degrades to the warm hit path and the doc comment does not say so"
   - id: WR-03
     severity: warning
-    disposition: open
+    disposition: fixed
     title: "The CGO-free step prints its evidence but never asserts it"
   - id: WR-04
     severity: warning
@@ -47,7 +47,7 @@ findings:
     severity: info
     disposition: open
     title: "The primitive arms bound key growth; the batch arms do not, so file-mode numbers drift with `b.N`"
-open: 11
+open: 9
 total: 11
 recorded: 2026-10-26T23:10:00.000Z
 ---
@@ -60,10 +60,10 @@ recorded: 2026-10-26T23:10:00.000Z
 
 | ID | Severity | Title | Disposition | Source |
 |----|----------|-------|-------------|--------|
-| CR-01 | critical | Primitive benchmark arms swallow every error, so a broken cache reports fast fake numbers | open | |
+| CR-01 | critical | Primitive benchmark arms swallow every error, so a broken cache reports fast fake numbers | fixed | 55b0f72 — provider probe + b.Fatal on every primitive op in cache/bench_test.go |
 | WR-01 | warning | The "Delete" arm measures Set+Delete, so the reported number is not the delete cost | open | |
 | WR-02 | warning | "GetOrSet" silently degrades to the warm hit path and the doc comment does not say so | open | |
-| WR-03 | warning | The CGO-free step prints its evidence but never asserts it | open | |
+| WR-03 | warning | The CGO-free step prints its evidence but never asserts it | fixed | ad010d2 — step fails unless CGO_ENABLED=0 and both driver pins resolve (.github/workflows/go.yml) |
 | WR-04 | warning | The macOS race step forces cgo even though darwin is the one OS where `-race` does not need it | open | |
 | IN-01 | info | `ExampleNew_withPath` leaks the first cache handle on every error path | open | |
 | IN-02 | info | The canceled-MGet caveat is stated twice in the package comment | open | |
