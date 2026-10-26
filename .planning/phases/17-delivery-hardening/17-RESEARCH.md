@@ -764,29 +764,36 @@ make coverage-quick
 
 **Everything else in this document was executed locally or read from the Go 1.26.4 toolchain source / GitHub Actions documentation this session.**
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All five were answered by the Phase 17 plans; the resolution line under each question records what was planned, not a new decision.
 
 1. **Should `cache/sqlite` be registered in `cache/cache_e2e_test.go`'s `providerCase` list?**
    - What we know: the shared provider-contract E2E covers mem/redis/valkey/memcache/postgres (`cache/cache_e2e_test.go:232`, `:243`, `:279`, `:322`, `:362`); sqlite is **absent**. PITFALLS Pitfall 16 (line 328-332) explicitly recommends adding a non-Docker sqlite case.
    - What's unclear: CONTEXT scopes QUAL-02 to five named classes and says "no new tests beyond filling a genuinely missing named class" — the shared contract is a sixth class with no requirement behind it.
    - Recommendation: **do not** add it in Phase 17; record it as a follow-up in the SUMMARY (one line). If the planner wants it, it is a genuinely cheap addition (no Docker needed), but it changes the phase from "audit" to "new test", which D-12 declines.
+   - **Resolution (17-03, Task 3):** not added. The audit's `## Not added in this phase` section records the shared provider-contract registration as a follow-up with no requirement behind it (D-12/D-14); `cache/cache_e2e_test.go` is not in any plan's `files_modified`.
 
 2. **Should `go vet` and the `go list -m` pin line join the `Build (CGO-free)` step?**
    - What we know: `CGO_ENABLED=0 go vet ./...` is clean; `go list -m modernc.org/sqlite modernc.org/libc` prints `v1.60.1` / `v1.77.1`.
    - What's unclear: D-03 specifies only `go env CGO_ENABLED` + `go build ./...`; both additions are discretion.
    - Recommendation: include both — they cost ~2 s, make QUAL-01's pin half visible in the log, and add a second (free) vet gate. Requirement: `shell: bash` (Pitfall 2), otherwise the appended commands mask a build failure.
+   - **Resolution (17-01, Task 1):** both included. The step runs `go env CGO_ENABLED` -> `go build ./...` -> `go vet ./...` -> `go list -m modernc.org/sqlite modernc.org/libc`, nothing after them, under `shell: bash` — exercised by the CONTEXT discretion item "whether `go vet` joins the build step".
 
 3. **`GetOrSet` primitive arm: warm fast-path or miss→setter?**
    - What we know: both are legitimate; warm-hit is the steady-state cost and is mem-comparable; miss measures the write path.
    - Recommendation: warm-hit on a bounded key ring; add a separately named `GetOrSet_Miss` arm only if someone wants the other question answered.
+   - **Resolution (17-02, Task 2):** warm fast-path only, on the bounded `primitiveKeyRing = 1024` ring; no `GetOrSet_Miss` arm is planned.
 
 4. **Should the doc.go batch paragraph mention the 100-key chunk size?**
    - What we know: `const chunkSize = 100` is an internal constant (`batch.go:19`), deliberately not an option surface (D-01 in Phase 16).
    - Recommendation: mention "chunked" without the number; the number is an implementation detail that would then be a doc-maintenance liability. The README clause likewise says "in chunks".
+   - **Resolution (17-03, Task 1):** no chunk-size number in `doc.go` or `README.md`; both say "chunked"/"in chunks" only, and the plan carries it as a prohibition.
 
 5. **The `coverage` job uses `actions/setup-go@v3` with no `go-version-file`.**
    - What we know: it therefore uses whatever Go the ubuntu-latest image provides, which may drift past `go 1.26.4`.
    - Recommendation: out of scope (untouched by QUAL-01..04); flag as a follow-up observation only. Do not "fix" it in this phase — it would add an unrelated diff to a delivery-hardening PR.
+   - **Resolution (17-01, `<verification>`):** untouched. The plan's verification section requires recording it in the SUMMARY as an out-of-scope follow-up observation, with an explicit "do NOT fix it here" instruction.
 
 ## Environment Availability
 
