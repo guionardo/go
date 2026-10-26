@@ -51,7 +51,24 @@ app:
 
 ### Single-file configuration
 
-For a service that needs one file and no environment layering, point the provider at the working directory and name the file after the default scope:
+For a service that needs one file and no environment layering, use `WithSingleConfigFile`:
+
+```go
+provider := config.NewProvider[AppConfig](config.WithSingleConfigFile("app.yml"))
+```
+
+```yaml
+# ./app.yml
+app:
+  name: my-app
+```
+
+- The extension is optional and resolved by the loader (`.yml`, `.yaml`, `.YML`, `.YAML`), so `"app"` finds `app.yml`.
+- A path in the argument sets the directory: `WithSingleConfigFile("configs/app.yml")` reads `configs/app.yml`. A bare name reads from the working directory.
+- The file's base name becomes **both** the default and the active scope, so no `default.yml` companion is required and `SCOPE` is ignored.
+- Panics if the argument has no usable file name (`""`, `"."`, `".."`, a bare separator).
+
+The equivalent using the lower-level option is `WithProfilesPath(".")` with the file named after the default scope:
 
 ```go
 provider := config.NewProvider[AppConfig](config.WithProfilesPath("."))
@@ -108,6 +125,7 @@ type AppConfig struct {
 | Option                    | Description                                                                            |
 |---------------------------|----------------------------------------------------------------------------------------|
 | `WithProfilesPath(path)`  | Sets the YAML profile directory. Panics if the directory does not exist.               |
+| `WithSingleConfigFile(file)` | Loads one YAML file: the path sets the profile directory (a bare name means the working directory) and the base name is used as both scopes, so no `default.yml` companion is required and `SCOPE` is ignored. Panics on an empty name. |
 | `WithScope(scope)`        | Sets the active scope name (e.g., `"production"`).                                     |
 | `WithDefaultScope(scope)` | Sets the fallback scope name.                                                          |
 | `WithLogger(logger)`      | Injects a custom `Logger` (can wrap `slog`, `testing.T.Logf`, etc.).                   |

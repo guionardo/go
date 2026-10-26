@@ -2,9 +2,12 @@ package config
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/guionardo/go/config/environment"
 )
@@ -40,6 +43,30 @@ func WithProfilesPath(profilesPath string) providerOption {
 
 	return func(p *provider) {
 		p.profilesPath = profilesPath
+	}
+}
+
+// WithSingleConfigFile loads a single YAML file instead of a default/scope pair.
+// configFile is the file name, with or without extension; the extension is
+// resolved by the profile loader (.yml, .yaml, .YML, .YAML). Any directory in
+// configFile becomes the profiles directory, and a bare name reads from the
+// working directory.
+//
+// The file's base name is used as both the default and the active scope, so no
+// second scope file is required and SCOPE is ignored.
+// Panics if configFile has no usable file name.
+func WithSingleConfigFile(configFile string) providerOption {
+	base := filepath.Base(strings.TrimSpace(configFile))
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+
+	if name == "" || name == "." || name == ".." || name == string(filepath.Separator) {
+		panic(errors.New("WithSingleConfigFile requires a config file name"))
+	}
+
+	return func(p *provider) {
+		p.profilesPath = filepath.Dir(strings.TrimSpace(configFile))
+		p.defaultScope = name
+		p.scope = name
 	}
 }
 

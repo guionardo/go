@@ -16,6 +16,7 @@
 //
 // Options:
 //   - WithProfilesPath: set YAML profile directory
+//   - WithSingleConfigFile: load one YAML file, no scope overlay
 //   - WithScope: set active scope name
 //   - WithDefaultScope: set fallback scope
 //   - WithLogger: inject custom logger
@@ -23,10 +24,12 @@
 //
 // Single-file configuration:
 //
-//	provider := config.NewProvider[AppConfig](config.WithProfilesPath("."))
+//	provider := config.NewProvider[AppConfig](config.WithSingleConfigFile("app.yml"))
 //
-// loads ./default.yml as-is, with no scope overlay. The active scope must stay
-// unset (or equal the default scope) so a second file is not required.
+// loads ./app.yml, or <dir>/app.yml when the argument carries a directory. The
+// file's base name is used as both scopes, so no second file is required and
+// SCOPE is ignored. WithProfilesPath(".") plus a file named default.yml is the
+// lower-level equivalent.
 //
 // Sub-packages:
 //   - config/environment: env-var parsing via struct tags
