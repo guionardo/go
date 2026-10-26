@@ -25,6 +25,10 @@ import (
 	"github.com/guionardo/go/cache/valkey"
 )
 
+// primitiveKeyRing bounds key growth during timed loops so file-mode Set
+// measures overwrite cost, not b-tree growth.
+const primitiveKeyRing = 1024
+
 // skipIfNoDocker skips the benchmark if Docker is not available.
 // Used by Docker-backed provider subtests.  Checks both the Docker CLI
 // (docker info) and the DOCKER_HOST environment variable, because
@@ -700,4 +704,65 @@ func BenchmarkBatch(b *testing.B) {
 			runBatchBenchmarks(b, c, p.name)
 		})
 	}
+}
+
+// runPrimitiveBenchmarks measures the single-key operations (Get/Set/Delete/
+// GetOrSet) against one provider. Keys are bounded by primitiveKeyRing so a
+// file-backed provider measures the operation instead of database growth.
+func runPrimitiveBenchmarks(b *testing.B, c cache.BatchCache[string, string]) {
+	b.Run("Get", func(b *testing.B) {
+		keys := prePopulateKeys(b, c, 1, "prim_get")
+
+		for i := 0; i < b.N; i++ {
+			_, _ = c.Get(b.Context(), keys[0])
+		}
+	})
+
+	b.Run("Set", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = c.Set(b.Context(), fmt.Sprintf("prim_set_%d", i%primitiveKeyRing), "v")
+		}
+	})
+
+	b.Run("Delete", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("prim_del_%d", i%primitiveKeyRing)
+			_ = c.Set(b.Context(), key, "v")
+			_ = c.Delete(b.Context(), key)
+		}
+	})
+
+	b.Run("GetOrSet", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			key := fmt.Sprintf("prim_gos_%d", i%primitiveKeyRing)
+			_, _ = c.GetOrSet(b.Context(), key, func(context.Context) (string, error) { return "v", nil })
+		}
+	})
+}
+
+// BenchmarkPrimitives compares the primitive cache operations across the mem
+// baseline and both sqlite modes, so the durable path is measured against the
+// in-memory one. Every provider is always-run (no Docker gate).
+func BenchmarkPrimitives(b *testing.B) {
+	b.Run("mem", func(b *testing.B) {
+		c := mem.New[string, string](b.Context())
+
+		b.Cleanup(func() { _ = c.Close() })
+		runPrimitiveBenchmarks(b, c)
+	})
+
+	b.Run("sqlite/Memory", func(b *testing.B) {
+		c := sqlite.New[string, string](sqlite.WithMemory())
+
+		b.Cleanup(func() { _ = c.Close() })
+		runPrimitiveBenchmarks(b, c)
+	})
+
+	b.Run("sqlite/File", func(b *testing.B) {
+		path := filepath.Join(b.TempDir(), "primitives.db")
+		c := sqlite.New[string, string](sqlite.WithPath(path))
+
+		b.Cleanup(func() { _ = c.Close() })
+		runPrimitiveBenchmarks(b, c)
+	})
 }
