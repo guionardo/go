@@ -53,7 +53,7 @@ requirements-completed: [QUAL-01]
 # Coverage metadata (#1602)
 coverage:
   - id: D1
-    description: "The three-OS `test` job enforces and visibly proves a CGO-free build: job-level `env: CGO_ENABLED: \"0\"`, a `Build (CGO-free)` step (`shell: bash`; `go env CGO_ENABLED` -> `go build ./...` -> `go vet ./...` -> `go list -m` pins) placed after `Set up Go` and before `Build swapper binaries`, and exactly one step-level `CGO_ENABLED: \"1\"` on the SQLite race detector whose Windows gate is untouched"
+    description: "The three-OS `test` job enforces and visibly proves a CGO-free build: job-level `env: CGO_ENABLED: \"0\"`, a `Build (CGO-free)` step (`shell: bash`; `go env CGO_ENABLED` -> `go build ./...` -> `go vet ./...` -> `go list -m` pins) placed after `Build swapper binaries` and before `Run tests` (reordered post-UAT — see Deviations), and exactly one step-level `CGO_ENABLED: \"1\"` on the SQLite race detector whose Windows gate is untouched"
     requirement: "QUAL-01"
     verification:
       - kind: other
@@ -100,7 +100,7 @@ status: complete
 ## Accomplishments
 
 - Job-level `env: CGO_ENABLED: "0"` on the three-OS `test` job, so `Build (CGO-free)`, `Run tests` and `SQLite two-process E2E` all run without cgo — the headline promise (embedded SQLite, no C toolchain) is now enforced on every leg, and the E2E's children re-exec `os.Args[0]`, so the property is structural rather than environmental.
-- New `Build (CGO-free)` step (`shell: bash`, placed between `Set up Go` and `Build swapper binaries`) printing `go env CGO_ENABLED` as the visible `0`, then `go build ./...`, `go vet ./...`, and `go list -m modernc.org/sqlite modernc.org/libc` — QUAL-01's pin half (`v1.60.1` / `v1.77.1`) now appears in the CI log with no extra job.
+- New `Build (CGO-free)` step (`shell: bash`, placed after `Build swapper binaries` and before `Run tests`) printing `go env CGO_ENABLED` as the visible `0`, then `go build ./...`, `go vet ./...`, and `go list -m modernc.org/sqlite modernc.org/libc` — QUAL-01's pin half (`v1.60.1` / `v1.77.1`) now appears in the CI log with no extra job. **Post-UAT correction (7306e6c):** the step originally sat between `Set up Go` and `Build swapper binaries`; that order broke the first CI run because `release/embed_swapper.go` `//go:embed`s the generated swapper binaries, which `make swapper` produces. The step now runs after them, still before `Run tests`.
 - Exactly one `CGO_ENABLED` exception: step-level `"1"` on `SQLite race detector`, whose `if: runner.os != 'Windows'` gate and `run:` line are byte-identical; its comment now records the supersession of the stale "`-race` still works (pure Go)" claim and keeps the Windows `-race` follow-up.
 - Local reproduction of the whole job is green: `CGO_ENABLED=0` build + vet + full 25-package suite + both two-process E2E arms; `CGO_ENABLED=1 -race` clean; the negative probe (`CGO_ENABLED=0 GOOS=linux go test -race -c`) still refuses with `go: -race requires cgo` (exit 2), which is what makes the override load-bearing.
 - `coverage` job, `Run tests`, `SQLite two-process E2E`, `Build swapper binaries`, the matrix list and the `name`/`permissions` blocks are unchanged (verified with a `diff` of the `coverage` job against `HEAD~`).
@@ -126,7 +126,13 @@ Followed D-01..D-04 without deviation; the one discretion item the plan opened w
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+**One post-UAT deviation (commit `7306e6c`).** The plan placed `Build (CGO-free)` after `Set up Go` and before `Build swapper binaries`. The first CI run (40419313142, ubuntu leg) failed in 19s:
+
+```
+##[error]release/embed_swapper.go:14:12: pattern swapper/swapper_darwin_amd64: no matching files found
+```
+
+`go build ./...` compiles `release/embed_swapper.go`, whose `//go:embed` directives require the generated `swapper/swapper_*` binaries that `make swapper` produces. The dependency was invisible locally because those gitignored artifacts already existed in the developer worktree. `Build swapper binaries` was moved ahead of `Build (CGO-free)` — still before `Run tests`, so the plan's ordering intent holds. Re-run 40419738438 is green on all three OSes. Found by the Phase 17 UAT CI-matrix checkpoint (`17-UAT.md` gap `G-17-1`).
 
 ## Issues Encountered
 

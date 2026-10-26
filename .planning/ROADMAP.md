@@ -52,7 +52,7 @@
 
 - [x] **Phase 15: Provider Foundation + Core Cache Semantics** - Sqlite provider constructor (3 location modes, pinned pool, hardened DSN), primitive Cache surface with provider parity, TTL expiry + sweeps, verified WAL pragmas, storage lifecycle controls (completed 2026-10-08)
 - [x] **Phase 16: Batch Surface + Multi-Process Hardening** - MGet/MSet/MDel with v1.6 semantics; two-process WAL safety proven by spike; bounded contention + race-clean; CI two-process E2E (completed 2026-10-26)
-- [ ] **Phase 17: Delivery Hardening** - CGO-free three-OS CI matrix, no-override coverage gates, doc.go + runnable example + README row, benchmark entries
+- [x] **Phase 17: Delivery Hardening** - CGO-free three-OS CI matrix, no-override coverage gates, doc.go + runnable example + README row, benchmark entries (completed 2026-10-26)
 
 ## Phase Details
 
@@ -128,7 +128,7 @@ Plans:
   3. `doc.go` documents the provider (TTL, reopen persistence, `:memory:`, multi-process constraints), a runnable example exists, and the README package index is updated.
   4. Benchmark entries measure the sqlite backend against mem and per-key loops, following the v1.6 benchmark suite conventions.
 
-**Plans:** 3/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 **Wave 1**
 
@@ -159,4 +159,4 @@ Plans:
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
 | 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | Complete    | 2026-10-26 |
-| 17. Delivery Hardening | v1.8 | 3/3 | In Progress | - |
+| 17. Delivery Hardening | v1.8 | 3/3 | Complete    | 2026-10-26 |
