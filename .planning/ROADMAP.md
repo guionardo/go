@@ -128,7 +128,16 @@ Plans:
   3. `doc.go` documents the provider (TTL, reopen persistence, `:memory:`, multi-process constraints), a runnable example exists, and the README package index is updated.
   4. Benchmark entries measure the sqlite backend against mem and per-key loops, following the v1.6 benchmark suite conventions.
 
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 17-01-PLAN.md — CGO-free `test` job: job-level `CGO_ENABLED=0`, named `Build (CGO-free)` proof step (`shell: bash`), one step-level `CGO_ENABLED=1` for the race detector (QUAL-01; tracer-led)
+- [ ] 17-02-PLAN.md — sqlite benchmark registration: `Memory`/`File` batch families in `BenchmarkBatch` plus `BenchmarkPrimitives` against mem (QUAL-04)
+
+**Wave 2** *(blocked on Wave 1 — records the phase-final gate output)*
+
+- [ ] 17-03-PLAN.md — docs + evidence: `doc.go` batch paragraph, `ExampleNew_withPath`, README clause, `17-COVERAGE-AUDIT.md` (QUAL-02, QUAL-03)
 
 ## Progress
 
@@ -150,4 +159,4 @@ Plans:
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
 | 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | Complete    | 2026-10-26 |
-| 17. Delivery Hardening | v1.8 | 0/— | Not started | - |
+| 17. Delivery Hardening | v1.8 | 0/3 | Planned | - |
