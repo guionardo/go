@@ -21,6 +21,13 @@
 //   - WithLogger: inject custom logger
 //   - WithDebugLogger: enable debug logging
 //
+// Single-file configuration:
+//
+//	provider := config.NewProvider[AppConfig](config.WithProfilesPath("."))
+//
+// loads ./default.yml as-is, with no scope overlay. The active scope must stay
+// unset (or equal the default scope) so a second file is not required.
+//
 // Sub-packages:
 //   - config/environment: env-var parsing via struct tags
 //   - config/profile: YAML profile loading and merging
