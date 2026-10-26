@@ -5,24 +5,24 @@ titles: json
 findings:
   - id: WR-01
     severity: warning
-    disposition: fixed
-    title: "`retryBusyWithin` can overrun its budget by a full extra `fn` call"
+    disposition: open
+    title: "Unsanitized `asset.Name` enables path traversal / arbitrary file write"
+  - id: IN-01
+    severity: info
+    disposition: open
+    title: "Redundant double-close of the file handle on the error path"
+  - id: IN-02
+    severity: info
+    disposition: open
+    title: "`ctx` parameter is unused in `DownloadUpdate`"
+  - id: IN-03
+    severity: info
+    disposition: open
+    title: "`removeFile` test seam is a mutable package global without the shared mutex"
   - id: WR-02
     severity: warning
     disposition: fixed
     title: "`chunksOf` hangs forever (infinite loop, unbounded allocation) on `size <= 0`"
-  - id: IN-01
-    severity: info
-    disposition: open
-    title: "MSet marshal failure error does not identify the failing key"
-  - id: IN-02
-    severity: info
-    disposition: open
-    title: "MGet logs a Warn for every call against a closed provider"
-  - id: IN-03
-    severity: info
-    disposition: open
-    title: "Double `cache/sqlite:` prefix persists on the batch surface (Phase 15 IN-01, still open)"
   - id: IN-04
     severity: info
     disposition: open
@@ -31,22 +31,22 @@ findings:
     severity: info
     disposition: open
     title: "`coverage` job pins unpinned third-party actions at old majors (pre-existing)"
-open: 5
+open: 6
 total: 7
-recorded: 2026-10-08T23:44:30.739Z
+recorded: 2026-10-26T14:20:34.037Z
 ---
 
 # Phase 16: Code Review Disposition
 
 | Finding | Severity | Disposition | Source |
 |---------|----------|-------------|--------|
-| WR-01 | warning | fixed | 16-REVIEW-FIX.md |
-| WR-02 | warning | fixed | 16-REVIEW-FIX.md |
+| WR-01 | warning | open | - |
 | IN-01 | info | open | - |
 | IN-02 | info | open | - |
 | IN-03 | info | open | - |
-| IN-04 | info | open | - |
-| IN-05 | info | open | - |
+| WR-02 | warning | fixed | 16-REVIEW-FIX.md (not in the current review) |
+| IN-04 | info | open | - (not in the current review) |
+| IN-05 | info | open | - (not in the current review) |
 
 Dispositions: `open` (recorded, not yet triaged), `fixed`, `skipped`, `deferred`.
 Set `deferred` by hand and put the reason in the Source cell; both are preserved. A `|` in the reason is kept as prose and escaped on the next run.
