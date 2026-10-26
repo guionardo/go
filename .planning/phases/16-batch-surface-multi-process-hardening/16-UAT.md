@@ -1,36 +1,31 @@
 ---
-status: testing
+status: complete
 phase: 16-batch-surface-multi-process-hardening
 source: [16-VERIFICATION.md]
 started: 2026-10-08T20:21:00Z
-updated: 2026-10-26T14:26:15Z
+updated: 2026-10-26T17:01:36.762Z
 ---
 
 ## Current Test
 
-number: 1
-name: CI two-process E2E matrix run (remote GitHub Actions) — G-16-1 re-test
-expected: |
-  windows-latest "Run tests" leg green (TestDownloadUpdate_DigestMismatch require.NoFileExists now passes);
-  "SQLite two-process E2E" step passes on ubuntu, macos and windows;
-  "SQLite race detector" step passes on ubuntu + macos and is skipped on windows.
-awaiting: remote CI run on the next push (external service)
+[testing complete]
 
 ## Tests
 
 ### 1. CI two-process E2E matrix run (remote GitHub Actions)
 expected: Both TestTwoProcessContention and TestTwoProcessCrashRecovery pass on all three OSes; the race step passes on ubuntu and macos and is skipped on windows.
-result: pending
+result: pass
+verified_at: 2026-10-26
+evidence: "PR #51 CI run 40340478439 (conclusion: success) — ubuntu-latest: Run tests ✓, SQLite two-process E2E ✓, SQLite race detector ✓; macos-latest: Run tests ✓, E2E ✓, race ✓; windows-latest: Run tests ✓ (TestDownloadUpdate_DigestMismatch green — G-16-1 reconciled), E2E ✓ (executed, no cascade-skip), race skipped by design; Go test coverage check ✓."
 reported: "failed only on windows test" (2026-10-09 — before the 16-05 fix)
 fix_applied: "Plan 16-05 closed the code side: release/update.go now closes the os.Create handle BEFORE removeFile(filePath), routes removal through the removeFile seam, and surfaces a cleanup failure via errors.Join; TestDownloadUpdate_CleanupFailureSurfaced pins it. Verified 14/14 must-haves (16-VERIFICATION.md, 2026-10-26)."
-retest_note: "Only the remote windows-latest leg can confirm; local POSIX runs (all 6 DownloadUpdate tests, coverage gate 82.1%, both e2e arms, race clean) are green."
 
 ## Summary
 
 total: 1
-passed: 0
+passed: 1
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
@@ -38,7 +33,9 @@ blocked: 0
 
 - gap_id: G-16-1
   truth: "Both TestTwoProcessContention and TestTwoProcessCrashRecovery pass on all three OSes; the race step passes on ubuntu and macos and is skipped on windows."
-  status: fix-applied-awaiting-retest
+  status: resolved
+  resolved_by: 16-05-PLAN.md
+  resolved_at: 2026-10-26
   reason: "User reported: failed only on windows test"
   severity: blocker
   test: 1
