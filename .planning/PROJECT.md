@@ -41,12 +41,13 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ Go, JavaScript/TypeScript, and PHP detectors — go.mod/package.json/composer.json parsing, README first-paragraph fallback, name/description chains — `project_probe/` — v1.7 (Phase 11)
 - ✓ TOML-subset reader + Python/Rust detectors — `readTOMLSection` with quote-aware skip states (strict degrade, never fabricates), pyproject.toml [project]/[tool.poetry], Cargo.toml [package] — `project_probe/` — v1.7 (Phase 12)
 - ✓ All 7 detectors live — Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP; C#/.NET via .csproj (XMLName namespace-agnostic), Java/Kotlin via pom.xml (parent version inheritance) + settings.gradle fallback — `project_probe/` — v1.7 (Phase 13)
+- ✓ SQLite cache provider core and batch surface — `sqlite.New[K,V]` (3 location modes, pinned 1-conn pool, hardened DSN), primitive `Cache` parity, TTL expiry + sweeps, storage controls, chunked `MGet`/`MDel` + single-transaction `MSet`, and proven multi-process WAL safety (bounded busy-only open retry, `journal_size_limit`, 3-OS two-process E2E) — `cache/sqlite/` — v1.8 (Phases 15–16)
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] SQLite-backed cache provider (`cache/sqlite`) — embedded persistent backend, pure-Go driver, multi-process WAL, default/`:memory:` path, TTL expiry (v1.8)
+- [ ] SQLite provider delivery hardening — contributor docs (`doc.go`), runnable example, README row, benchmarks vs mem/per-key loops, no-override coverage gates, CGO-free 3-OS matrix (v1.8 Phase 17)
 - [ ] String utilities package (v2 backlog — truncation, padding, join/split)
 - [ ] Retry package with backoff strategies and jitter support (v2 backlog)
 - [ ] Framework detection for project_probe (v2 — dependencies-based)
@@ -94,7 +95,11 @@ Eliminated duplicate setter work in cache misses and reduced round trips via sin
 
 ## Current State
 
-**v1.7 — Project Probe** (SHIPPED 2026-09-30)
+**v1.8 — SQLite Cache Backend** (IN PROGRESS: Phase 15 ✓, Phase 16 ✓, Phase 17 pending)
+
+`cache/sqlite` is functionally complete: pure-Go `modernc.org/sqlite` provider, three location modes, pinned single-connection pool, hardened DSN with pragma read-back, TTL expiry + sweeps, `Optimizable` storage controls, the full `BatchCache` surface (chunked MGet/MDel, atomic MSet), and multi-process WAL safety proven by a two-process E2E running on the 3-OS CI matrix. Phase 16 UAT 1/1 with G-16-1 reconciled in CI (PR #51); security 13/13 threats closed. Remaining: Phase 17 delivery hardening (docs/example/README, benchmarks, CGO-free matrix, no-override coverage).
+
+**Previous: v1.7 — Project Probe** (SHIPPED 2026-09-30)
 
 The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states), fuzz-hardened, doc.go Version-semantics contract, anti-feature audit. 820+ tests / 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
 
@@ -153,6 +158,10 @@ This is a personal Go monorepo of utility packages published as `github.com/guio
 | `_javascript` filename over `_js` | `_js` suffix is a legacy GOARCH build constraint (silently excludes from non-js builds) | ✓ Good (v1.7, Phase 11) |
 | Quote-aware skip-state scanning in TOML reader | Whole-line delimiter detection fabricated data from malformed TOML (SC4); closesMultiLine/clearsBracket/opensMultiLine + pendingMLS fix it | ✓ Good (v1.7, Phase 12, gap closure) |
 | `version.workspace = true` → empty Version (no resolution) | Dotted-key classification degrades naturally; never fabricated, never resolved | ✓ Good (v1.7, Phase 12) |
+| Pinned 1-connection pool for both file and `:memory:` modes | The single most important correctness decision — eliminates intra-process contention on the shared file | ✓ Good (v1.8, Phase 15) |
+| Bounded busy-only open retry (5 ms backoff / 5 s budget, `Code()&0xff==5`) at the connection-establishment seam | Cross-process WAL conversion can return immediate SQLITE_BUSY; retry only there, never on ordinary queries | ✓ Good (v1.8, Phase 16, CONC-01/02 — 30/30 policy arm vs 8/10 raw failures) |
+| Two-process E2E on all three OSes; `-race` gated to non-Windows runners | Proves the milestone's headline promise in CI; Windows lacks a C toolchain for `-race` in this repo | ✓ Good (v1.8, Phase 16, CONC-05) |
+| Close-then-remove on download error paths (`f.Close()` before `removeFile`), cleanup failure surfaced via `errors.Join` | Windows denies `DeleteFile` on an open handle (no `FILE_SHARE_DELETE`); POSIX semantics masked the leak that broke CI | ✓ Good (v1.8, Phase 16 gap G-16-1) |
 
 ## Evolution
 
@@ -172,4 +181,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-08 after starting v1.8 SQLite Cache Backend milestone*
+*Last updated: 2026-10-26 after Phase 16 (Batch Surface + Multi-Process Hardening) completed*

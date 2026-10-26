@@ -51,7 +51,7 @@
 **Milestone Goal:** Add an embedded, persistent SQLite-backed cache provider (`cache/sqlite`) — durable local caching for CLIs and small services with no external infrastructure, safe for multi-process access via WAL.
 
 - [x] **Phase 15: Provider Foundation + Core Cache Semantics** - Sqlite provider constructor (3 location modes, pinned pool, hardened DSN), primitive Cache surface with provider parity, TTL expiry + sweeps, verified WAL pragmas, storage lifecycle controls (completed 2026-10-08)
-- [ ] **Phase 16: Batch Surface + Multi-Process Hardening** - MGet/MSet/MDel with v1.6 semantics; two-process WAL safety proven by spike; bounded contention + race-clean; CI two-process E2E
+- [x] **Phase 16: Batch Surface + Multi-Process Hardening** - MGet/MSet/MDel with v1.6 semantics; two-process WAL safety proven by spike; bounded contention + race-clean; CI two-process E2E (completed 2026-10-26)
 - [ ] **Phase 17: Delivery Hardening** - CGO-free three-OS CI matrix, no-override coverage gates, doc.go + runnable example + README row, benchmark entries
 
 ## Phase Details
@@ -149,5 +149,5 @@ Plans:
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
-| 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | In Progress|  |
+| 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | Complete    | 2026-10-26 |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |

@@ -2,39 +2,39 @@
 gsd_state_version: "1.0"
 milestone: v1.8
 milestone_name: SQLite Cache Backend
-current_phase: 16
-current_phase_name: Batch Surface + Multi-Process Hardening
-status: executing
-stopped_at: Completed 16-05-PLAN.md
-last_updated: "2026-10-26T14:15:07.645Z"
+current_phase: 17
+current_phase_name: Delivery Hardening
+status: planning
+stopped_at: Phase 16 complete, ready to plan Phase 17
+last_updated: "2026-10-26T17:02:47.883Z"
 last_activity: 2026-10-26
-last_activity_desc: Phase 16 execution started
-state_head: cb2da46cc474b8629d2538ae0c0c2080b80f4bdb
+last_activity_desc: Phase 16 complete, transitioned to Phase 17
+state_head: 9907f2674de2844e18a89628b8b7aa673b557f19
 progress:
   total_phases: 3
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 8
   completed_plans: 8
-  percent: 100
+  percent: 93
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-08)
+See: .planning/PROJECT.md (updated 2026-10-26)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 16 — Batch Surface + Multi-Process Hardening
+**Current focus:** Phase 17 — Delivery Hardening
 
 ## Current Position
 
-Phase: 16 (Batch Surface + Multi-Process Hardening) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute
-Last activity: 2026-10-26 — Phase 16 execution started
+Phase: 17 — Delivery Hardening
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-26 — Phase 16 complete, transitioned to Phase 17
 
-Progress: [██████████] 100%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -112,6 +112,8 @@ Recent decisions affecting current work:
 - [Phase 16]: 16-04: CI race step gated to runner.os != 'Windows' (C toolchain); Windows -race broadening recorded as a reviewer-flagged follow-up in the workflow comment
 - [Phase 16]: 16-05: The close-before-remove + errors.Join half of G-16-1 was already on the branch (a prior PR); this plan completed the removeFile = os.Remove test seam, routed the error-path removal through it, and normalized the message to 'removing partial file %s: %w' — the fs.ErrNotExist guard and io/fs import were dropped to match the plan's exact spec
 - [Phase 16]: 16-05: The removeFile seam block sits after the type declarations but before func (f optionFunc) apply to satisfy decorder type->var->func order; the plan's 'keep it where it is' position (after the apply method) tripped dec-order the moment the line became new
+- [Phase 16]: UAT 1/1 passed — the single checkpoint (CI two-process E2E matrix / G-16-1 re-test) was answered by PR #51 CI run 40340478439: windows 'Run tests' green (close-before-remove fixed DigestMismatch's NoFileExists), E2E executed on all three OSes, race green on ubuntu/macos and skipped on windows
+- [Phase 16]: Security verified 13/13 threats closed at ASVS L1 (register authored at plan time → L1 short-circuit, no auditor spawn); SECURITY.md recorded retroactively (no prior file existed)
 
 ### Pending Todos
 
@@ -119,11 +121,12 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- [v1.8 Research — LOW confidence]: Two-process `SQLITE_BUSY` behavior under the chosen pragma set is unverified — must be proven by the two-process spike; CONC-01 is the Phase 16 exit criterion and the retry policy follows its results
-- [v1.8 Research — open decisions]: `WithMemory()` vs literal empty-path semantics; `ErrClosed` divergence from mem; context-cancellation `interrupted` classification; chunk size and `journal_size_limit` values — settle during Phase 15 discussion/planning
+- [Phase 16 — resolved]: Two-process `SQLITE_BUSY` behavior is now proven — 16-01 raw arm failed 8/10 runs (DI-15-01 reproduced cross-process) while the bounded busy-only policy arm ran 30/30 clean, and 16-04's CI E2E (contention + crash arms) is green on ubuntu/macos/windows. CONC-01/CONC-02 closed.
+- [Phase 16 — reviewer-flagged follow-up]: Windows `-race` broadening — the race step is gated to `runner.os != 'Windows'` (no C toolchain); recorded as a follow-up in the `.github/workflows/go.yml` comment.
+- [Phase 16 — pre-existing, tracked]: `release/update.go` joins untrusted `Asset.Name` into `os.Create` without sanitization (path traversal, defense-in-depth). Predates Phase 16, no requirement covers it; recorded `open` in `16-REVIEW-DISPOSITION.md`.
 - [Deferred — tracked]: Phase 10 CR-01 — D-04 errno mapping needs Windows verification (syscall.EACCES invented on Windows) — deferred with rationale in 14-AUDIT.md (needs Windows CI evidence)
 - [Deferred — tracked]: Phase 10 WR-02 — panic logging at registry dispatch — deferred with rationale in 14-AUDIT.md (dev-experience nicety, not correctness)
-- [Non-blocking]: verification-debt SUMMARY metadata warnings (files not on disk) — tracked in /gsd-progress /gsd-audit-uat
+- [Non-blocking]: verification-debt SUMMARY metadata warnings (files not on disk) — 16-02/16-03 SUMMARYs cite a stale `internal_probe/two_process_test.go` path; tracked in /gsd-progress /gsd-audit-uat
 
 ## Deferred Items
 
@@ -136,10 +139,11 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-10-26T14:14:15.195Z
-Stopped at: Completed 16-05-PLAN.md
+Stopped at: Phase 16 complete, ready to plan Phase 17
 Resume file: None
 
 ## Operator Next Steps
 
-- Discuss the first phase: `/gsd-discuss-phase 15`
-- Then plan it: `/gsd-plan-phase 15`
+- Phase 16 complete (5/5 plans, UAT 1/1, security 13/13) — PR #51 open and green
+- Discuss Phase 17: `/gsd-discuss-phase 17`
+- Or plan it directly: `/gsd-plan-phase 17`
