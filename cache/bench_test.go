@@ -706,36 +706,81 @@ func BenchmarkBatch(b *testing.B) {
 	}
 }
 
+// requireNoErr fails the benchmark on the first error, so a provider that stops
+// working mid-run is reported instead of silently measuring an error return.
+// Healthy providers never take this branch, so it costs one predictable check.
+func requireNoErr(b *testing.B, err error) {
+	b.Helper()
+
+	if err != nil {
+		b.Fatal(err)
+	}
+}
+
+// requireUsable probes the provider once before any timing starts. sqlite
+// defers open/validation errors to the first operation (New stores them in
+// initErr), so without this probe a broken cache would report fabricated ns/op.
+func requireUsable(b *testing.B, c cache.BatchCache[string, string]) {
+	b.Helper()
+
+	const probeKey = "prim_smoke"
+
+	err := c.Set(b.Context(), probeKey, "v")
+	if err != nil {
+		b.Fatalf("provider unusable: Set failed: %v", err)
+	}
+
+	_, err = c.Get(b.Context(), probeKey)
+	if err != nil {
+		b.Fatalf("provider unusable: Get failed: %v", err)
+	}
+}
+
 // runPrimitiveBenchmarks measures the single-key operations (Get/Set/Delete/
 // GetOrSet) against one provider. Keys are bounded by primitiveKeyRing so a
 // file-backed provider measures the operation instead of database growth.
+//
+// Every operation is error-checked, matching the b.Fatal pattern
+// runBatchBenchmarks already uses.
 func runPrimitiveBenchmarks(b *testing.B, c cache.BatchCache[string, string]) {
+	requireUsable(b, c)
+
 	b.Run("Get", func(b *testing.B) {
 		keys := prePopulateKeys(b, c, 1, "prim_get")
 
 		for i := 0; i < b.N; i++ {
-			_, _ = c.Get(b.Context(), keys[0])
+			_, err := c.Get(b.Context(), keys[0])
+			requireNoErr(b, err)
 		}
 	})
 
 	b.Run("Set", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = c.Set(b.Context(), fmt.Sprintf("prim_set_%d", i%primitiveKeyRing), "v")
+			err := c.Set(b.Context(), fmt.Sprintf("prim_set_%d", i%primitiveKeyRing), "v")
+			requireNoErr(b, err)
 		}
 	})
 
 	b.Run("Delete", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			key := fmt.Sprintf("prim_del_%d", i%primitiveKeyRing)
-			_ = c.Set(b.Context(), key, "v")
-			_ = c.Delete(b.Context(), key)
+
+			err := c.Set(b.Context(), key, "v")
+			requireNoErr(b, err)
+
+			err = c.Delete(b.Context(), key)
+			requireNoErr(b, err)
 		}
 	})
 
 	b.Run("GetOrSet", func(b *testing.B) {
+		setter := func(context.Context) (string, error) { return "v", nil }
+
 		for i := 0; i < b.N; i++ {
 			key := fmt.Sprintf("prim_gos_%d", i%primitiveKeyRing)
-			_, _ = c.GetOrSet(b.Context(), key, func(context.Context) (string, error) { return "v", nil })
+
+			_, err := c.GetOrSet(b.Context(), key, setter)
+			requireNoErr(b, err)
 		}
 	})
 }
