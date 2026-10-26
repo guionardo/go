@@ -20,7 +20,7 @@ func (p *provider) postInit() *provider {
 
 	// Set the profiles path if not set
 	if p.profilesPath == "" {
-		p.profilesPath = environment.GetEnv(EnvConfigurationLog, DefaultConfigurationPath)
+		p.profilesPath = environment.GetEnv(EnvProfilesPath, DefaultConfigurationPath)
 	}
 
 	logger().Info("configuration provider initialized",

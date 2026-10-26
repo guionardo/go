@@ -421,6 +421,13 @@ func TestPostInit(t *testing.T) {
 		assert.Equal(t, DefaultConfigurationPath, p.profilesPath)
 	})
 
+	t.Run("ignores_configuration_log_env", func(t *testing.T) {
+		t.Setenv(EnvConfigurationLog, "true")
+
+		p := (&provider{}).postInit()
+		assert.Equal(t, DefaultConfigurationPath, p.profilesPath)
+	})
+
 	t.Run("preserves_existing_values", func(t *testing.T) {
 		p := (&provider{
 			defaultScope: "custom-default",

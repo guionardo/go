@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/guionardo/go/config/merger"
@@ -66,9 +67,8 @@ func getProfileFiles(
 	scope string,
 ) (defaultProfile, scopeProfile string, err error) {
 	for _, s := range []string{defaultScope, scope} {
-		clean := path.Clean(path.Join(basePath, s))
-		if !strings.HasPrefix(clean, path.Clean(basePath)) {
-			return "", "", fmt.Errorf("scope %q escapes base path %q", s, basePath)
+		if err := validateScope(basePath, s); err != nil {
+			return "", "", err
 		}
 	}
 
@@ -85,6 +85,22 @@ func getProfileFiles(
 	slog.Debug("getProfileFiles", slog.String("default", defaultProfile), slog.String("scope", scopeProfile))
 
 	return defaultProfile, scopeProfile, nil
+}
+
+// validateScope reports whether scope resolves to a path inside basePath.
+// Containment is decided on the cleaned relative path, so a base path of "."
+// is valid and a sibling sharing the base name as a prefix (e.g. "../guarded-evil"
+// against base "guarded") is still rejected.
+func validateScope(basePath, scope string) error {
+	base := filepath.Clean(basePath)
+	target := filepath.Clean(filepath.Join(basePath, scope))
+
+	rel, err := filepath.Rel(base, target)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("scope %q escapes base path %q", scope, basePath)
+	}
+
+	return nil
 }
 
 func findYAMLFile(fileName string) (string, error) {
