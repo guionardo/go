@@ -1,217 +1,99 @@
 ---
 phase: 16-batch-surface-multi-process-hardening
-reviewed: 2026-10-08T23:17:33Z
+reviewed: 2026-10-26T14:19:38Z
 depth: standard
-files_reviewed: 13
+files_reviewed: 2
 files_reviewed_list:
-  - .github/workflows/go.yml
-  - cache/sqlite/batch.go
-  - cache/sqlite/batch_internal_test.go
-  - cache/sqlite/doc.go
-  - cache/sqlite/dsn.go
-  - cache/sqlite/dsn_internal_test.go
-  - cache/sqlite/retry.go
-  - cache/sqlite/retry_internal_test.go
-  - cache/sqlite/schema.go
-  - cache/sqlite/sqlite.go
-  - cache/sqlite/sqlite_internal_test.go
-  - cache/sqlite/sqlite_test.go
-  - cache/sqlite/twoprocess_e2e_test.go
+  - release/update.go
+  - release/update_test.go
 findings:
   critical: 0
-  warning: 2
-  info: 5
-  total: 7
+  warning: 1
+  info: 3
+  total: 4
 status: issues_found
 ---
 
 # Phase 16: Code Review Report
 
-**Reviewed:** 2026-10-08T23:17:33Z
+**Reviewed:** 2026-10-26T14:19:38Z
 **Depth:** standard
-**Files Reviewed:** 13
+**Files Reviewed:** 2
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the completed batch surface (MGet/MSet/MDel), the bounded open-retry
-fix for DI-15-01, the DSN `journal_size_limit` pragma, the two-process E2E,
-and the CI wiring. Cross-checked against the frozen `cache.BatchCache`
-contract, the mem provider parity precedent, and decisions D-01..D-10 in
-16-CONTEXT.md.
-
-Verification performed (all green): `go test ./cache/sqlite/` (148 tests,
-including the DI-15-01 regression `TestBootstrapIdempotence` and the
-`TestBeginContentionBounded` D-07 no-retry proof), `-race` run, `go vet`,
-`golangci-lint` (full enabled linter set), the `-tags=e2e` two-process E2E
-(both arms), and coverage (package 92.1%, worst file 85% — the
-`.testcoverage-quick.yml` gates hold). The implementation faithfully matches
-the documented design: pre-marshal-then-transaction MSet atomicity is real
-(no partial writes possible through the single upsert tx), MGet chunk failure
-policy follows D-03, MDel fail-fast follows D-05, chunk math and the
-`perRoleRows = 287` E2E arithmetic check out exactly.
-
-No critical issues found. Two warnings on latent robustness of the two new
-loop constructs (retry budget semantics, chunking guard), plus five
-informational items. The retry/deadline semantics of `retryBusyWithin` are
-the only place where the documented bound ("bounded by the same timeout",
-doc.go / D-06) can be exceeded in a reachable path.
+Reviewed the phase 16 gap-closure wave for `DownloadUpdate` (plan 16-05, UAT gap G-16-1). The wave
+adds a close-before-remove error path, routes cleanup through the `removeFile` test seam, and surfaces
+a removal failure via `errors.Join`. The core change is correct: the file handle is closed before
+`os.Remove` (necessary on Windows), the removal failure is joined with the download error, and the new
+test `TestDownloadUpdate_CleanupFailureSurfaced` correctly pins the surfaced error via
+`require.ErrorIs`. No critical issues were found in the changed lines themselves; one pre-existing
+security hardening gap (unsanitized asset filename) and three minor quality items are reported below.
 
 ## Warnings
 
-### WR-01: `retryBusyWithin` can overrun its budget by a full extra `fn` call
+### WR-01: Unsanitized `asset.Name` enables path traversal / arbitrary file write
 
-**File:** `cache/sqlite/retry.go:51-65`
-**Issue:** The absolute deadline is only consulted *after* `fn` returns and
-only once per iteration. The sequence: `fn` returns busy at T < deadline, the
-`select` sleeps `backoff` and crosses the deadline, and the loop then invokes
-`fn` one more time past the deadline. If `fn` (a `PingContext`) blocks in the
-SQLite busy handler for the full `busy_timeout` — exactly the case D-06/doc.go
-("bounded by the same timeout") claims to bound — the total open-window wait
-becomes budget + backoff + one full `fn` duration, i.e. up to ~10 s for the
-nominal 5 s budget (2×). `New` in that window rides a deferred error into
-every operation, so a slow-but-recoverable first-open contention scenario is
-turned into a false permanent failure at double the documented bound. The
-unit test only exercises the fast-`fn` path (fake busy errors return
-immediately), so the overrun is untested.
-**Fix:** Hoist the deadline check to the top of the loop and return the last
-busy error without calling `fn` again once the deadline has passed:
+**File:** `release/update.go:139`
+**Issue:** `filePath := filepath.Join(targetDir, asset.Name)` passes a filename sourced from remote,
+attacker-influenceable GitHub release metadata straight into `os.Create` (line 140) without validation.
+`filepath.Join` does not neutralize `..` segments or absolute paths, so an asset named
+`../../../tmp/evil_linux_amd64.tar.gz` (which still satisfies `findAsset`'s `Contains(goos/goarch)`
+matching) escapes `targetDir` and writes to an arbitrary filesystem location. The existing
+`TestDownloadUpdate_CreateError` (which feeds `Name: "sub/..."`) confirms that path separators in the
+name are accepted by design rather than rejected. This is pre-existing and defense-in-depth — the
+self-update flow already trusts the release to supply an executable binary — but as an exported library
+function the `DownloadUpdate` contract ("write inside `targetDir`") is silently violated.
+**Fix:** Validate the name is a clean base name before joining, e.g.:
 
 ```go
-func retryBusyWithin(ctx context.Context, budget, backoff time.Duration, fn func(context.Context) error) error {
-	deadline := time.Now().Add(budget)
-	var lastErr error
-
-	for {
-		if time.Now().After(deadline) && lastErr != nil {
-			return lastErr // budget exhausted: surface the last busy error
-		}
-
-		err := fn(ctx)
-		if err == nil || !isBusyError(err) || time.Now().After(deadline) {
-			return err
-		}
-
-		lastErr = err
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
-		}
-	}
+name := asset.Name
+if name == "" || filepath.Base(name) != name || filepath.IsAbs(name) || name == "." || name == ".." {
+    return "", fmt.Errorf("invalid asset name: %q", name)
 }
-```
-
-Alternatively, select on a deadline timer in the `select` so the sleep cannot
-cross it:
-
-```go
-timer := time.NewTimer(backoff)
-defer timer.Stop()
-// and in the select: case <-time.After(time.Until(deadline)): return lastErr
-```
-
-### WR-02: `chunksOf` hangs forever (infinite loop, unbounded allocation) on `size <= 0`
-
-**File:** `cache/sqlite/batch.go:45-58`
-**Issue:** With `size <= 0`, `start += size` never advances, so the loop
-appends `keys[0:0]` chunks forever — an infinite loop that grows a slice
-until OOM. Both production call sites pass the fixed `chunkSize` constant
-(100), so this is latent today, but `chunksOf` is a standalone exported-shape
-helper whose `size` parameter is already exercised by `TestChunksOf` with
-arbitrary sizes, and D-01 explicitly contemplates the chunk size being
-"adjustable later" — the first refactor that reads it from config (with a
-zero-value default) turns a hang into a production outage. The edge case is
-also untested (`TestChunksOf` covers only positive sizes).
-**Fix:** Guard the parameter:
-
-```go
-func chunksOf[K comparable](keys []K, size int) [][]K {
-	if len(keys) == 0 || size <= 0 {
-		return nil
-	}
-	// ...
-}
+filePath := filepath.Join(targetDir, name)
 ```
 
 ## Info
 
-### IN-01: MSet marshal failure error does not identify the failing key
+### IN-01: Redundant double-close of the file handle on the error path
 
-**File:** `cache/sqlite/batch.go:159-165`
-**Issue:** When one value of a batch fails `json.Marshal`, the returned error
-is `cache/sqlite: json: unsupported type: ...` with no indication of which key
-failed. For a large batch (the atomicity test uses 2000 items) the caller
-cannot tell which entry to fix without bisecting.
-**Fix:** Include the key in the wrapping error:
-`return fmt.Errorf("cache/sqlite: marshal key %q: %w", fmt.Sprint(key), err)`.
+**File:** `release/update.go:144,150`
+**Issue:** The explicit `_ = f.Close()` on the download-error branch is followed by the already-registered
+`defer func() { _ = f.Close() }()` (line 144) when the function returns. The second `Close` is a harmless
+no-op returning an ignored error, but the deliberate first close is easy to misread as a missing-close
+fix when the `defer` already covers it. Not a bug, but the control flow is now split across two close
+sites.
+**Fix:** Consolidate the close into a single site. For example, drop the `defer` and make both the
+success and error paths close explicitly, or keep the `defer` and document why the early close must
+precede `removeFile` (as the existing comment already does) — just avoid implying the defer is not there.
 
-### IN-02: MGet logs a Warn for every call against a closed provider
+### IN-02: `ctx` parameter is unused in `DownloadUpdate`
 
-**File:** `cache/sqlite/batch.go:76-79`
-**Issue:** `MGetFunc` routes *both* the deferred open error and `ErrClosed`
-through `logger().Warn("… batch get skipped …")`. A closed provider is a
-normal shutdown condition (the batch API also has no error channel), and
-during shutdown races every concurrent `MGet` can emit a warning — log spam
-at the wrong level. (The sibling test name "closed_provider_returns_empty_map"
-also implies a noise-free path.) DB/init failures legitimately deserve Warn;
-`ErrClosed` does not.
-**Fix:** Special-case the level:
+**File:** `release/update.go:129`
+**Issue:** `DownloadUpdate(ctx context.Context, ...)` accepts a context but never uses it. The actual
+fetch happens in `Asset.Download` (`release/release.go:128`), which calls `downloadClient.Get(...)` with
+no context, so a caller-supplied deadline or cancellation is silently ignored and a hung download cannot
+be aborted. Pre-existing, not introduced by this wave.
+**Fix:** Thread the context into the download, e.g. change `Asset.Download` to
+`Download(ctx context.Context, w io.Writer)` and use `http.NewRequestWithContext(ctx, http.MethodGet, ...)`,
+or remove the unused parameter if cancellation is out of scope.
 
-```go
-if err := c.check(); err != nil {
-	if errors.Is(err, ErrClosed) {
-		logger().Debug("cache/sqlite: batch get skipped", "error", err)
-	} else {
-		logger().Warn("cache/sqlite: batch get skipped", "error", err)
-	}
-	return result
-}
-```
+### IN-03: `removeFile` test seam is a mutable package global without the shared mutex
 
-### IN-03: Double `cache/sqlite:` prefix persists on the batch surface (Phase 15 IN-01, still open)
-
-**File:** `cache/sqlite/sqlite.go:177-187` (callers: `batch.go:148-151`, `214-217`)
-**Issue:** `check()` wraps `ErrClosed`/`ErrInvalidPath` (which already carry
-the `cache/sqlite:` prefix) with `fmt.Errorf("cache/sqlite: %w", …)`, so the
-new batch methods surface errors like
-`cache/sqlite: cache/sqlite: cache is closed`. This is the Phase 15 IN-01
-ledger entry; it was not addressed in this phase and the new `MSetFunc`/
-`MDelFunc` error paths are affected just like the point API. Cosmetic but
-confusing when matching error text downstream.
-**Fix:** Drop the prefix when wrapping sentinel errors (`ErrClosed`,
-`ErrInvalidPath`), i.e. `fmt.Errorf("%w", c.initErr)` / `fmt.Errorf("%w",
-ErrClosed)` — the sentinels are already prefixed.
-
-### IN-04: MSet does not dedup colliding stringified keys, so the stored value is nondeterministic
-
-**File:** `cache/sqlite/batch.go:157-166`
-**Issue:** `MGet`/`MDel` dedup inputs by their `fmt.Sprint` form (D-02,
-`uniqueKeys`), but `MSetFunc` iterates the input map directly without
-deduping. With `K = any` (or any custom `fmt.Stringer`) two distinct map keys
-like `42` and `"42"` share the SQL keyspace row, and both upserts run inside
-the same transaction — the surviving value depends on Go's randomized map
-iteration order and is therefore nondeterministic across calls. (The mem
-provider keeps both keys distinct, so the parity story is also inconsistent
-here.)
-**Fix:** Either dedup pairs by string form (same predicate as `uniqueKeys`)
-before the transaction, or document that colliding forms are last-writer-wins
-with unspecified order. Add one test pinning the chosen behavior.
-
-### IN-05: `coverage` job pins unpinned third-party actions at old majors (pre-existing)
-
-**File:** `.github/workflows/go.yml:48-49`
-**Issue:** The coverage job uses `actions/checkout@v3` and
-`actions/setup-go@v3` (no SHA pinning, and v3 is EOL relative to the `test`
-job's `@v4`/`@v5`). This predates the phase — only the two new E2E/race steps
-were added — but the file is in scope and unpinned action supply-chain
-pinning is a standard hardening item.
-**Fix:** Align with the test job: `actions/checkout@v4`, `actions/setup-go@v5`
-with `go-version-file: go.mod`, and consider SHA-pinning both.
+**File:** `release/update.go:32`, `release/update_test.go:495`
+**Issue:** `removeFile` is swapped directly in `TestDownloadUpdate_CleanupFailureSurfaced` without the
+`mu sync.Mutex` that guards the sibling global `githubAPIBase`. It is currently race-free only because
+the test omits `t.Parallel()` (sequential tests complete before parallel tests run) and every other
+`DownloadUpdate` test runs under `t.Parallel()` afterward. This invariant is implicit and fragile: a
+future parallel test that also swaps `removeFile` would introduce a data race.
+**Fix:** Document the invariant on the seam (mirror the existing `//nolint:paralleltest` rationale) or
+guard the swap with the existing `mu`, or prefer an injectable seam (function field on `Config`) so tests
+do not mutate shared package state at all.
 
 ---
 
-_Reviewed: 2026-10-08T23:17:33Z_
+_Reviewed: 2026-10-26T14:19:38Z_
 _Reviewer: the agent (gsd-code-reviewer)_
 _Depth: standard_

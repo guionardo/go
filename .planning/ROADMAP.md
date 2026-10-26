@@ -51,7 +51,7 @@
 **Milestone Goal:** Add an embedded, persistent SQLite-backed cache provider (`cache/sqlite`) — durable local caching for CLIs and small services with no external infrastructure, safe for multi-process access via WAL.
 
 - [x] **Phase 15: Provider Foundation + Core Cache Semantics** - Sqlite provider constructor (3 location modes, pinned pool, hardened DSN), primitive Cache surface with provider parity, TTL expiry + sweeps, verified WAL pragmas, storage lifecycle controls (completed 2026-10-08)
-- [ ] **Phase 16: Batch Surface + Multi-Process Hardening** - MGet/MSet/MDel with v1.6 semantics; two-process WAL safety proven by spike; bounded contention + race-clean; CI two-process E2E
+- [x] **Phase 16: Batch Surface + Multi-Process Hardening** - MGet/MSet/MDel with v1.6 semantics; two-process WAL safety proven by spike; bounded contention + race-clean; CI two-process E2E (completed 2026-10-26)
 - [ ] **Phase 17: Delivery Hardening** - CGO-free three-OS CI matrix, no-override coverage gates, doc.go + runnable example + README row, benchmark entries
 
 ## Phase Details
@@ -96,7 +96,7 @@ Plans:
   4. Contention surfaces at `BEGIN` within `busy_timeout` as a bounded error (immediate transaction lock mode; no unbounded auto-retry), the provider passes `go test -race` under concurrent goroutines on the pinned single-connection pool, and package docs state WAL's constraints (local storage only, same-host sharing).
   5. A CI E2E test spawns two OS processes sharing one temp database and asserts no corruption and correct behavior under concurrent writes.
 
-**Plans:** 4/4 plans executed
+**Plans:** 4/4 executed + 1 gap-closure plan pending (UAT G-16-1)
 
 Plans:
 **Wave 1**
@@ -111,6 +111,10 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 16-04-PLAN.md — Two-process E2E (contention + crash arms), 3-OS CI steps + race gate (D-09/D-10, CONC-05), CONC-04 docs
+
+**Gap Closure** *(UAT G-16-1 — out-of-phase release-package Windows leak)*
+
+- [x] 16-05-PLAN.md — Close-before-remove + surfaced cleanup error in `release/update.go` DownloadUpdate (G-16-1)
 
 ### Phase 17: Delivery Hardening
 
@@ -145,5 +149,5 @@ Plans:
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
-| 16. Batch + Multi-Process Hardening | v1.8 | 4/4 | In Progress|  |
+| 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | Complete    | 2026-10-26 |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |
