@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -421,6 +422,13 @@ func TestPostInit(t *testing.T) {
 		assert.Equal(t, DefaultConfigurationPath, p.profilesPath)
 	})
 
+	t.Run("ignores_configuration_log_env", func(t *testing.T) {
+		t.Setenv(EnvConfigurationLog, "true")
+
+		p := (&provider{}).postInit()
+		assert.Equal(t, DefaultConfigurationPath, p.profilesPath)
+	})
+
 	t.Run("preserves_existing_values", func(t *testing.T) {
 		p := (&provider{
 			defaultScope: "custom-default",
@@ -431,6 +439,111 @@ func TestPostInit(t *testing.T) {
 		assert.Equal(t, "custom-scope", p.scope)
 		assert.Equal(t, "/custom/path", p.profilesPath)
 	})
+}
+
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestNewProvider_SingleFileConfiguration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("TESTCFG_NAME", "")
+	t.Setenv("TESTCFG_VERSION", "")
+
+	require.NoError(t, os.WriteFile("default.yml", []byte("name: from-single-file\nversion: 7"), 0600))
+
+	cfg, err := NewProvider[testConfig](WithProfilesPath(".")).GetConfiguration()
+	require.NoError(t, err)
+	assert.Equal(t, "from-single-file", cfg.Name)
+	assert.Equal(t, 7, cfg.Version)
+}
+
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestNewProvider_SingleConfigFileOption(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("TESTCFG_NAME", "")
+	t.Setenv("TESTCFG_VERSION", "")
+	t.Setenv(EnvScope, "")
+
+	require.NoError(t, os.WriteFile("app.yml", []byte("name: from-app-file\nversion: 3"), 0600))
+
+	cfg, err := NewProvider[testConfig](WithSingleConfigFile("app.yml")).GetConfiguration()
+	require.NoError(t, err)
+	assert.Equal(t, "from-app-file", cfg.Name)
+	assert.Equal(t, 3, cfg.Version)
+}
+
+func TestWithSingleConfigFile(t *testing.T) {
+	t.Parallel()
+
+	const scopeName = "app"
+
+	testCases := []struct {
+		name       string
+		configFile string
+		wantPath   string
+		wantScope  string
+	}{
+		{name: "bare name", configFile: "app.yml", wantPath: ".", wantScope: scopeName},
+		{name: "no extension", configFile: "app", wantPath: ".", wantScope: scopeName},
+		{name: "yaml extension", configFile: "app.yaml", wantPath: ".", wantScope: scopeName},
+		{
+			name:       "directory in argument",
+			configFile: path.Join("configs", "app.yml"),
+			wantPath:   "configs",
+			wantScope:  scopeName,
+		},
+		{name: "surrounding spaces", configFile: "  app.yml  ", wantPath: ".", wantScope: scopeName},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &provider{}
+			WithSingleConfigFile(tc.configFile)(p)
+
+			assert.Equal(t, tc.wantPath, p.profilesPath)
+			assert.Equal(t, tc.wantScope, p.defaultScope)
+			assert.Equal(t, tc.wantScope, p.scope)
+		})
+	}
+}
+
+func TestWithSingleConfigFile_RejectsMissingName(t *testing.T) {
+	t.Parallel()
+
+	for _, configFile := range []string{"", "   ", ".", "..", string(filepath.Separator)} {
+		t.Run("input_"+strings.ReplaceAll(configFile, string(filepath.Separator), "slash"), func(t *testing.T) {
+			t.Parallel()
+
+			assert.Panics(t, func() { WithSingleConfigFile(configFile) })
+		})
+	}
+}
+
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestNewProvider_SingleConfigFileIgnoresScopeEnv(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("TESTCFG_NAME", "")
+	t.Setenv(EnvScope, "production")
+
+	require.NoError(t, os.WriteFile("app.yaml", []byte("name: from-yaml-extension"), 0600))
+
+	cfg, err := NewProvider[testConfig](WithSingleConfigFile("app.yaml")).GetConfiguration()
+	require.NoError(t, err)
+	assert.Equal(t, "from-yaml-extension", cfg.Name)
+}
+
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestNewProvider_SingleConfigFileInDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("TESTCFG_NAME", "")
+	t.Setenv(EnvScope, "")
+
+	require.NoError(t, os.MkdirAll("configs", 0o700))
+	require.NoError(t, os.WriteFile(path.Join("configs", "app.yml"), []byte("name: from-subdir"), 0600))
+
+	cfg, err := NewProvider[testConfig](WithSingleConfigFile(path.Join("configs", "app.yml"))).GetConfiguration()
+	require.NoError(t, err)
+	assert.Equal(t, "from-subdir", cfg.Name)
 }
 
 func TestProvider_HTTPHandler_method_not_allowed(t *testing.T) {

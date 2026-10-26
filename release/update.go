@@ -3,7 +3,9 @@ package release
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -138,7 +140,17 @@ func DownloadUpdate(ctx context.Context, rel *Release, targetDir string) (string
 	defer func() { _ = f.Close() }()
 
 	if err := asset.Download(f); err != nil {
-		os.Remove(filePath)
+		// The handle must be closed before removal: on Windows an open handle
+		// makes os.Remove fail, which would silently leave the partial download
+		// behind and report only the download error.
+		_ = f.Close()
+
+		if removeErr := os.Remove(filePath); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+			return "", errors.Join(
+				fmt.Errorf("download failed: %w", err),
+				fmt.Errorf("removing partial file: %w", removeErr),
+			)
+		}
 
 		return "", fmt.Errorf("download failed: %w", err)
 	}

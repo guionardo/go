@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-var logger = sync.OnceValue[*slog.Logger](func() *slog.Logger {
+var logger = sync.OnceValue(func() *slog.Logger {
 	return slog.With(slog.String("module", "config"))
 })
 

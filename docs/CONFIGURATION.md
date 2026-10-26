@@ -17,11 +17,9 @@ The following environment variables control how the `config.Provider[T]` locates
 | Variable            | Required | Default     | Description                                                                                                                  |
 |---------------------|----------|-------------|------------------------------------------------------------------------------------------------------------------------------|
 | `SCOPE`             | Optional | `default`   | Active scope name used to select a scope-specific YAML profile. Constant `EnvScope`.                                         |
-| `PROFILES_PATH`     | Optional | *(empty)*   | Overrides the base directory where YAML profile files are looked up. Constant `EnvProfilesPath`. Read during construction and via `getProfilesPath()`. |
-| `CONFIGURATION_LOG` | Optional | `./CONFIGS` | Fallback used to derive `profilesPath` when it would otherwise be empty. Constant `EnvConfigurationLog`.                     |
+| `PROFILES_PATH`     | Optional | `./CONFIGS` | Base directory where YAML profile files are looked up. Constant `EnvProfilesPath`. Read during construction and via `getProfilesPath()`. Set it to `.` to use a single file in the working directory. |
+| `CONFIGURATION_LOG` | —        | —           | Declared as constant `EnvConfigurationLog` but not read anywhere. It neither enables logging nor affects path resolution.      |
 | `DEFAULT_SCOPE`     | Optional | —           | Declared as constant `EnvDefaultScope = "DEFAULT_SCOPE"` but not currently wired into the loading logic. Not honored by the provider. |
-
-> **Behavior note:** `CONFIGURATION_LOG` is technically used as a fallback for the *profiles path* in `postInit()` (`config/options.go`), not for enabling configuration logging as its name suggests. Prefer `PROFILES_PATH` or the `WithProfilesPath` option to control the profile directory.
 
 When the profiles path resolves to an empty string, `loadStaticConfiguration()` skips profile loading and logs `no profiles path found, skipping profile loading` (`config/provider.go`).
 
@@ -51,6 +49,50 @@ app:
   name: my-app-prod
 ```
 
+### Single-file configuration
+
+For a service that needs one file and no environment layering, use `WithSingleConfigFile`:
+
+```go
+provider := config.NewProvider[AppConfig](config.WithSingleConfigFile("app.yml"))
+```
+
+```yaml
+# ./app.yml
+app:
+  name: my-app
+```
+
+- The extension is optional and resolved by the loader (`.yml`, `.yaml`, `.YML`, `.YAML`), so `"app"` finds `app.yml`.
+- A path in the argument sets the directory: `WithSingleConfigFile("configs/app.yml")` reads `configs/app.yml`. A bare name reads from the working directory.
+- The file's base name becomes **both** the default and the active scope, so no `default.yml` companion is required and `SCOPE` is ignored.
+- Panics if the argument has no usable file name (`""`, `"."`, `".."`, a bare separator).
+
+The equivalent using the lower-level option is `WithProfilesPath(".")` with the file named after the default scope:
+
+```go
+provider := config.NewProvider[AppConfig](config.WithProfilesPath("."))
+```
+
+```yaml
+# ./default.yml
+app:
+  name: my-app
+```
+
+The same result without the option:
+
+```bash
+export PROFILES_PATH=.
+```
+
+Rules for this mode:
+
+- The file **must be named `default.yml`** (or `default.yaml` / `.yml` / `.YAML`). The loader resolves *scope names* to files, so any other name — `config.yml`, `app.yml` — is not found.
+- **Leave `SCOPE` unset.** Setting it makes the provider require a second file named after that scope. If `<scope>.yml` is absent, profile loading fails with `file not found` and the configuration silently falls back to struct tags.
+- `PROFILES_PATH` is a **directory**, never a file path. `WithProfilesPath` panics when the directory does not exist.
+- Profile read failures are logged at `Warn` and are not returned by `GetConfiguration()`; the configuration is then built from env/default tags alone.
+
 ## Struct-tag configuration schema
 
 Fields of the `T` struct passed to `config.NewProvider[T]` are populated from environment variables and validated using struct tags. `ParseEnvironment` recurses into nested struct fields automatically.
@@ -58,12 +100,14 @@ Fields of the `T` struct passed to `config.NewProvider[T]` are populated from en
 | Tag               | Purpose                                                                    |
 |-------------------|----------------------------------------------------------------------------|
 | `env:"NAME"`      | Environment variable name to read the field value from. If the var is unset/empty, the `default` tag is used. |
-| `default:"value"` | Fallback value applied when the `env` variable is unset.                   |
+| `default:"value"` | Value applied when the `env` variable is unset **and** after the YAML profile is loaded — see the precedence note below. |
 | `yaml:"key"`      | YAML key for profile files.                                                |
 | `validate:"..."`  | Validation rule applied via go-playground/validator (e.g., `validate:"required"`). |
 | `safe:"true"`     | Redacts the field in log output as `********` (`config/logging.go`).       |
 
 Supported scalar kinds: `string`, `int`/`int8`–`int64`, `uint`, `bool`, `float32`/`float64`, and nested structs. Env lookup is case-insensitive.
+
+> **Precedence:** env var > `default` tag > YAML file. `ParseEnvironment` runs *after* the YAML unmarshal and treats the `default` tag as a value for the field, so a field declared `default:"app"` is `app` even when the profile file sets a different value. Omit the `default` tag on fields that should come from the profile.
 
 ```go
 type AppConfig struct {
@@ -81,6 +125,7 @@ type AppConfig struct {
 | Option                    | Description                                                                            |
 |---------------------------|----------------------------------------------------------------------------------------|
 | `WithProfilesPath(path)`  | Sets the YAML profile directory. Panics if the directory does not exist.               |
+| `WithSingleConfigFile(file)` | Loads one YAML file: the path sets the profile directory (a bare name means the working directory) and the base name is used as both scopes, so no `default.yml` companion is required and `SCOPE` is ignored. Panics on an empty name. |
 | `WithScope(scope)`        | Sets the active scope name (e.g., `"production"`).                                     |
 | `WithDefaultScope(scope)` | Sets the fallback scope name.                                                          |
 | `WithLogger(logger)`      | Injects a custom `Logger` (can wrap `slog`, `testing.T.Logf`, etc.).                   |
@@ -107,7 +152,7 @@ Defaults come from three layers: struct tags, provider code, and cache provider 
 |----------------|-------------|--------------------------------------------------------------------------|
 | `scope`        | `default`   | `config/consts.DefaultScope`, applied when `SCOPE` is unset              |
 | `defaultScope` | `default`   | `config/consts.DefaultScope`                                              |
-| `profilesPath` | `./CONFIGS` | `config/consts.DefaultConfigurationPath`, via `CONFIGURATION_LOG` fallback |
+| `profilesPath` | `./CONFIGS` | `config/consts.DefaultConfigurationPath`; overridden by `PROFILES_PATH` or `WithProfilesPath` |
 
 **Cache providers** (defaults from each provider's `defaultConfig()` and `cache/mem/mem.go`):
 

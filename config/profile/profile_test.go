@@ -133,6 +133,40 @@ func TestGetProfileFiles_PathTraversal(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "escapes base path")
 	})
+
+	t.Run("sibling_sharing_base_prefix", func(t *testing.T) {
+		t.Parallel()
+
+		parent := t.TempDir()
+		base := path.Join(parent, "guarded")
+		require.NoError(t, os.MkdirAll(base, 0700))
+		require.NoError(t, os.WriteFile(path.Join(parent, "guarded-evil.yml"), []byte("name: outside"), 0600))
+
+		_, _, err := getProfileFiles(base, "default", "../guarded-evil")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "escapes base path")
+	})
+}
+
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestGetProfileFiles_RelativeBasePath(t *testing.T) {
+	t.Chdir(t.TempDir())
+	require.NoError(t, os.WriteFile("default.yml", []byte("name: from-single-file"), 0600))
+
+	defaultProfile, scopeProfile, err := getProfileFiles(".", "default", "default")
+	require.NoError(t, err)
+	require.Equal(t, "default.yml", defaultProfile)
+	require.Equal(t, "default.yml", scopeProfile)
+}
+
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestGetScopedProfileContent_RelativeBasePath(t *testing.T) {
+	t.Chdir(t.TempDir())
+	require.NoError(t, os.WriteFile("default.yml", []byte("name: from-single-file"), 0600))
+
+	content, err := GetScopedProfileContent(".", "default", "default")
+	require.NoError(t, err)
+	require.Contains(t, string(content), "from-single-file")
 }
 
 func TestGetScopedProfileContent(t *testing.T) {
