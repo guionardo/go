@@ -44,6 +44,15 @@
 // requires local storage: network filesystems and cross-host sharing are
 // unsupported.
 //
+// Batch operations follow the same durability model. MGet issues chunked IN
+// queries and silently skips missing, expired, and undecodable entries; a
+// failed chunk is logged and skipped, and a canceled context yields the
+// partial results gathered so far (the frozen signature has no error channel).
+// MSet resolves one TTL for the whole batch and writes every pair in a single
+// BEGIN IMMEDIATE transaction: any error — marshal, begin, exec, or commit —
+// rolls the entire batch back. MDel deletes in chunks and is idempotent for
+// duplicate and missing keys.
+//
 // Long-running processes can tune WAL checkpointing with WithAutoCheckpoint
 // and reclaim space explicitly through the Optimizable interface
 // (Checkpoint for a cheap WAL truncate, Vacuum for a heavy full rewrite).

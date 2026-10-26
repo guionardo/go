@@ -88,6 +88,9 @@ Each provider lives in its own sub-package and is independently importable:
 configuration opens an in-memory cache, `WithPath`/`WithName` open a durable
 WAL-mode file that survives restarts, and the same file can be shared by
 multiple processes on one host (a 5 s busy timeout bounds write contention).
+`MGet` silently skips missing, expired, and undecodable keys, `MSet` writes the
+whole batch in one transaction under one TTL (all-or-nothing), and `MDel`
+deletes in idempotent chunks.
 
 #### Interfaces
 
