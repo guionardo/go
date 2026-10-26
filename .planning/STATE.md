@@ -4,17 +4,17 @@ milestone: v1.8
 milestone_name: SQLite Cache Backend
 current_phase: 16
 current_phase_name: Batch Surface + Multi-Process Hardening
-status: verifying
-stopped_at: Completed 16-04-PLAN.md
-last_updated: "2026-10-08T23:06:46.017Z"
-last_activity: 2026-10-08
-last_activity_desc: Phase 16 execution resumed (wave continue)
-state_head: a717aac65655aa410af8b350a2bbc969513c396e
+status: executing
+stopped_at: Completed 16-05-PLAN.md
+last_updated: "2026-10-26T14:15:07.645Z"
+last_activity: 2026-10-26
+last_activity_desc: Phase 16 execution started
+state_head: cb2da46cc474b8629d2538ae0c0c2080b80f4bdb
 progress:
   total_phases: 3
   completed_phases: 13
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 8
+  completed_plans: 8
   percent: 100
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-08)
 ## Current Position
 
 Phase: 16 (Batch Surface + Multi-Process Hardening) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-10-08 — Phase 16 execution resumed (wave continue)
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-10-26 — Phase 16 execution started
 
 Progress: [██████████] 100%
 
@@ -72,6 +72,7 @@ Progress: [██████████] 100%
 | Phase 16-batch-surface-multi-process-hardening P02 | 23 | 3 tasks | 6 files |
 | Phase 16-batch-surface-multi-process-hardening P03 | 20 | 3 tasks | 5 files |
 | Phase 16 P04 | 9min | 3 tasks | 3 files |
+| Phase 16 P05 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase 16]: 16-04: crash child blocks on a timer loop (not bare select {}) so the Go deadlock detector never terminates it on its own before the parent kills it
 - [Phase 16]: 16-04: contention row-count contract pinned to 287 per role with the 14-distinct-deletion derivation in the constant's doc comment; deleted-key spot checks 0000/0007 (MDel) + 0050 (point)
 - [Phase 16]: 16-04: CI race step gated to runner.os != 'Windows' (C toolchain); Windows -race broadening recorded as a reviewer-flagged follow-up in the workflow comment
+- [Phase 16]: 16-05: The close-before-remove + errors.Join half of G-16-1 was already on the branch (a prior PR); this plan completed the removeFile = os.Remove test seam, routed the error-path removal through it, and normalized the message to 'removing partial file %s: %w' — the fs.ErrNotExist guard and io/fs import were dropped to match the plan's exact spec
+- [Phase 16]: 16-05: The removeFile seam block sits after the type declarations but before func (f optionFunc) apply to satisfy decorder type->var->func order; the plan's 'keep it where it is' position (after the apply method) tripped dec-order the moment the line became new
 
 ### Pending Todos
 
@@ -132,8 +135,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-08T23:06:45.989Z
-Stopped at: Completed 16-04-PLAN.md
+Last session: 2026-10-26T14:14:15.195Z
+Stopped at: Completed 16-05-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

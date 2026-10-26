@@ -114,7 +114,7 @@ Plans:
 
 **Gap Closure** *(UAT G-16-1 — out-of-phase release-package Windows leak)*
 
-- [ ] 16-05-PLAN.md — Close-before-remove + surfaced cleanup error in `release/update.go` DownloadUpdate (G-16-1)
+- [x] 16-05-PLAN.md — Close-before-remove + surfaced cleanup error in `release/update.go` DownloadUpdate (G-16-1)
 
 ### Phase 17: Delivery Hardening
 
@@ -149,5 +149,5 @@ Plans:
 | 13. XML Detectors | v1.7 | 2/2 | Complete | 2026-09-29 |
 | 14. Semantics, Hardening, Polish | v1.7 | 4/4 | Complete | 2026-09-29 |
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
-| 16. Batch + Multi-Process Hardening | v1.8 | 4/4 | In Progress|  |
+| 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | In Progress|  |
 | 17. Delivery Hardening | v1.8 | 0/— | Not started | - |
