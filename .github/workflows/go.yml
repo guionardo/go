@@ -16,12 +16,26 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      # shell: bash is load-bearing: the default Windows shell (pwsh) only
+      # propagates the LAST command's exit code, which would let a failing
+      # `go build` report success when `go vet` follows it.
+      - name: Build (CGO-free)
+        shell: bash
+        run: |
+          go env CGO_ENABLED
+          go build ./...
+          go vet ./...
+          go list -m modernc.org/sqlite modernc.org/libc
+
       - name: Build swapper binaries
         run: make swapper
 
@@ -31,11 +45,15 @@ jobs:
       - name: SQLite two-process E2E
         run: go test -tags=e2e -run 'TestTwoProcess' ./cache/sqlite/ -v -count=1 -timeout=180s
 
-      # -race requires a C toolchain, which Linux and macOS runners provide
-      # (they satisfy CONC-03). Enabling -race on Windows (mingw setup) is a
-      # reviewer-flagged open question for a future phase.
+      # The driver is pure Go, but -race is a cgo build mode on every non-darwin
+      # OS, so this step re-enables cgo inside an otherwise CGO-free job; the
+      # Linux and macOS runners ship the required C toolchain (CONC-03).
+      # Enabling -race on Windows (mingw setup) stays a reviewer-flagged
+      # follow-up for a future phase.
       - name: SQLite race detector
         if: runner.os != 'Windows'
+        env:
+          CGO_ENABLED: "1"
         run: go test -race ./cache/sqlite/ -count=1 -timeout=180s
 
   coverage:
