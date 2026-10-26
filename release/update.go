@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,11 +25,16 @@ type Option interface {
 
 type optionFunc func(*Config)
 
+var (
+	githubAPIBase = "https://api.github.com"
+
+	// removeFile is a test seam: tests can swap it to force the cleanup-failure branch.
+	removeFile = os.Remove
+)
+
 func (f optionFunc) apply(c *Config) {
 	f(c)
 }
-
-var githubAPIBase = "https://api.github.com"
 
 func WithOwner(owner string) Option {
 	return optionFunc(func(c *Config) {
@@ -145,10 +149,10 @@ func DownloadUpdate(ctx context.Context, rel *Release, targetDir string) (string
 		// behind and report only the download error.
 		_ = f.Close()
 
-		if removeErr := os.Remove(filePath); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+		if removeErr := removeFile(filePath); removeErr != nil {
 			return "", errors.Join(
 				fmt.Errorf("download failed: %w", err),
-				fmt.Errorf("removing partial file: %w", removeErr),
+				fmt.Errorf("removing partial file %s: %w", filePath, removeErr),
 			)
 		}
 
