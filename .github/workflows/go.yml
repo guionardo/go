@@ -31,10 +31,31 @@ jobs:
       - name: Build (CGO-free)
         shell: bash
         run: |
-          go env CGO_ENABLED
+          set -euo pipefail
+
+          # Assert the CGO-free configuration instead of only printing it: a dropped
+          # job-level env, a setup-go change, or a later step-level override must
+          # fail here rather than let the proof silently regress.
+          cgo=$(go env CGO_ENABLED)
+          echo "CGO_ENABLED=$cgo"
+          if [ "$cgo" != "0" ]; then
+            echo "::error::CGO_ENABLED=$cgo, expected 0 (the CGO-free proof is not being exercised)"
+            exit 1
+          fi
+
           go build ./...
           go vet ./...
-          go list -m modernc.org/sqlite modernc.org/libc
+
+          # Assert the pure-Go driver modules resolve to a pinned version, so swapping
+          # in a cgo-backed driver cannot keep this step green.
+          pins=$(go list -m modernc.org/sqlite modernc.org/libc)
+          echo "$pins"
+          for mod in modernc.org/sqlite modernc.org/libc; do
+            if ! printf '%s\n' "$pins" | grep -q "^${mod} v"; then
+              echo "::error::${mod} did not resolve to a pinned version; the CGO-free driver proof is broken"
+              exit 1
+            fi
+          done
 
       - name: Build swapper binaries
         run: make swapper
