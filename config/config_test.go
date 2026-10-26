@@ -440,6 +440,20 @@ func TestPostInit(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // global state mutation: working directory via t.Chdir
+func TestNewProvider_SingleFileConfiguration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("TESTCFG_NAME", "")
+	t.Setenv("TESTCFG_VERSION", "")
+
+	require.NoError(t, os.WriteFile("default.yml", []byte("name: from-single-file\nversion: 7"), 0600))
+
+	cfg, err := NewProvider[testConfig](WithProfilesPath(".")).GetConfiguration()
+	require.NoError(t, err)
+	assert.Equal(t, "from-single-file", cfg.Name)
+	assert.Equal(t, 7, cfg.Version)
+}
+
 func TestProvider_HTTPHandler_method_not_allowed(t *testing.T) {
 	provider := NewProvider[testConfig]()
 	handler := provider.HTTPHandler()
