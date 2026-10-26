@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/guionardo/go/cache/memcache"
 	"github.com/guionardo/go/cache/postgres"
 	"github.com/guionardo/go/cache/redis"
+	"github.com/guionardo/go/cache/sqlite"
 	"github.com/guionardo/go/cache/valkey"
 )
 
@@ -527,6 +529,25 @@ func BenchmarkBatch(b *testing.B) {
 				}
 			})
 		}
+	})
+
+	// ---- SQLite provider batch subtests (always run, no Docker) ----
+
+	b.Run("sqlite", func(b *testing.B) {
+		b.Run("Memory", func(b *testing.B) {
+			c := sqlite.New[string, string](sqlite.WithMemory())
+
+			b.Cleanup(func() { _ = c.Close() })
+			runBatchBenchmarks(b, c, "sqlite_memory")
+		})
+
+		b.Run("File", func(b *testing.B) {
+			path := filepath.Join(b.TempDir(), "batch.db")
+			c := sqlite.New[string, string](sqlite.WithPath(path))
+
+			b.Cleanup(func() { _ = c.Close() })
+			runBatchBenchmarks(b, c, "sqlite_file")
+		})
 	})
 
 	// ---- Docker-backed provider batch subtests (gated by skipIfNoDocker) ----
