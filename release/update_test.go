@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -487,5 +488,43 @@ func TestDownloadUpdate_DigestMismatch(t *testing.T) {
 	require.Contains(t, err.Error(), "download failed")
 	// the partial file must be removed on digest mismatch
 	require.NoFileExists(t, filepath.Join(dir, rel.Assets[0].Name))
+	require.Empty(t, filePath)
+}
+
+//nolint:paralleltest // modifies global state (removeFile), must stay sequential
+func TestDownloadUpdate_CleanupFailureSurfaced(t *testing.T) {
+	original := removeFile
+	stubErr := errors.New("stub remove failure")
+	removeFile = func(string) error { return stubErr }
+
+	defer func() { removeFile = original }()
+
+	content := []byte("test binary content for download")
+	differentContent := []byte("different content than expected")
+	d := digest.FromBytes(differentContent)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(content)
+	}))
+	defer server.Close()
+
+	rel := &Release{
+		TagName: "v2.0.0",
+		Assets: []Asset{
+			{
+				Name:               "myapp_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz",
+				BrowserDownloadURL: server.URL + "/download",
+				Digest:             d.String(),
+				Size:               len(content),
+			},
+		},
+	}
+
+	dir := t.TempDir()
+
+	filePath, err := DownloadUpdate(context.Background(), rel, dir)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "download failed")
+	require.ErrorIs(t, err, stubErr)
 	require.Empty(t, filePath)
 }
