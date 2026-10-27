@@ -1,6 +1,6 @@
 ---
 id: SEED-261008-2o5
-status: dormant
+status: completed
 planted: 2026-10-08
 planted_during: v1.7 (between milestones)
 trigger_when: when planning the next milestone (/gsd-new-milestone)

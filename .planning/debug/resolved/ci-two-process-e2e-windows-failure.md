@@ -1,8 +1,8 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "CI run red on Windows only. Test 1 in UAT (.planning/phases/16-batch-surface-multi-process-hardening/16-UAT.md): 'failed only on windows test'. GitHub Actions run 37863201983 (PR #48, branch gsd/v1.8-sqlite-cache-backend): job 'Run tests (windows-latest)' FAILED; ubuntu-latest and macos-latest succeeded. Only failing test: --- FAIL: TestDownloadUpdate_DigestMismatch (0.01s) — package github.com/guionardo/go/release; release/update_test.go:489 require.NoFileExists — Error: file 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\TestDownloadUpdate_DigestMismatch1350819659\\001\\myapp_windows_amd64.tar.gz' exists. Goal: find_root_cause_only."
 created: 2026-10-09T00:15:00Z
-updated: 2026-10-09T00:35:00Z
+updated: 2026-10-27T00:00:00Z
 ---
 
 ## Current Focus

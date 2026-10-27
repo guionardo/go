@@ -41,10 +41,11 @@ var (
 
 	// ErrClosed is the sentinel for an operation attempted on a closed cache.
 	// Providers do not share one closed-error value: cache/sqlite wraps this
-	// sentinel (so errors.Is(err, ErrClosed) matches after unwrapping), redis
-	// and valkey surface their client library's own closed error, and mem,
-	// memcache and postgres do not signal closure at all. Compare with
-	// errors.Is, never with ==.
+	// sentinel (so errors.Is(err, ErrClosed) matches after unwrapping); redis,
+	// valkey and postgres surface their client library's own closed error (a
+	// closed client or pool); memcache has no closed state at all, its Close is
+	// a documented no-op; and mem reports misses rather than a closed state.
+	// Compare with errors.Is, never with ==.
 	ErrClosed = errors.New("cache: cache is closed")
 )
 

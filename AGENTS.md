@@ -11,6 +11,11 @@ Every new milestone must have its own git branch for the pull request flow.
 Work on the milestone branch, then open a PR to `main` when complete.
 Branch name: `gsd/v{VERSION}-{slug}` (e.g., `gsd/v1.6-retry-package`).
 
+After a squash-merge, sync the local trunk with `git reset --hard origin/main`.
+`/gsd-plan-phase` commits to whichever branch is checked out, so planning commits land
+on `main` before the phase branch exists; the squash rewrites their SHAs and a plain
+`git pull` then cannot fast-forward even though the trees match.
+
 ## Before Every Commit
 
 - **Spike findings for go** (implementation patterns, constraints, gotchas) → `Skill("spike-findings-go")`
