@@ -39,10 +39,8 @@
 // busy_timeout bounds write contention, which surfaces as an error at BEGIN
 // rather than silent corruption. A fresh database opened concurrently with
 // another process briefly retries connection establishment (busy-only,
-// bounded by the same timeout). A canceled MGet returns the partial results
-// gathered so far — the frozen MGet signature has no error channel. WAL
-// requires local storage: network filesystems and cross-host sharing are
-// unsupported.
+// bounded by the same timeout). WAL requires local storage: network
+// filesystems and cross-host sharing are unsupported.
 //
 // Batch operations follow the same durability model. MGet issues chunked IN
 // queries and silently skips missing, expired, and undecodable entries; a
@@ -51,7 +49,9 @@
 // MSet resolves one TTL for the whole batch and writes every pair in a single
 // BEGIN IMMEDIATE transaction: any error — marshal, begin, exec, or commit —
 // rolls the entire batch back. MDel deletes in chunks and is idempotent for
-// duplicate and missing keys.
+// duplicate and missing keys, but it is not atomic: the first failing chunk
+// returns its error with the earlier chunks already deleted, so a retry is
+// safe yet the batch may end up partially applied.
 //
 // Long-running processes can tune WAL checkpointing with WithAutoCheckpoint
 // and reclaim space explicitly through the Optimizable interface

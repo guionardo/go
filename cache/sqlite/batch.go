@@ -217,9 +217,10 @@ func (c *sqliteCache[K, V]) msetTx(ctx context.Context, pairs []msetPair, exp an
 }
 
 // MDelFunc removes multiple keys via chunked IN-list deletes (D-05, BATCH-03).
-// Duplicate and missing keys are no-ops; the first chunk error returns the
-// wrapped error (fail-fast — partial deletion is acceptable because MDel is
-// idempotent and a caller may safely retry).
+// Duplicate and missing keys are no-ops. Unlike MSet it is not atomic: the
+// first chunk error returns the wrapped error immediately (fail-fast) with the
+// earlier chunks already deleted, so the batch may be partially applied — a
+// retry is nonetheless safe because the deletion is idempotent.
 func (c *sqliteCache[K, V]) MDelFunc(ctx context.Context, keys ...K) error {
 	if err := c.check(); err != nil {
 		return err
