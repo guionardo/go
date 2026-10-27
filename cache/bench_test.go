@@ -358,9 +358,38 @@ func benchmarkMGetPerKey(b *testing.B, c cache.BatchCache[string, string], n int
 	}
 }
 
+// batchKeyRing builds a bounded ring of keys under prefix. The batch arms draw
+// their per-iteration key windows from it, so their key space is capped at
+// primitiveKeyRing exactly as the primitive arms' is — a file-backed provider
+// then measures the batch operation, not b-tree growth.
+func batchKeyRing(prefix string) []string {
+	ring := make([]string, primitiveKeyRing)
+	for i := range ring {
+		ring[i] = fmt.Sprintf("%s_ring_%d", prefix, i)
+	}
+
+	return ring
+}
+
+// fillBatchKeys fills dst with the len(dst) keys of the window starting at
+// offset, wrapping around ring. dst is reused across iterations, so selecting
+// the window costs no allocation inside the timed loop.
+func fillBatchKeys(dst, ring []string, offset int) {
+	start := offset % len(ring)
+	for j := range dst {
+		dst[j] = ring[(start+j)%len(ring)]
+	}
+}
+
 // runBatchBenchmarks runs the full MGet/MSet/MDel benchmark suite on a given
 // provider. Extracted as a shared helper so both the mem subtests and the
 // Docker-backed provider subtests reuse the same measurement structure.
+//
+// What is timed: MGet reads keys populated before the timed loop; MSet writes a
+// window of n keys drawn from a bounded key ring; MDel deletes such a window,
+// with the Set calls that make those keys exist run with the timer stopped, so
+// ns/op covers only the delete and never the seeding. The key space of every
+// arm is capped at primitiveKeyRing, so b.N cannot grow the database.
 func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name string) {
 	batchSizes := []int{1, 10, 100, 1000}
 
@@ -380,27 +409,30 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 	b.Run("MSet", func(b *testing.B) {
 		for _, n := range batchSizes {
 			n := n
+			ring := batchKeyRing(fmt.Sprintf("%s_mset_%d", name, n))
+			keys := make([]string, n)
+
 			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
+					fillBatchKeys(keys, ring, i*n)
+
 					items := make(map[string]string, n)
-					for j := 0; j < n; j++ {
-						items[fmt.Sprintf("%s_mset_native_%d_%d_%d", name, n, i, j)] = "v"
+					for _, key := range keys {
+						items[key] = "v"
 					}
-					if err := c.MSet(b.Context(), items); err != nil {
-						b.Fatal(err)
-					}
+
+					requireNoErr(b, c.MSet(b.Context(), items))
 				}
 			})
+
 			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					items := make(map[string]string, n)
-					for j := 0; j < n; j++ {
-						items[fmt.Sprintf("%s_mset_pk_%d_%d_%d", name, n, i, j)] = "v"
-					}
-					for k, v := range items {
-						if err := c.Set(b.Context(), k, v); err != nil {
-							b.Fatal(err)
-						}
+					fillBatchKeys(keys, ring, i*n)
+
+					for _, key := range keys {
+						requireNoErr(b, c.Set(b.Context(), key, "v"))
 					}
 				}
 			})
@@ -410,6 +442,9 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 	b.Run("MDel", func(b *testing.B) {
 		for _, n := range batchSizes {
 			n := n
+			ring := batchKeyRing(fmt.Sprintf("%s_mdel_%d", name, n))
+			keys := make([]string, n)
+
 			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
@@ -417,42 +452,33 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 					// timer stopped so ns/op covers only the batch delete.
 					b.StopTimer()
 
-					keys := make([]string, n)
-					for j := 0; j < n; j++ {
-						key := fmt.Sprintf("%s_mdel_native_%d_%d_%d", name, n, i, j)
-						if err := c.Set(b.Context(), key, "v"); err != nil {
-							b.Fatal(err)
-						}
-						keys[j] = key
+					fillBatchKeys(keys, ring, i*n)
+
+					for _, key := range keys {
+						requireNoErr(b, c.Set(b.Context(), key, "v"))
 					}
 
 					b.StartTimer()
 
-					if err := c.MDel(b.Context(), keys...); err != nil {
-						b.Fatal(err)
-					}
+					requireNoErr(b, c.MDel(b.Context(), keys...))
 				}
 			})
+
 			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
 
-					keys := make([]string, n)
-					for j := 0; j < n; j++ {
-						key := fmt.Sprintf("%s_mdel_pk_%d_%d_%d", name, n, i, j)
-						if err := c.Set(b.Context(), key, "v"); err != nil {
-							b.Fatal(err)
-						}
-						keys[j] = key
+					fillBatchKeys(keys, ring, i*n)
+
+					for _, key := range keys {
+						requireNoErr(b, c.Set(b.Context(), key, "v"))
 					}
 
 					b.StartTimer()
 
 					for _, key := range keys {
-						if err := c.Delete(b.Context(), key); err != nil {
-							b.Fatal(err)
-						}
+						requireNoErr(b, c.Delete(b.Context(), key))
 					}
 				}
 			})
@@ -462,108 +488,15 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 
 // BenchmarkBatch quantifies the performance win of native batch operations
 // (MGet/MSet/MDel) against per-key sequential fallback across multiple batch
-// sizes. Runs the mem provider (zero-dependency) plus the always-run sqlite
-// Memory and File families; the remaining provider families sit behind the
-// skipIfNoDocker Docker gate.
+// sizes. The mem family runs first through runBatchBenchmarks, the same helper
+// the sqlite and Docker-backed families use, so every family shares one
+// measurement structure: bounded key ring, and only the batch delete timed in
+// the MDel arms.
 func BenchmarkBatch(b *testing.B) {
 	c := mem.New[string, string](b.Context())
 	defer c.Close()
-	batchSizes := []int{1, 10, 100, 1000}
 
-	b.Run("MGet", func(b *testing.B) {
-		for _, n := range batchSizes {
-			n := n
-			keys := prePopulateKeys(b, c, n, fmt.Sprintf("batch_mget_%d", n))
-			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
-				benchmarkMGetNative(b, c, n, keys)
-			})
-			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
-				benchmarkMGetPerKey(b, c, n, keys)
-			})
-		}
-	})
-
-	b.Run("MSet", func(b *testing.B) {
-		for _, n := range batchSizes {
-			n := n
-			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					items := make(map[string]string, n)
-					for j := 0; j < n; j++ {
-						items[fmt.Sprintf("mset_native_%d_%d_%d", n, i, j)] = "v"
-					}
-					if err := c.MSet(b.Context(), items); err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
-					items := make(map[string]string, n)
-					for j := 0; j < n; j++ {
-						items[fmt.Sprintf("mset_pk_%d_%d_%d", n, i, j)] = "v"
-					}
-					for k, v := range items {
-						if err := c.Set(b.Context(), k, v); err != nil {
-							b.Fatal(err)
-						}
-					}
-				}
-			})
-		}
-	})
-
-	b.Run("MDel", func(b *testing.B) {
-		for _, n := range batchSizes {
-			n := n
-			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					// Seeding is setup, not the operation: it runs with the
-					// timer stopped so ns/op covers only the batch delete.
-					b.StopTimer()
-
-					keys := make([]string, n)
-					for j := 0; j < n; j++ {
-						key := fmt.Sprintf("mdel_native_%d_%d_%d", n, i, j)
-						if err := c.Set(b.Context(), key, "v"); err != nil {
-							b.Fatal(err)
-						}
-						keys[j] = key
-					}
-
-					b.StartTimer()
-
-					if err := c.MDel(b.Context(), keys...); err != nil {
-						b.Fatal(err)
-					}
-				}
-			})
-			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					b.StopTimer()
-
-					keys := make([]string, n)
-					for j := 0; j < n; j++ {
-						key := fmt.Sprintf("mdel_pk_%d_%d_%d", n, i, j)
-						if err := c.Set(b.Context(), key, "v"); err != nil {
-							b.Fatal(err)
-						}
-						keys[j] = key
-					}
-
-					b.StartTimer()
-
-					for _, key := range keys {
-						if err := c.Delete(b.Context(), key); err != nil {
-							b.Fatal(err)
-						}
-					}
-				}
-			})
-		}
-	})
+	runBatchBenchmarks(b, c, "mem")
 
 	// ---- SQLite provider batch subtests (always run, no Docker) ----
 
