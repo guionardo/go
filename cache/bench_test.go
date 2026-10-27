@@ -770,6 +770,15 @@ func requireUsable(b *testing.B, c cache.BatchCache[string, string]) {
 // GetOrSet) against one provider. Keys are bounded by primitiveKeyRing so a
 // file-backed provider measures the operation instead of database growth.
 //
+// Exactly what each arm times:
+//   - Get: one read of a pre-populated key.
+//   - Set: one overwrite of a key picked from the ring.
+//   - Delete: a Set+Delete cycle, because removing an existing key requires
+//     creating it first — the reported ns/op is that whole cycle.
+//   - GetOrSet: the miss path. The key is deleted before every call with the
+//     timer stopped, so the setter runs each iteration and the reported ns/op
+//     is GetOrSet's miss cost, not a warm hit.
+//
 // Every operation is error-checked, matching the b.Fatal pattern
 // runBatchBenchmarks already uses.
 func runPrimitiveBenchmarks(b *testing.B, c cache.BatchCache[string, string]) {
@@ -808,6 +817,11 @@ func runPrimitiveBenchmarks(b *testing.B, c cache.BatchCache[string, string]) {
 
 		for i := 0; i < b.N; i++ {
 			key := fmt.Sprintf("prim_gos_%d", i%primitiveKeyRing)
+
+			// Force a miss: the delete is setup, so it is untimed.
+			b.StopTimer()
+			requireNoErr(b, c.Delete(b.Context(), key))
+			b.StartTimer()
 
 			_, err := c.GetOrSet(b.Context(), key, setter)
 			requireNoErr(b, err)
