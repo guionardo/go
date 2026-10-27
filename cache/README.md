@@ -189,7 +189,9 @@ Cache contents are unencrypted at rest.
 
 **`cache/postgres` schema.** `New` creates the cache table and attempts `pg_prewarm`;
 prewarm is best-effort (a warning is logged and startup continues). The table is
-`UNLOGGED`, so it is truncated by crash recovery — it is a cache, not storage.
+`UNLOGGED`, so it is truncated by crash recovery — it is a cache, not storage. The
+table defaults to `cache_entries` and `WithTableName` renames it for the DDL, the
+queries and the prewarm alike.
 
 ## Benchmarks
 
