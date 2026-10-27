@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,11 +22,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// closedMessage is the exact consumer-visible message for a closed sqlite
-// cache: one "cache/sqlite: " provider prefix followed by the cache-level
-// sentinel text. It is pinned so a future re-wrap cannot reintroduce the
-// duplicated token (W1, D-01, D-05).
-const closedMessage = "cache/sqlite: cache: cache is closed"
+const (
+	// closedMessage is the exact consumer-visible message for a closed sqlite
+	// cache: one "cache/sqlite: " provider prefix followed by the cache-level
+	// sentinel text. It is pinned so a future re-wrap cannot reintroduce the
+	// duplicated token (W1, D-01, D-05).
+	closedMessage = "cache/sqlite: cache: cache is closed"
+
+	// wantDirPerm is the permission mode the provider creates cache directories
+	// with — the documented contract behind New(WithName(...)). It is asserted
+	// only on non-Windows runners, where permission bits round-trip (W5, D-11).
+	wantDirPerm os.FileMode = 0o700
+)
 
 func TestMemoryRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -878,4 +886,51 @@ func TestOptimizableDeferredErr(t *testing.T) {
 	err = opt.Vacuum(t.Context())
 	require.ErrorIs(t, err, sqlite.ErrInvalidPath)
 	require.ErrorContains(t, err, "cache/sqlite:")
+}
+
+// TestNewWithNameDurability pins the headline usage advertised in doc.go: a
+// cache opened by name lands at os.UserCacheDir()/<name>/cache.db with its
+// directory created 0700, and data written before Close survives a reopen of
+// the same name. The three environment variables os.UserCacheDir consults are
+// all redirected into one temporary root (XDG on Linux, HOME on darwin,
+// LocalAppData on Windows), so no real cache directory is ever touched (D-11).
+//
+//nolint:paralleltest // global state mutation: HOME/XDG_CACHE_HOME/LocalAppData via t.Setenv
+func TestNewWithNameDurability(t *testing.T) {
+	root := t.TempDir()
+
+	t.Setenv("XDG_CACHE_HOME", root)
+	t.Setenv("HOME", root)
+	t.Setenv("LocalAppData", root)
+
+	cacheDir, err := os.UserCacheDir()
+	require.NoError(t, err)
+	require.Contains(t, cacheDir, root, "cache dir isolation did not take effect")
+
+	name := "withname-app"
+	dbPath := filepath.Join(cacheDir, name, "cache.db")
+
+	first := sqlite.New[string, string](sqlite.WithName(name))
+
+	require.NoError(t, first.Set(t.Context(), "greeting", "hello"))
+	require.NoError(t, first.Close())
+
+	require.FileExists(t, dbPath)
+
+	info, err := os.Stat(filepath.Dir(dbPath))
+	require.NoError(t, err)
+
+	// Windows does not round-trip permission bits (AGENTS.md), so the
+	// documented 0700 contract is asserted only where it is observable.
+	if runtime.GOOS != "windows" {
+		require.Equal(t, wantDirPerm, info.Mode().Perm())
+	}
+
+	second := sqlite.New[string, string](sqlite.WithName(name))
+
+	t.Cleanup(func() { _ = second.Close() })
+
+	got, err := second.Get(t.Context(), "greeting")
+	require.NoError(t, err)
+	assert.Equal(t, "hello", got)
 }
