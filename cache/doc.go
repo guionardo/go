@@ -54,9 +54,11 @@
 //	var ErrMiss   = errors.New("cache: key not found")
 //	var ErrClosed = errors.New("cache: cache is closed")
 //
-// Sentinel support is currently per-provider: cache/sqlite wraps
-// cache.ErrMiss and cache.ErrClosed, while the other providers return their
-// own errors. Consumers branch with errors.Is, never with ==.
+// cache.ErrMiss is honoured by every provider: the in-memory provider returns
+// it bare, while redis, valkey, memcache, postgres and sqlite wrap it with
+// their own prefix. cache.ErrClosed is the one with per-provider adoption —
+// cache/sqlite is currently the only provider that returns it; the others do
+// not signal close. Consumers branch with errors.Is, never with ==.
 //
 // SingleflightGetOrSet[K, V] is an exported helper that dedups concurrent
 // GetOrSet misses on the same key. Providers embed it to share one
