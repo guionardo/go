@@ -58,7 +58,9 @@
 // (Checkpoint for a cheap WAL truncate, Vacuum for a heavy full rewrite).
 //
 // New never fails: open and validation errors are recorded and deferred, and
-// are returned by the first operation that needs the database.
+// are returned by the first database-needing operation.
+// MGet is the exception: it returns an empty map and logs the error at Error
+// level, because its frozen signature has no error channel.
 //
 // Cache contents are unencrypted at rest; the cache directory is created with
 // 0700 permissions and the database file inherits the process umask.

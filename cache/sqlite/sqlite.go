@@ -58,7 +58,9 @@ var (
 // New creates a new SQLite cache provider with optional functional options.
 //
 // New never fails: open or validation errors are recorded and deferred, and
-// the first operation that needs the database returns them wrapped. Returns a
+// the first operation that needs the database returns them.
+// MGet is the exception: it returns an empty map and logs the error at Error
+// level, because its frozen signature has no error channel. Returns a
 // cache.BatchCache sharing the in-memory singleflight GetOrSet; the returned
 // value also implements Optimizable (type-assert to reach Checkpoint/Vacuum).
 func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
