@@ -2,15 +2,11 @@
 
 ## What This Is
 
-A collection of reusable Go utility packages — config, data structures, validators, and CLI helpers — authored by Guionardo and published as `github.com/guionardo/go`. It serves as both a personal toolkit and a public Go module.
+A collection of reusable Go packages — configuration, data structures, validators, caching, project detection, and CLI self-update — authored by Guionardo and published as `github.com/guionardo/go`. It serves as both a personal toolkit and a public Go module.
 
 ## Core Value
 
 Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-
-## Business Context
-
-<!-- OPTIONAL — only for monetized or customer-facing projects. Delete this section otherwise. -->
 
 ## Requirements
 
@@ -25,143 +21,104 @@ Provide reliable, well-tested utility packages that solve common Go development 
 - ✓ CPF and CNPJ validation (Brazilian documents) — `br_docs/` — existing
 - ✓ Cross-platform machine identifier (Linux, macOS, Windows) — `mid/` — existing
 - ✓ File/directory path utilities (existence, creation, Go root detection) — `path_tools/` — existing
-- ✓ Quoted shell argument parsing and case-insensitive env var lookup — `shell_tools/` — existing
+- ✓ Quoted shell argument parsing and environment lookup — `shell_tools/` — existing
 - ✓ Time string parser with auto-prioritizing layout list — `time_tools/` — existing
 - ✓ Reflection utilities for zero-value checking — `reflect_tools/` — existing
 - ✓ HTTP mock server for tests with request matching from code or files — `httptest_mock/` — existing
 - ✓ GitHub latest release fetcher with asset download and digest verification — `release/` — existing
 - ✓ CI pipeline with golangci-lint, pre-commit, commitlint, coverage enforcement, vulncheck — existing
-- ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — v1.0: in-memory, Redis, Memcache, Postgres, Valkey
+- ✓ Generic `Cache[K, V]` abstraction over 5 backends — `cache/` — v1.0
 - ✓ `SingleflightGetOrSet[K, V]` shared helper deduplicating concurrent GetOrSet misses — `cache/` — v1.6
-- ✓ Provider integration — all 5 providers delegate GetOrSet through the shared helper — `cache/` — v1.6
 - ✓ `BatchCache[K, V]` with MGet/MSet/MDel across all 5 providers — `cache/` — v1.6
 - ✓ Benchmark suite quantifying dedup and batching wins — `cache/` — v1.6
 - ✓ Complete self-update mechanism with version detection, SHA256 verification, atomic swap, and relaunch — `release/` — v1.5
-- ✓ `project_probe` package foundation — never-fail `Probe` contract, `ProjectData` model, `Language` type, error sentinels, ordered detector registry, ignore list, `readManifest` — `project_probe/` — v1.7 (Phase 10)
-- ✓ Go, JavaScript/TypeScript, and PHP detectors — go.mod/package.json/composer.json parsing, README first-paragraph fallback, name/description chains — `project_probe/` — v1.7 (Phase 11)
-- ✓ TOML-subset reader + Python/Rust detectors — `readTOMLSection` with quote-aware skip states (strict degrade, never fabricates), pyproject.toml [project]/[tool.poetry], Cargo.toml [package] — `project_probe/` — v1.7 (Phase 12)
-- ✓ All 7 detectors live — Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP; C#/.NET via .csproj (XMLName namespace-agnostic), Java/Kotlin via pom.xml (parent version inheritance) + settings.gradle fallback — `project_probe/` — v1.7 (Phase 13)
-- ✓ SQLite cache provider core and batch surface — `sqlite.New[K,V]` (3 location modes, pinned 1-conn pool, hardened DSN), primitive `Cache` parity, TTL expiry + sweeps, storage controls, chunked `MGet`/`MDel` + single-transaction `MSet`, and proven multi-process WAL safety (bounded busy-only open retry, `journal_size_limit`, 3-OS two-process E2E) — `cache/sqlite/` — v1.8 (Phases 15–16)
+- ✓ `project_probe` — never-fail `Probe`, 7 language detectors, README fallback, strict-degrade TOML reader — `project_probe/` — v1.7
+- ✓ SQLite cache provider — `sqlite.New[K,V]` (3 location modes, pinned 1-conn pool, hardened DSN), primitive `Cache` parity, TTL + sweeps, storage controls, full `BatchCache` surface, multi-process WAL safety with a bounded busy-only open retry — `cache/sqlite/` — v1.8 (Phases 15–16)
+- ✓ Delivery hardening — CGO-free three-OS CI matrix that asserts its own claim, no-override coverage gates, `doc.go` + runnable example + package README, benchmarks against mem and per-key loops — `cache/sqlite/` — v1.8 (Phase 17)
+- ✓ Honest error contract — one provider prefix per error, `sqlite.ErrClosed` asserted through both `sqlite.ErrClosed` and `cache.ErrClosed`, `MGet`'s deferred-error exception documented and logged at the level it deserves, sqlite in the shared conformance E2E — `cache/` — v1.8 (Phase 17.1)
+- ✓ Documentation regime — root README as an index, 18 package READMEs, 23 of 26 packages with `// Output:`-asserted examples, and drift made a defect in `AGENTS.md` — repo-wide — v1.8 closeout
 
 ### Active
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] SQLite provider delivery hardening — contributor docs (`doc.go`), runnable example, README row, benchmarks vs mem/per-key loops, no-override coverage gates, CGO-free 3-OS matrix (v1.8 Phase 17)
 - [ ] String utilities package (v2 backlog — truncation, padding, join/split)
 - [ ] Retry package with backoff strategies and jitter support (v2 backlog)
-- [ ] Framework detection for project_probe (v2 — dependencies-based)
-
-## Current Milestone: v1.8 SQLite Cache Backend
-
-**Goal:** Add an embedded, persistent SQLite-backed cache provider (`cache/sqlite`) — durable local caching for CLIs and small services with no external infrastructure, safe for multi-process access via WAL.
-
-**Target features:**
-- SQLite provider implementing the existing `cacher[K, V]` primitive + `BatchCache[K, V]` surface (Get/Set/Delete/GetOrSet/Close, MGet/MSet/MDel) via `NewConcreteCache`
-- Pure-Go `modernc.org/sqlite` driver (CGO-free; Linux/macOS/Windows CI)
-- Multi-process safety: WAL journal mode + `busy_timeout`
-- Location modes: default `os.UserCacheDir` path via cache name; `:memory:` when path empty; explicit path override
-- TTL expiry: lazy delete on read + sweep of expired rows on open
-- JSON values / `fmt.Sprint` key parity with existing providers; tests, coverage gates, doc.go, example
-
-## Current State
-
-**v1.7 Project Probe — SHIPPED 2026-09-30**
-
-The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP) with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states — SC4 fabrication gap closed), fuzz-hardened (3 targets, 20-seed corpus), doc.go Version-semantics contract, and the anti-feature audit. 820+ tests across 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
-
-**Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
-
-**Backlog (deferred from earlier milestones):** String utilities package; Retry package with backoff strategies and jitter support
-
-## Completed Milestones
-
-### v1.6 Cache Dedup — completed 2026-08-08
-
-Eliminated duplicate setter work in cache misses and reduced round trips via singleflight GetOrSet across all 5 providers, batch operations (MGet/MSet/MDel), and a benchmarking suite.
-
-**Key results:**
-- Singleflight dedup: setter runs exactly once for N concurrent misses (vs N× without)
-- Batch MGet: 10-17% faster than per-key loop; MDel: up to 49% faster
-- All 5 providers use optimal strategies (pipeline, GetMulti, SendBatch, single-lock)
+- [ ] Framework detection for `project_probe` (v2 — dependencies-based)
 
 ### Out of Scope
-
-<!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
 
 | Feature | Reason |
 |---------|--------|
 | Slices utility package | Go 1.26 stdlib `slices` package covers common operations — not needed |
+| Arbitrary SQL/ORM surface on `cache/sqlite` | Turns a cache backend into a database wrapper; breaks provider-swap abstraction |
+| Retry middleware beyond `busy_timeout` | Hides pathological lock holders and multiplies latency; errors must surface |
+| Cross-host / network-filesystem cache sharing | WAL needs shared memory — use redis/valkey/postgres for shared infrastructure |
 
 ## Current State
 
-**v1.8 — SQLite Cache Backend** (IN PROGRESS: Phase 15 ✓, Phase 16 ✓, Phase 17 pending)
+**v1.8 SQLite Cache Backend — SHIPPED 2026-10-27**
 
-`cache/sqlite` is functionally complete: pure-Go `modernc.org/sqlite` provider, three location modes, pinned single-connection pool, hardened DSN with pragma read-back, TTL expiry + sweeps, `Optimizable` storage controls, the full `BatchCache` surface (chunked MGet/MDel, atomic MSet), and multi-process WAL safety proven by a two-process E2E running on the 3-OS CI matrix. Phase 16 UAT 1/1 with G-16-1 reconciled in CI (PR #51); security 13/13 threats closed. Remaining: Phase 17 delivery hardening (docs/example/README, benchmarks, CGO-free matrix, no-override coverage).
+`cache/sqlite` ships complete: a pure-Go `modernc.org/sqlite` provider with three location modes, a pinned single-connection pool, a hardened DSN with pragma read-back, TTL expiry plus sweeps, `Optimizable` storage controls, the full `BatchCache` surface, and multi-process WAL safety proven by a two-process E2E running on the three-OS CI matrix. The delivery phase added a CGO-free matrix that asserts its own claim, benchmarks placed against mem and per-key loops, and provider docs. Phase 17.1 then made the error contract honest (single prefix, dual-sentinel `errors.Is`, documented `MGet` exception) and registered sqlite in the shared conformance harness.
 
-**Previous: v1.7 — Project Probe** (SHIPPED 2026-09-30)
+**Quality:** 25,914 lines of Go across 26 packages · coverage 82.4% total, `cache/sqlite` 92.7% (no override) · 3-OS CI green · 23 of 26 packages carry runnable examples · milestone audit `passed`, 27/27 requirements, 0 open artifacts.
 
-The `project_probe` package ships complete: never-fail `Probe(folder)` detecting all 7 languages with name/version/description chains, README first-paragraph fallback, strict-degrade TOML reader (quote-aware skip states), fuzz-hardened, doc.go Version-semantics contract, anti-feature audit. 820+ tests / 25 packages; `make coverage-quick` green (80.7%); UAT 12/12; security 16/16 threats closed.
+**Next:** no milestone is active — start one with `/gsd-new-milestone` (the v2 backlog above is the natural seed).
 
-**Previous: v1.6 — Cache Dedup** (shipped 2026-08-08)
+## Completed Milestones
 
-All five cache providers now share a common `cacher` / `concreteCache` architecture with singleflight-wrapped `GetOrSet`, `BatchCache[K,V]` interface with MGet/MSet/MDel using provider-optimal strategies, and a benchmark suite proving the dedup and batching wins. Built on 9 validated spikes from 2026-08-06.
+### v1.8 SQLite Cache Backend — 2026-10-27
+Added an embedded, durable cache backend with no external infrastructure, and proved its multi-process safety in CI. 4 phases, 13 plans, 34 tasks; 7 merged PRs over 20 days. Archive: `milestones/v1.8-ROADMAP.md`.
 
-**Next:** String utilities or retry package — see Active requirements.
+### v1.7 Project Probe — 2026-09-30
+Never-fail project detection across 7 languages with manifest chains, README fallback, and a strict-degrade TOML reader. Fuzz-hardened, 820+ tests.
 
-**Previous: v1.5 — Self-Update** (shipped 2026-07-21)
+### v1.6 Cache Dedup — 2026-08-08
+Singleflight dedup of concurrent misses, batch operations across all 5 providers, and the benchmark suite that quantified both (MGet 10-17% faster; MDel up to 49%).
 
-The `release` package now provides a complete self-update mechanism: version detection from build info, GitHub release checking, platform-specific asset download with SHA256 verification, atomic binary replacement via an embedded swapper (cross-platform), and automatic relaunch. All 21 library packages have proper `doc.go` documentation files. The main README was restructured with a package index table.
+### v1.5 Self-Update — 2026-07-21
+Version detection, GitHub release checking, SHA256 verification, atomic swap via an embedded swapper, relaunch.
 
-**Previous: v1.4 — Core Packages** (shipped 2026-07-21)
+### v1.4 Core Packages — 2026-07-21
+The generic `Cache[K, V]` package with 5 backends and ~13 utility packages.
 
-Shipped the generic `Cache[K, V]` package with 5 backends. ~13 utility packages with 6,600+ lines of code across the cache subsystem.
-
-**Tech stack:** Go 1.26, testcontainers-go for E2E, go-redis/v9, valkey-go, gomemcache, pgx/v5, hashicorp/go-version
+**Tech stack:** Go 1.26 · `modernc.org/sqlite` (CGO-free) · go-redis/v9 · valkey-go · gomemcache · pgx/v5 · hashicorp/go-version · testcontainers-go for E2E
 
 ## Context
 
-This is a personal Go monorepo of utility packages published as `github.com/guionardo/go`. The codebase follows Go standard library idioms with minimal external dependencies. Testing uses `testify` assertions with `httptest` for HTTP tests. CI enforces 95% total coverage, conventional commits, and comprehensive linting.
+A personal Go monorepo published as `github.com/guionardo/go`, following Go standard-library idioms with minimal external dependencies. Tests use `testify`, `httptest`, and real temp directories; `make coverage-quick` gates at packages ≥80% / files ≥70% / total ≥75% with no per-package overrides for `cache/sqlite`. CI runs Linux, macOS and Windows with `CGO_ENABLED=0`, plus a two-process E2E and a race-detector lane where a C toolchain exists.
+
+Documentation is a contract, not decoration: every package carries a `doc.go`, a runnable `example_test.go` with `// Output:` assertions, and its own `README.md`; the root README is an index. See `AGENTS.md` § Documentation.
 
 ## Constraints
 
-- **[Language]**: Go 1.26 only — all packages must follow Go stdlib idioms
-- **[Dependencies]**: Minimal external dependencies — prefer stdlib solutions
-- **[Compatibility]**: Must support Linux, macOS, and Windows (tested in CI matrix)
-- **[Quality]**: Must maintain 95%+ total test coverage and pass all linters
+- **[Language]**: Go 1.26 only — all packages follow Go stdlib idioms
+- **[Dependencies]**: Minimal external dependencies — prefer stdlib solutions; the cache's sixth backend stays CGO-free
+- **[Compatibility]**: Linux, macOS, and Windows (three-OS CI matrix)
+- **[Quality]**: `make coverage-quick` green before every commit; golangci-lint at zero issues; Conventional Commits
 
 ## Key Decisions
-
-<!-- Decisions that constrain future work. Add throughout project lifecycle. -->
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Go stdlib over frameworks | Keep dependencies minimal for a utility library | ✓ Good |
-| Monorepo of independent packages | Each package is usable independently via `go get` | ✓ Good |
-| Conventional commits + pre-commit | Enforce consistent commit history and code quality | ✓ Good |
-| Generic Cache interface over 5 backends | Swap providers without code changes; memory cache for zero-dep testing | ✓ Good (v1.0) |
+| Monorepo of independent packages | Each package usable independently via `go get` | ✓ Good |
+| Conventional commits + pre-commit | Consistent history and code quality | ✓ Good |
+| Generic Cache interface over 6 backends | Swap providers without code changes | ✓ Good (v1.0, extended v1.8) |
 | Self-update via embedded swapper | Spawn → exit → swap → exec avoids file-in-use locks on Windows | ✓ Good (v1.5) |
-| hashicorp/go-version for semver | Replaces custom parser; handles prereleases, pseudo-versions, build metadata | ✓ Good (v1.5) |
-| Two-phase SHA256 verification | go-digest at download + stdlib at swap protects against corruption mid-flight | ✓ Good (v1.5) |
-| singleflight wraps only the setter | Dedups concurrent misses without locking the fast-path Get | ✓ Validated (v1.6 spikes) |
-| Shared GetOrSet helper over per-provider bodies | Eliminates 5× duplicated miss→setter→Set code | ✓ Validated (v1.6 spikes) |
-| Never-fail Probe contract (error only for hard I/O) | Best-effort detection; content never fails | ✓ Good (v1.7, Phase 10) |
-| syscall errno → sentinel mapping (ENOENT/ENOTDIR/EACCES/EPERM) | Cross-platform error discrimination without string matching | ✓ Good (v1.7, Phase 10) |
-| Typed `Language` constants with display values | Discoverable API, switchable, extensible (v2 typescript) | ✓ Good (v1.7, Phase 10) |
-| `Folder` = filepath.Clean(as-given), never absolutized | Deterministic tests, Windows-safe, caller gets what they asked for | ✓ Good (v1.7, Phase 10) |
-| Panic-recovery at registry dispatch | A panicking detector is a non-match, never an error (cache callSetter precedent) | ✓ Good (v1.7, Phase 10) |
-| readManifest 1 MB cap + BOM strip, `([]byte, bool)` | Never-fail contract; no panic on pathological input | ✓ Good (v1.7, Phase 10) |
-| go.mod `go` directive as Version (toolchain floor, raw) | Never fabricated or normalized; documented semantics | ✓ Good (v1.7, Phase 11) |
-| Always-JavaScript for package.json | Distinct `typescript` value deferred to v2 (REFN-01) | ✓ Good (v1.7, Phase 11) |
-| README first-real-paragraph fallback (README.md → README.rst → README) | Description chain when manifest lacks one; skips badges/TOC/headings | ✓ Good (v1.7, Phase 11) |
-| README extraction skip predicates | Badges, TOC lists, rst/setext underline headings, ATX, HTML comments | ✓ Good (v1.7, Phase 11) |
-| `_javascript` filename over `_js` | `_js` suffix is a legacy GOARCH build constraint (silently excludes from non-js builds) | ✓ Good (v1.7, Phase 11) |
-| Quote-aware skip-state scanning in TOML reader | Whole-line delimiter detection fabricated data from malformed TOML (SC4); closesMultiLine/clearsBracket/opensMultiLine + pendingMLS fix it | ✓ Good (v1.7, Phase 12, gap closure) |
-| `version.workspace = true` → empty Version (no resolution) | Dotted-key classification degrades naturally; never fabricated, never resolved | ✓ Good (v1.7, Phase 12) |
-| Pinned 1-connection pool for both file and `:memory:` modes | The single most important correctness decision — eliminates intra-process contention on the shared file | ✓ Good (v1.8, Phase 15) |
-| Bounded busy-only open retry (5 ms backoff / 5 s budget, `Code()&0xff==5`) at the connection-establishment seam | Cross-process WAL conversion can return immediate SQLITE_BUSY; retry only there, never on ordinary queries | ✓ Good (v1.8, Phase 16, CONC-01/02 — 30/30 policy arm vs 8/10 raw failures) |
-| Two-process E2E on all three OSes; `-race` gated to non-Windows runners | Proves the milestone's headline promise in CI; Windows lacks a C toolchain for `-race` in this repo | ✓ Good (v1.8, Phase 16, CONC-05) |
-| Close-then-remove on download error paths (`f.Close()` before `removeFile`), cleanup failure surfaced via `errors.Join` | Windows denies `DeleteFile` on an open handle (no `FILE_SHARE_DELETE`); POSIX semantics masked the leak that broke CI | ✓ Good (v1.8, Phase 16 gap G-16-1) |
+| Two-phase SHA256 verification | go-digest at download + stdlib at swap protects against mid-flight corruption | ✓ Good (v1.5) |
+| singleflight wraps only the setter | Dedups concurrent misses without locking the fast-path Get | ✓ Validated (v1.6) |
+| Never-fail Probe contract | Best-effort detection; content never fails | ✓ Good (v1.7) |
+| Pinned 1-connection pool (file and `:memory:`) | The single most important correctness decision — eliminates intra-process file contention | ✓ Good (v1.8, Phase 15) |
+| Bounded busy-only open retry (5 ms / 5 s, busy code at the connection seam) | Cross-process WAL conversion can return immediate SQLITE_BUSY; retry only there | ✓ Good (v1.8, CONC-01/02: 30/30 vs 8/10 raw) |
+| Two-process E2E on three OSes; `-race` gated to non-Windows | Proves the headline promise in CI; Windows lacks a C toolchain for `-race` here | ✓ Good (v1.8, Phase 16) |
+| Close-then-remove on download error paths | Windows denies `DeleteFile` on an open handle; POSIX masked the leak | ✓ Good (v1.8, G-16-1) |
+| Sentinels wrap the cache-level sentinel; one prefix per error | `errors.Is` works for both `sqlite.ErrClosed` and `cache.ErrClosed` without a custom type | ✓ Good (v1.8, Phase 17.1) |
+| `MGet` keeps its frozen signature and documents the exception | The interface is frozen; returning `nil` or adding `MGetErr` would change a published contract for a logging concern | ✓ Good (v1.8, Phase 17.1) |
+| Root README is an index; detail lives in package READMEs | Keeps the entry point scannable and each package's docs next to its code | ✓ Good (v1.8 closeout) |
+| One `cache/README.md` for the backend matrix | The backends differ by driver, not by story; six READMEs would be six things to keep true | ✓ Good (v1.8 closeout) |
+| Benchmarks must measure what they claim | A bounded key ring and a real miss path; growing keys made file-mode runs measure the database, not the operation | ✓ Good (v1.8 closeout) |
+| After a squash-merge, `git reset --hard origin/main` | Planning commits land on `main` before the phase branch, so the squash rewrites their SHAs and `pull` cannot fast-forward | ✓ Good (recorded in AGENTS.md) |
 
 ## Evolution
 
@@ -181,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-26 after Phase 16 (Batch Surface + Multi-Process Hardening) completed*
+*Last updated: 2026-10-27 at the v1.8 milestone close*

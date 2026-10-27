@@ -1,0 +1,8 @@
+{
+  "command": "go test ./cache/sqlite/ -run 'TestMSet|TestMDel' -v",
+  "exitCode": 1,
+  "targetTest": "TestMSetFunc",
+  "output": "# tests 11\n# pass 0\n# fail 11\nnot ok 1 - TestMSetNoPartialWrites\nnot ok 2 - TestMSetFunc/marshal_failure_writes_nothing\nnot ok 3 - TestMSetFunc/closed_provider_wrapped_errclosed\nnot ok 4 - TestMSetFunc/overwrite_replaces_value_and_expiry\nnot ok 5 - TestMSetFunc/happy_path_one_ttl_for_batch\nnot ok 6 - TestMSetFunc\nnot ok 7 - TestMDelFunc/closed_provider_wrapped_errclosed\nnot ok 8 - TestMDelFunc/closed_db_handle_fail_fast_wrapped\nnot ok 9 - TestMDelFunc/duplicate_input_keys_delete_once\nnot ok 10 - TestMDelFunc/chunked_250_keys_all_deleted\nnot ok 11 - TestMDelFunc\n",
+  "expected": "MSetFunc pre-marshals all pairs before BeginTx, writes one row per pair in one transaction with one resolved TTL, and returns wrapped errors; MDelFunc chunk-deletes deduplicated keys and fails fast with a wrapped error",
+  "actual": "MSetFunc stub returned nil without writing any row; MDelFunc stub returned nil without deleting"
+}

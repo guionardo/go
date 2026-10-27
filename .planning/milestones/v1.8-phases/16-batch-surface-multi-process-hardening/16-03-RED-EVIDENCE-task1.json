@@ -1,0 +1,8 @@
+{
+  "command": "go test ./cache/sqlite/ -run 'TestUniqueKeys|TestChunksOf|TestInPlaceholders|TestMGetFunc' -v",
+  "exitCode": 1,
+  "targetTest": "TestUniqueKeys",
+  "output": "# tests 14\n# pass 0\n# fail 14\nnot ok 1 - TestInPlaceholders\nnot ok 2 - TestUniqueKeys/duplicates_collapse_preserving_first_seen_order\nnot ok 3 - TestUniqueKeys/form_collision_collapses_to_first_occurrence\nnot ok 4 - TestUniqueKeys\nnot ok 5 - TestChunksOf/empty_input_no_chunks\nnot ok 6 - TestChunksOf/101_splits_100_plus_1\nnot ok 7 - TestChunksOf/250_splits_100_100_50\nnot ok 8 - TestChunksOf\nnot ok 9 - TestMGetFunc/duplicate_input_keys_produce_one_entry\nnot ok 10 - TestMGetFunc/corrupt_row_skipped_siblings_return\nnot ok 11 - TestMGetFunc/seeded_fresh_keys_return_values\nnot ok 12 - TestMGetFunc/expired_row_absent_but_retained\nnot ok 13 - TestMGetFunc/cross_chunk_150_keys_all_returned\nnot ok 14 - TestMGetFunc\n",
+  "expected": "uniqueKeys collapses duplicates preserving first-seen order; chunksOf splits at the 100 boundary; inPlaceholders emits n question marks; MGetFunc returns values for seeded fresh keys",
+  "actual": "uniqueKeys returned [1 1 1]; chunksOf returned one unbounded chunk; inPlaceholders returned \"?\"; MGetFunc returned an empty map"
+}

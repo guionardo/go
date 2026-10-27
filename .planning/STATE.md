@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.8
 milestone_name: SQLite Cache Backend
-current_phase: "17.1"
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 17.1 complete — all phases complete
-last_updated: "2026-10-27T09:22:57.886Z"
+last_updated: "2026-10-27T13:06:34.472Z"
 last_activity: 2026-10-27
-last_activity_desc: Phase 17.1 complete
-state_head: 52a9db67486118e0f2f5cfef6d6789ca276ff1a3
+last_activity_desc: Milestone v1.8 completed and archived
+state_head: b09358bd1c4821879253f521ba9aac4c97602115
 progress:
   total_phases: 4
   completed_phases: 15
   total_plans: 13
   completed_plans: 13
   percent: 100
+current_phase: "17.1"
 ---
 
 # Project State
@@ -28,12 +28,10 @@ See: .planning/PROJECT.md (updated 2026-10-26)
 
 ## Current Position
 
-Phase: 17.1
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-10-27 — Phase 17.1 complete
-
-Progress: [██████████] 100%
+Phase: Milestone v1.8 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-27 — Milestone v1.8 completed and archived
 
 ## Performance Metrics
 
@@ -147,6 +145,4 @@ Resume file: .planning/phases/17.1-fix-error-sentinel-identity-and-mget-error-pr
 
 ## Operator Next Steps
 
-- Phase 16 complete (5/5 plans, UAT 1/1, security 13/13) — PR #51 open and green
-- Discuss Phase 17: `/gsd-discuss-phase 17`
-- Or plan it directly: `/gsd-plan-phase 17`
+- Start the next milestone with /gsd-new-milestone

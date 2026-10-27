@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.8 SQLite Cache Backend (Shipped: 2026-10-27)
+
+**Phases completed:** 4 phases (15, 16, 17, 17.1), 13 plans, 34 tasks
+
+**Key accomplishments:**
+
+- A sixth cache backend — embedded, durable SQLite on the pure-Go `modernc` driver: persistence with no CGO, no server, and no infrastructure for downstream projects
+- Contract parity with the five existing providers: same `Cache`/`BatchCache` surface, `fmt.Sprint` keys, JSON values, `ErrMiss` wrapping, and the shared singleflight `GetOrSet`
+- Multi-process WAL safety proven, not asserted: a two-process E2E on all three OSes in CI, with a bounded busy-only open retry (30/30 clean vs 8/10 failures raw) and a 64 MB journal bound
+- Atomic batch surface — chunked `MGet`/`MDel` and a single-transaction `MSet` with one TTL, race-clean on both memory and file modes
+- Delivery hardening per repo standards: a CGO-free three-OS matrix that asserts its own claim, no coverage overrides, and benchmarks placing sqlite against mem and per-key loops
+- An honest error contract and a documentation regime with teeth — one provider prefix per error, dual-sentinel `errors.Is`, root README as an index, 18 package READMEs, 23 of 26 packages with runnable examples
+
+**Delivered:** 7 merged PRs over 20 days (2026-10-08 → 2026-10-27); audit `passed`, 27/27 requirements, 0 open artifacts.
+
+**Archived artifacts:**
+
+- `milestones/v1.8-ROADMAP.md`
+- `milestones/v1.8-REQUIREMENTS.md`
+- `milestones/v1.8-MILESTONE-AUDIT.md`
+- `milestones/v1.8-phases/`
+
+---
+
 ## v1.7 Project Probe (Shipped: 2026-09-30)
 
 **Phases completed:** 5 phases, 16 plans, 36 tasks
