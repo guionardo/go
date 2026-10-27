@@ -5,6 +5,7 @@ package cache_test
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -247,6 +248,17 @@ func TestCacheE2E_SQLite(t *testing.T) {
 			name: "sqlite_memory",
 			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return sqlite.New[string, string](sqlite.WithMemory())
+			},
+		},
+		{
+			// File mode is the durable path: WAL on disk, not :memory:.
+			// t.TempDir is removed with the subtest, so the database and its
+			// -wal/-shm sidecars clean themselves up. No Docker involved.
+			name: "sqlite_file",
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
+				path := filepath.Join(t.TempDir(), "e2e.db")
+
+				return sqlite.New[string, string](sqlite.WithPath(path))
 			},
 		},
 	})

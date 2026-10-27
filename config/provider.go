@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"reflect"
 	"sync"
@@ -116,27 +115,27 @@ func (p *Provider[T]) HTTPHandler() http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(cfg); err != nil {
-			slog.Error("failed to encode configuration response", "error", err)
+			p.log().Error("failed to encode configuration response", "error", err)
 		}
 	})
 }
 
 func (p *Provider[T]) updateConfiguration(configuration T) error {
 	if err := p.validateConfiguration(configuration); err != nil {
-		logger().Error("error validating configuration", "error", err)
+		p.log().Error("error validating configuration", "error", err)
 		return err
 	}
 
 	// Compare the configuration with the previous configuration
 	if reflect.DeepEqual(p.configuration, configuration) {
-		logger().Info("configuration is the same as the previous configuration, skipping update")
+		p.log().Info("configuration is the same as the previous configuration, skipping update")
 		return nil
 	}
 
 	p.configuration = configuration
 	p.loaded = true
 
-	logger().Info("configuration updated", getConfigurationLog(configuration))
+	p.log().Info("configuration updated", getConfigurationLog(configuration))
 
 	return nil
 }
@@ -149,20 +148,27 @@ func (p *Provider[T]) loadStaticConfiguration() error {
 		errs          []error
 	)
 
-	if profilesPath := p.getProfilesPath(); profilesPath == "" {
-		slog.Info("no profiles path found, skipping profile loading")
+	profilesPath := p.getProfilesPath()
+
+	p.debugLog("loading static configuration",
+		"profilesPath", profilesPath,
+		"defaultScope", p.defaultScope,
+		"scope", p.scope)
+
+	if profilesPath == "" {
+		p.log().Info("no profiles path found, skipping profile loading")
 	} else {
 		content, err := profile.GetScopedProfileContent(p.profilesPath, p.defaultScope, p.scope)
 		if err != nil {
-			logger().Warn("error reading profile", "error", err)
+			p.log().Warn("error reading profile", "error", err)
 		} else if err := yaml.Unmarshal(content, &configuration); err != nil {
-			logger().Error("error unmarshalling profile", "error", err)
+			p.log().Error("error unmarshalling profile", "error", err)
 			errs = append(errs, fmt.Errorf("yaml: %w", err))
 		}
 	}
 
 	if err := environment.ParseEnvironment(&configuration, nil); err != nil {
-		logger().Error("error parsing environment", "error", err)
+		p.log().Error("error parsing environment", "error", err)
 		errs = append(errs, fmt.Errorf("env: %w", err))
 	}
 

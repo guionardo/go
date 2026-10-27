@@ -67,6 +67,27 @@ jobs:
       - name: Run tests
         run: go test -v ./...
 
+      # Smoke only: proves the benchmark suite compiles and runs, without paying
+      # for real measurement (-benchtime=1x, one iteration). -run=^$ skips every
+      # test so this step cannot time out the job on unrelated failures.
+      # Docker-backed provider benchmarks gate themselves inside the benchmark
+      # code, so no daemon is needed here.
+      # shell: bash for the same reason as the build gate above: the default
+      # Windows shell is pwsh, where `$` is a variable sigil — `-run=^$` arrives
+      # mangled and `go test` then falls back to package "." (no Go files here).
+      - name: Benchmark smoke
+        shell: bash
+        run: go test -run=^$ -bench=. -benchtime=1x ./cache/...
+
+      # The conformance E2E is a stock `go test` run under the e2e tag; nothing
+      # else in CI executes it. Restricted to the local providers (mem, sqlite)
+      # on purpose: the Redis/Valkey/Memcache/Postgres cases spin up
+      # testcontainers and only skip under -short, so they would need a Docker
+      # daemon that the macOS and Windows runners do not have.
+      - name: Cache conformance E2E (local providers)
+        shell: bash
+        run: go test -tags=e2e -run 'TestCacheE2E_(Mem|SQLite)$' ./cache/ -count=1 -timeout=120s
+
       - name: SQLite two-process E2E
         run: go test -tags=e2e -run 'TestTwoProcess' ./cache/sqlite/ -v -count=1 -timeout=180s
 
@@ -88,8 +109,11 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
       - name: Build swapper binaries
         run: make swapper

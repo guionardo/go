@@ -10,10 +10,11 @@
 // cross-multiply) when a fraction may have come out of Add or Subtract.
 //
 // The zero value Fraction{} is 0/0, which is not a valid fraction: Float64()
-// returns NaN, Multiply returns 0/1 because it discards New's error, Divide
-// returns ErrDivideByZero, and Add/Subtract panic with an integer divide by
-// zero. Always build fractions with New or FromFloat64. Operations return new
-// Fraction values — the original is never modified.
+// returns NaN, Multiply returns 0/1 because it discards New's error, and Divide
+// returns ErrDivideByZero. Add and Subtract treat a zero denominator as 0/1, so
+// the zero value behaves as zero in those two operations. Prefer building
+// fractions with New or FromFloat64. Operations return new Fraction values — the
+// original is never modified.
 //
 // Key types:
 //   - Fraction: immutable fraction with Numerator() and Denominator() accessors

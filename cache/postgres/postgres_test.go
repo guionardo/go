@@ -90,6 +90,30 @@ func TestPostgresCache_SetGet(t *testing.T) {
 	})
 }
 
+// TestPostgresCache_CustomTableName guards the custom-table path end to end:
+// the DDL New executes must create the table the queries read from.
+func TestPostgresCache_CustomTableName(t *testing.T) {
+	t.Parallel()
+
+	connString := skipIfNoPostgres(t)
+
+	c, err := postgres.New[string, string](
+		postgres.WithConnString(connString),
+		postgres.WithTableName("custom_cache_entries"),
+	)
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	require.NoError(t, c.Set(t.Context(), "custom_table_key", "custom_table_value"))
+
+	got, err := c.Get(t.Context(), "custom_table_key")
+	require.NoError(t, err)
+	assert.Equal(t, "custom_table_value", got)
+
+	require.NoError(t, c.Delete(t.Context(), "custom_table_key"))
+}
+
 func TestPostgresCache_Close(t *testing.T) {
 	t.Parallel()
 

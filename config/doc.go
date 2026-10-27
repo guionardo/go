@@ -19,8 +19,8 @@
 //   - WithSingleConfigFile: load one YAML file, no scope overlay
 //   - WithScope: set active scope name
 //   - WithDefaultScope: set fallback scope
-//   - WithLogger: inject custom logger
-//   - WithDebugLogger: enable debug logging
+//   - WithLogger: inject the Logger that receives the provider's messages
+//   - WithDebugLogger: enable the provider's debug-level messages
 //
 // Single-file configuration:
 //

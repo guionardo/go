@@ -50,6 +50,10 @@ func ExampleNew_withPath() {
 	ctx := context.Background()
 
 	first := sqlite.New[string, string](sqlite.WithPath(path))
+	// Close on every path: the explicit Close below is part of the demo, and
+	// this deferred Close covers the error returns before it (IN-01).
+	defer func() { _ = first.Close() }()
+
 	if err := first.Set(ctx, "greeting", "hello"); err != nil {
 		fmt.Println("set failed:", err)
 

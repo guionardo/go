@@ -57,9 +57,9 @@ Because this is a library rather than a running service, "data flow" is describe
 3. `Do` runs a **fast-path** `Get` *outside* the singleflight group (`cache/singleflight.go`): a hit returns immediately with no lock contention.
 4. On a miss, `group.Do` runs the group function once (**singleflight** deduplicates concurrent misses on the same key):
    - **double-check** `Get` so a concurrent direct `Set` is not clobbered,
-   - run the `setter` in the leader's goroutine (with panic recovery via `callSetter` → `*cache.Panic`),
+   - run the `setter` in the leader's goroutine (with panic recovery via `callSetter` → `*cache.PanicError`),
    - call the provider's `Set` with the verbatim TTL (leader's TTL wins on conflict).
-5. Every concurrent waiter receives the identical computed value or error. `DoChan` adds per-caller cancellation: a canceled waiter abandons its wait promptly and receives an error wrapping both `cache.ErrCanceled` and its own `ctx.Err()`.
+5. Every concurrent waiter receives the identical computed value or error. `Do` is context-blind: a caller that cancels its own context still waits for the leader, because the shared setter runs once in the leader's goroutine with the leader's context. There is no `DoChan` and no cancellation sentinel.
 
 **Config — `Provider.GetConfiguration()` (config/provider.go):**
 1. First call acquires the write lock and invokes `loadStaticConfiguration`.
@@ -80,9 +80,9 @@ Because this is a library rather than a running service, "data flow" is describe
 | Abstraction | Location | Description |
 |-------------|----------|-------------|
 | `Cache[K, V]` interface | `cache/cache.go` | Generic key-value cache contract: `Get`, `Set`, `Delete`, `GetOrSet` are context-aware; `Close` takes no context. |
-| `SingleflightGetOrSet[K, V]` | `cache/singleflight.go` | Deduplicates concurrent `GetOrSet` misses on the same key; provides cancel-aware `DoChan`. |
+| `SingleflightGetOrSet[K, V]` | `cache/singleflight.go` | Deduplicates concurrent `GetOrSet` misses on the same key through one context-blind `Do`; a canceled waiter still blocks for the leader. |
 | `NewConcreteCache` / `cacher` | `cache/concrete_cache.go` | Bridges the public `Cache` interface to provider-specific `GetFunc/SetFunc/DeleteFunc/CloseFunc`. |
-| `Panic` error type | `cache/errors.go` | Wraps recovered setter panics (mirrors `x/sync` singleflight's `panicError`); `Unwrap` traverses the recovered error. |
+| `PanicError` error type | `cache/errors.go` | Wraps recovered setter panics (mirrors `x/sync` singleflight's `panicError`); `Unwrap` traverses the recovered error. |
 | `Provider[T]` | `config/provider.go` | Generic typed configuration provider; thread-safe `GetConfiguration`/`UpdateConfiguration` backed by YAML profiles + env + validation. |
 | `Logger` interface | `config/provider.go` | Logging seam (implemented by `log/slog`, `testing.T`, or custom) used for configuration events. |
 | `UpdateResult`, `UpdateState` | `release/self_update.go` | Result struct + state enum describing the entry of a self-update attempt. |

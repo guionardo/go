@@ -9,8 +9,9 @@ type (
 	// Fraction represents a fraction. It is an immutable type.
 	//
 	// Fractions built with New or FromFloat64 are simplified and never x/0.
-	// The zero value Fraction{} is 0/0, and Add/Subtract return unreduced
-	// results; see the package documentation.
+	// The zero value Fraction{} is 0/0, which Add and Subtract treat as 0/1, so
+	// the zero value behaves as zero. Add and Subtract return unreduced results;
+	// see the package documentation.
 	Fraction struct {
 		numerator   int64
 		denominator int64
@@ -148,7 +149,13 @@ func FromFloat64(f float64) (Fraction, error) { //nolint:cyclop
 }
 
 // Add adds both fractions and returns the result.
+//
+// The result is the common-denominator value, unreduced. A fraction with a zero
+// denominator is treated as 0/1, so the zero value Fraction{} adds like zero.
 func (f1 Fraction) Add(f2 Fraction) Fraction {
+	f1 = f1.zeroDenominatorAsZero()
+	f2 = f2.zeroDenominatorAsZero()
+
 	m := lcm(f1.denominator, f2.denominator)
 
 	return Fraction{
@@ -181,6 +188,9 @@ func (f1 Fraction) Multiply(f2 Fraction) Fraction {
 }
 
 // Subtract subtracts both fractions and returns the result.
+//
+// The result is the common-denominator value, unreduced. A fraction with a zero
+// denominator is treated as 0/1, so the zero value Fraction{} subtracts like zero.
 func (f1 Fraction) Subtract(f2 Fraction) Fraction {
 	f2.numerator *= -1
 	return f1.Add(f2)
@@ -199,6 +209,17 @@ func (f1 Fraction) Denominator() int64 {
 // Numerator returns the fraction numerator.
 func (f1 Fraction) Numerator() int64 {
 	return f1.numerator
+}
+
+// zeroDenominatorAsZero treats a zero denominator as 0/1. Only the zero value
+// Fraction{} has a zero denominator, so this makes it behave as zero in Add and
+// Subtract instead of dividing by zero.
+func (f1 Fraction) zeroDenominatorAsZero() Fraction {
+	if f1.denominator == 0 {
+		return zeroValue
+	}
+
+	return f1
 }
 
 // abs returns the absolute value of an integer.

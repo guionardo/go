@@ -45,11 +45,11 @@ func New[K comparable, V any](opts ...Option) (cache.BatchCache[K, V], error) {
 		return nil, fmt.Errorf("cache/postgres: %w", err)
 	}
 
-	if _, err := pool.Exec(context.Background(), CreateTableSQL); err != nil {
+	if _, err := pool.Exec(context.Background(), createTableSQL(cfg.TableName)); err != nil {
 		return nil, fmt.Errorf("cache/postgres: %w", err)
 	}
 
-	if _, err := pool.Exec(context.Background(), PrewarmSQL); err != nil {
+	if _, err := pool.Exec(context.Background(), prewarmSQL(cfg.TableName)); err != nil {
 		logger().Warn("pg_prewarm not available, skipping prewarm", "error", err)
 	}
 

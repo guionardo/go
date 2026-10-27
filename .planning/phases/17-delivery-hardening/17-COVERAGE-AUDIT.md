@@ -1,6 +1,12 @@
 # QUAL-02 Coverage Audit — `cache/sqlite`
 
 **Audit date:** 2026-10-26
+
+> **Snapshot, not a live pointer.** The figures and `file.go:LINE` citations below were
+> captured on 2026-10-26. Later phases changed `cache/sqlite`, so citation line numbers
+> have drifted and the totals moved (current: 82.4% total, `cache/sqlite` 92.4%). The
+> mapping still names real tests and QUAL-02 is re-proven by re-running the command in
+> the header.
 **Command:** `make coverage-quick` (`go test ./... -coverprofile=./cover.out -covermode=atomic -count=1`
 then `go-test-coverage --config=./.testcoverage-quick.yml`)
 **Tree:** branch `gsd/phase-17-delivery-hardening`, after 17-01 (CI) and 17-02 (benchmarks) landed and

@@ -9,9 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:paralleltest // global state read: MachineID reads collectFuncs, which sibling tests swap
 func TestMachineID(t *testing.T) {
-	t.Parallel()
-
 	got := mid.MachineID()
 	t.Logf("MachineID [%s] = %q", runtime.GOOS, got)
 
@@ -26,19 +25,15 @@ func TestMachineID(t *testing.T) {
 	assert.NotEmpty(t, got, "MachineID should be available on %s", runtime.GOOS)
 }
 
+//nolint:paralleltest // global state read: MachineID reads collectFuncs, which sibling tests swap
 func TestMachineID_AlwaysString(t *testing.T) {
-	t.Parallel()
-
 	got := mid.MachineID()
 	assert.IsType(t, "", got, "MachineID must always return a string")
 }
 
+//nolint:paralleltest // global state read: MachineID reads collectFuncs, which sibling tests swap
 func TestConcurrentAccess(t *testing.T) {
-	t.Parallel()
-
 	t.Run("parallel_calls_dont_crash", func(t *testing.T) {
-		t.Parallel()
-
 		done := make(chan struct{}, 10)
 		for range 10 {
 			go func() {

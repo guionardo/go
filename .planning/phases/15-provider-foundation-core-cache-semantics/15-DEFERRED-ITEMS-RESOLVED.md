@@ -1,10 +1,15 @@
 # Phase 15 Deferred Items
 
+> **DI-15-01 was resolved in Phase 16** by the bounded busy-only open retry
+> (`retry.go`, 5 ms backoff over the 5 s budget, classified on the SQLITE_BUSY
+> code at the connection-establishment seam), verified 0/30 failures versus the
+> 29/40 baseline. This file is kept as the historical evidence record.
+
 Items discovered during 15-02 execution that are pre-existing (not caused by this
 plan's changes) and are deliberately not fixed here per the executor scope
 boundary. Each carries enough evidence for Phase 16 (CONC-01/02) to act.
 
-## DI-15-01: Concurrent first-open of a fresh file can defer SQLITE_BUSY (WAL conversion race)
+## DI-15-01 (RESOLVED in Phase 16): Concurrent first-open of a fresh file can defer SQLITE_BUSY (WAL conversion race)
 
 **Discovered during:** 15-02 Task 3 (a `go test -cover` run failed
 `TestBootstrapIdempotence/concurrent_first_open_all_usable`).
@@ -24,12 +29,14 @@ and ~10% of 4-way concurrent first-open test iterations.
 **Isolation evidence** (scratch diagnostic, removed after use; 40 iterations ×
 4 workers = 160 connection pings per variant, all on one fresh path):
 
+```text
 | DSN variant | ping SQLITE_BUSY |
 |-------------|------------------|
-| `_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate` (production DSN) | 4/160 |
-| `_busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate` (no journal_mode) | 0/160 |
-| `_busy_timeout=5000&_journal_mode=WAL` | 3/160 |
-| `_busy_timeout=5000` | 0/160 |
+| _busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate (production DSN) | 4/160 |
+| _busy_timeout=5000&_synchronous=NORMAL&_txlock=immediate (no journal_mode) | 0/160 |
+| _busy_timeout=5000&_journal_mode=WAL | 3/160 |
+| _busy_timeout=5000 | 0/160 |
+```
 
 The driver (modernc.org/sqlite v1.60.1, `sqlite.go` `applyQueryParams`) applies
 `busy_timeout` before `journal_mode`, so ordering is not the issue; SQLite

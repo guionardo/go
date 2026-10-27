@@ -70,10 +70,12 @@ mux.Handle("/config", provider.HTTPHandler())
   resolved). Panics if no usable file name is given.
 - `WithScope(scope)` — active scope name (e.g. `production`, `development`).
 - `WithDefaultScope(scope)` — fallback scope name.
-- `WithLogger(logger)` — supply a `Logger`. See [Notes](#notes).
-- `WithDebugLogger()` — build a debug-level `slog` logger writing to stdout and emit a
-  warning that it must not be used in production. Not wired into the provider's log
-  output either; see [Notes](#notes).
+- `WithLogger(logger)` — supply a `Logger` for the provider's own messages: info,
+  warn and error, plus debug when `WithDebugLogger` is also enabled. Without one the
+  provider logs through the default `slog` logger tagged `module=config`.
+- `WithDebugLogger()` — enable the provider's debug messages. When no `Logger` has
+  been supplied yet it installs a debug-level `slog` logger writing to stdout, and it
+  warns that it must not be used in production.
 
 ```go
 provider := config.NewProvider[AppConfig](
@@ -141,7 +143,23 @@ Each is independently importable:
 
 ## Notes
 
-Logging is done through `log/slog` with `module=config`. `WithLogger` stores the supplied
-`Logger` but the provider does not yet route its messages through it, and `WithDebugLogger`
-only sets a handler on its own internal logger plus the construction-time warning. To
-change log output today, configure `slog.SetDefault`.
+Logging goes through the `Logger` installed by `WithLogger`. Without one, the provider
+falls back to `slog`'s default logger tagged `module=config`, so `slog.SetDefault`
+still redirects it as long as the default is set before the provider logs for the
+first time.
+
+```go
+provider := config.NewProvider[AppConfig](
+	config.WithLogger(customLogger),
+	config.WithDebugLogger(), // debug messages now reach customLogger
+)
+```
+
+`WithDebugLogger` enables the provider's own debug messages (resolved profiles path
+and scopes). It sets the debug flag and installs its stdout logger only when no
+`Logger` is present yet, so either option order reaches your logger: with `WithLogger`
+first it receives the debug output, and with `WithLogger` second it replaces the
+stdout logger while the debug flag stays on.
+
+The `config/environment` and `config/profile` sub-packages log through `slog`'s
+default logger directly and are unaffected by these options.

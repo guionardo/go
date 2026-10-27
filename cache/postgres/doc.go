@@ -4,6 +4,9 @@
 // table (blazing-fast writes, no WAL) and optionally calls pg_prewarm
 // on startup. A background goroutine sweeps expired entries.
 //
+// The table is named cache_entries by default; WithTableName creates and
+// queries a table with the given name instead.
+//
 // Usage:
 //
 //	c, err := postgres.New[string, string](

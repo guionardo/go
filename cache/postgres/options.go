@@ -16,7 +16,7 @@ type Option func(*Config)
 
 func defaultConfig() *Config {
 	return &Config{
-		TableName:     "cache_entries",
+		TableName:     defaultTableName,
 		PoolSize:      5,
 		SweepInterval: 1 * time.Minute,
 	}

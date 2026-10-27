@@ -29,6 +29,12 @@ const (
 	// duplicated token (W1, D-01, D-05).
 	closedMessage = "cache/sqlite: cache: cache is closed"
 
+	// providerPrefix is the delimiter every consumer-visible provider error
+	// carries. Counting the delimiter (not the bare token) means a message
+	// that mentions "cache/sqlite" without the separator cannot satisfy the
+	// exactly-one-prefix assertions (IN-01).
+	providerPrefix = "cache/sqlite: "
+
 	// wantDirPerm is the permission mode the provider creates cache directories
 	// with — the documented contract behind New(WithName(...)). It is asserted
 	// only on non-Windows runners, where permission bits round-trip (W5, D-11).
@@ -566,6 +572,7 @@ func TestClosedOps(t *testing.T) {
 
 	_, err := c.Get(t.Context(), "k")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 
 	err = c.Set(t.Context(), "k", "v")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
@@ -718,7 +725,24 @@ func TestClosedErrorPrefix(t *testing.T) {
 	require.ErrorIs(t, err, sqlite.ErrClosed)
 	require.ErrorIs(t, err, cache.ErrClosed)
 	require.Equal(t, closedMessage, err.Error())
-	assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+	assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
+}
+
+// TestMissErrorPrefix applies the same exactly-one-prefix invariant to the
+// other sentinel every provider wraps: a missing key must carry one provider
+// delimiter around the cache-level ErrMiss text, so a re-wrap cannot silently
+// double the token while errors.Is(t, cache.ErrMiss) still holds.
+func TestMissErrorPrefix(t *testing.T) {
+	t.Parallel()
+
+	c := sqlite.New[string, string](sqlite.WithMemory())
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	_, err := c.Get(t.Context(), "absent")
+	require.ErrorIs(t, err, cache.ErrMiss)
+	require.Equal(t, providerPrefix+"cache: key not found", err.Error())
+	assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
 }
 
 // TestDeferredErrorPrefix pins the exactly-one-prefix contract for the two
@@ -738,7 +762,7 @@ func TestDeferredErrorPrefix(t *testing.T) {
 		_, err := c.Get(t.Context(), "k")
 		require.ErrorIs(t, err, sqlite.ErrInvalidPath)
 		require.Equal(t, "cache/sqlite: invalid path: path must not contain '?' or '#'", err.Error())
-		assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+		assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
 	})
 
 	t.Run("bare_open_error_wrapped_once", func(t *testing.T) {
@@ -767,8 +791,36 @@ func TestDeferredErrorPrefix(t *testing.T) {
 		var pathErr *fs.PathError
 		require.ErrorAs(t, err, &pathErr)
 
-		assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+		assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
 	})
+}
+
+// TestDeferredUserCacheDirError pins the third deferred open-error shape: the
+// os.UserCacheDir lookup that name mode performs. The failure comes from the
+// real code path — os.UserCacheDir reads HOME/XDG_CACHE_HOME (LocalAppData on
+// Windows) and returns a bare error when they are empty, which New records and
+// check() wraps exactly once. It carries no ErrInvalidPath identity, and it
+// must not gain a second prefix (WR-05).
+//
+//nolint:paralleltest // global state mutation: HOME/XDG_CACHE_HOME/LocalAppData via t.Setenv
+func TestDeferredUserCacheDirError(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("LocalAppData", "")
+
+	_, envErr := os.UserCacheDir()
+	require.Error(t, envErr, "empty HOME/XDG_CACHE_HOME/LocalAppData must make os.UserCacheDir fail")
+
+	c := sqlite.New[string, string](sqlite.WithName("usercachedir-app"))
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	_, err := c.Get(t.Context(), "k")
+	require.Error(t, err)
+	require.ErrorContains(t, err, "resolve user cache dir", "the real lookup path must supply the error")
+	require.NotErrorIs(t, err, sqlite.ErrInvalidPath)
+	require.True(t, strings.HasPrefix(err.Error(), providerPrefix))
+	assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
 }
 
 func TestOptimizable(t *testing.T) {
@@ -856,17 +908,23 @@ func TestOptimizableClosed(t *testing.T) {
 	opt, ok := c.(sqlite.Optimizable)
 	require.True(t, ok)
 
-	err := opt.Checkpoint(t.Context())
-	require.ErrorIs(t, err, sqlite.ErrClosed)
-	require.ErrorIs(t, err, cache.ErrClosed)
-	require.ErrorContains(t, err, "cache/sqlite:")
-	require.Equal(t, closedMessage, err.Error())
-	assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+	// Both entry points must yield the identical closed error — same sentinel
+	// identity, same exact message, exactly one provider delimiter — so neither
+	// regression path stays unpinned (IN-03).
+	for name, call := range map[string]func(context.Context) error{
+		"checkpoint": opt.Checkpoint,
+		"vacuum":     opt.Vacuum,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	err = opt.Vacuum(t.Context())
-	require.ErrorIs(t, err, sqlite.ErrClosed)
-	require.ErrorIs(t, err, cache.ErrClosed)
-	require.ErrorContains(t, err, "cache/sqlite:")
+			err := call(t.Context())
+			require.ErrorIs(t, err, sqlite.ErrClosed)
+			require.ErrorIs(t, err, cache.ErrClosed)
+			require.Equal(t, closedMessage, err.Error())
+			assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
+		})
+	}
 }
 
 func TestOptimizableDeferredErr(t *testing.T) {
@@ -879,13 +937,22 @@ func TestOptimizableDeferredErr(t *testing.T) {
 	opt, ok := c.(sqlite.Optimizable)
 	require.True(t, ok)
 
-	err := opt.Checkpoint(t.Context())
-	require.ErrorIs(t, err, sqlite.ErrInvalidPath)
-	require.ErrorContains(t, err, "cache/sqlite:")
+	// Mirror the closed case: an already-prefixed deferred validation error
+	// must pass through check() untouched from either entry point, never
+	// gaining a second delimiter (WR-05).
+	for name, call := range map[string]func(context.Context) error{
+		"checkpoint": opt.Checkpoint,
+		"vacuum":     opt.Vacuum,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	err = opt.Vacuum(t.Context())
-	require.ErrorIs(t, err, sqlite.ErrInvalidPath)
-	require.ErrorContains(t, err, "cache/sqlite:")
+			err := call(t.Context())
+			require.ErrorIs(t, err, sqlite.ErrInvalidPath)
+			require.Equal(t, "cache/sqlite: invalid path: path must not contain '?' or '#'", err.Error())
+			assert.Equal(t, 1, strings.Count(err.Error(), providerPrefix))
+		})
+	}
 }
 
 // TestNewWithNameDurability pins the headline usage advertised in doc.go: a
@@ -911,6 +978,10 @@ func TestNewWithNameDurability(t *testing.T) {
 	dbPath := filepath.Join(cacheDir, name, "cache.db")
 
 	first := sqlite.New[string, string](sqlite.WithName(name))
+
+	// Defensive close: the explicit Close below is the assertion under test,
+	// and this cleanup still releases the handle if an assertion fails first.
+	t.Cleanup(func() { _ = first.Close() })
 
 	require.NoError(t, first.Set(t.Context(), "greeting", "hello"))
 	require.NoError(t, first.Close())
