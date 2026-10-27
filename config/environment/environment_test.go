@@ -83,10 +83,17 @@ func TestParseEnvironmentErrors(t *testing.T) {
 func TestParseEnvironment(t *testing.T) { //nolint:paralleltest
 	ts := TestStruct{}
 
+	// Restore the global logger when this test ends: leaving it pointed at
+	// t.Output() makes any later log write panic with "Write called after
+	// TestParseEnvironment has completed" (reproducible under -count>1).
+	previousLogger := slog.Default()
+
 	logger := slog.New(slog.NewTextHandler(t.Output(), &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	slog.SetDefault(logger)
+
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
 
 	t.Setenv("INT", "2")
 	t.Setenv("INT16", "17")
