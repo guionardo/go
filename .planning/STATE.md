@@ -4,12 +4,12 @@ milestone: v1.8
 milestone_name: SQLite Cache Backend
 current_phase: "17.1"
 current_phase_name: Fix error sentinel identity and MGet error propagation
-status: Not planned (inserted gap-closure phase)
+status: executing
 stopped_at: Phase 17.1 context gathered
-last_updated: "2026-10-27T01:25:30.303Z"
-last_activity: 2026-10-26
-last_activity_desc: Phase 17 complete
-state_head: fa6392c58f31bf231c545e5f6e54c3254f0a0a93
+last_updated: "2026-10-27T08:56:48.609Z"
+last_activity: 2026-10-27
+last_activity_desc: Phase 17.1 execution started
+state_head: 4342700eb4bdb673414961eae364b02c37f09c9e
 progress:
   total_phases: 4
   completed_phases: 15
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-26)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 17 — Delivery Hardening
+**Current focus:** Phase 17.1 — Fix error sentinel identity and MGet error propagation
 
 ## Current Position
 
-Phase: 17.1 (Fix error sentinel identity and MGet error propagation) — READY TO EXECUTE
-Plan: Not started
-Status: Not planned (inserted gap-closure phase)
-Last activity: 2026-10-26 — Phase 17 complete
+Phase: 17.1 (Fix error sentinel identity and MGet error propagation) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 17.1
+Last activity: 2026-10-27 — Phase 17.1 execution started
 
 Progress: [█████████░] 85%
 
