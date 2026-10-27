@@ -8,6 +8,6 @@
 //
 // Usage:
 //
-//	c := mem.New[string, string](cache.WithDefaultTTL(5*time.Minute))
+//	c := mem.New[string, string](ctx, mem.WithDefaultTTL(5*time.Minute))
 //	c.Set(ctx, "key", "value")
 package mem

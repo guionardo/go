@@ -8,7 +8,9 @@ import (
 type (
 	// Fraction represents a fraction. It is an immutable type.
 	//
-	// It is always a valid fraction (never x/0) and it is always simplified.
+	// Fractions built with New or FromFloat64 are simplified and never x/0.
+	// The zero value Fraction{} is 0/0, and Add/Subtract return unreduced
+	// results; see the package documentation.
 	Fraction struct {
 		numerator   int64
 		denominator int64

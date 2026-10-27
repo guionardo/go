@@ -11,7 +11,7 @@
 //	import "github.com/guionardo/go/cache"
 //
 //	var c cache.Cache[string, string]
-//	c = mem.New[string, string]()
+//	c = mem.New[string, string](ctx) // ctx drives the background TTL sweeper
 //	c.Set(ctx, "key", "value")
 //	v, err := c.Get(ctx, "key")
 //
@@ -37,9 +37,10 @@
 //	MSet(ctx, items map[K]V, ttl ...time.Duration) — store multiple values with optional single TTL
 //	MDel(ctx, keys ...K)                 — delete multiple keys (idempotent)
 //
-// Each provider uses an optimal strategy: mem uses a single lock acquisition,
-// redis/valkey use pipelines, memcache uses GetMulti, postgres uses SendBatch,
-// sqlite uses chunked IN queries and a single-transaction prepared upsert.
+// Each provider uses its client library's single-round-trip primitive: mem takes
+// one lock acquisition, redis uses a go-redis Pipeline, valkey uses valkey-go
+// DoMulti, memcache uses GetMulti, postgres uses pgx SendBatch, and sqlite uses
+// chunked IN queries plus a single-transaction prepared upsert.
 // BatchCache[K,V] embeds Cache[K,V] for full backward compatibility.
 //
 // Configuration via functional options:

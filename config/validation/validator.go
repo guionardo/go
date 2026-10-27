@@ -7,8 +7,9 @@ import (
 )
 
 // Validator is the interface implemented by types that can self-validate.
-// Types implementing this interface receive custom validation logic
-// before the standard struct validation runs.
+// Types implementing this interface replace the standard struct validation:
+// Validate returns Validate() immediately, so validator/v10 struct tags on
+// such a type are never run.
 type Validator interface {
 	Validate() error
 }

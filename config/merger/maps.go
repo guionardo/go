@@ -3,8 +3,10 @@ package merger
 import "reflect"
 
 // MergeMaps performs a recursive deep-merge of multiple maps.
-// Each subsequent map's values are merged into the accumulator. Nested maps
-// are merged recursively; non-map values from later maps overwrite earlier ones.
+// Each subsequent map's values are merged into the accumulator. Nested
+// map[string]any values are merged recursively; any other value replaces an
+// earlier one only when both have the same dynamic type, otherwise the later
+// value is skipped and the earlier one is kept.
 func MergeMaps(maps ...map[string]any) map[string]any {
 	current := make(map[string]any)
 	for _, m := range maps {
