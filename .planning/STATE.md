@@ -3,18 +3,19 @@ gsd_state_version: "1.0"
 milestone: v1.8
 milestone_name: SQLite Cache Backend
 current_phase: "17.1"
+current_phase_name: Fix error sentinel identity and MGet error propagation
 status: Not planned (inserted gap-closure phase)
 stopped_at: Phase 17.1 context gathered
-last_updated: "2026-10-27T00:43:12.565Z"
+last_updated: "2026-10-27T01:25:30.303Z"
 last_activity: 2026-10-26
 last_activity_desc: Phase 17 complete
-state_head: 58907ed9356e7718e9e153c027b65aac62f84690
+state_head: fa6392c58f31bf231c545e5f6e54c3254f0a0a93
 progress:
   total_phases: 4
   completed_phases: 15
-  total_plans: 11
+  total_plans: 13
   completed_plans: 11
-  percent: 100
+  percent: 85
 ---
 
 # Project State
@@ -28,12 +29,12 @@ See: .planning/PROJECT.md (updated 2026-10-26)
 
 ## Current Position
 
-Phase: 17.1
+Phase: 17.1 (Fix error sentinel identity and MGet error propagation) — READY TO EXECUTE
 Plan: Not started
 Status: Not planned (inserted gap-closure phase)
 Last activity: 2026-10-26 — Phase 17 complete
 
-Progress: [██████████] 100%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
