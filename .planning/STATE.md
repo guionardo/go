@@ -21,10 +21,10 @@ current_phase: "17.1"
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-26)
+See: .planning/PROJECT.md (updated 2026-10-27)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 17.1 — Fix error sentinel identity and MGet error propagation
+**Current focus:** Awaiting the next milestone — v1.8 is shipped and archived
 
 ## Current Position
 
@@ -118,12 +118,12 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- [Phase 16 — resolved]: Two-process `SQLITE_BUSY` behavior is now proven — 16-01 raw arm failed 8/10 runs (DI-15-01 reproduced cross-process) while the bounded busy-only policy arm ran 30/30 clean, and 16-04's CI E2E (contention + crash arms) is green on ubuntu/macos/windows. CONC-01/CONC-02 closed.
-- [Phase 16 — reviewer-flagged follow-up]: Windows `-race` broadening — the race step is gated to `runner.os != 'Windows'` (no C toolchain); recorded as a follow-up in the `.github/workflows/go.yml` comment.
-- [Phase 16 — pre-existing, tracked]: `release/update.go` joins untrusted `Asset.Name` into `os.Create` without sanitization (path traversal, defense-in-depth). Predates Phase 16, no requirement covers it; recorded `open` in `16-REVIEW-DISPOSITION.md`.
-- [Deferred — tracked]: Phase 10 CR-01 — D-04 errno mapping needs Windows verification (syscall.EACCES invented on Windows) — deferred with rationale in 14-AUDIT.md (needs Windows CI evidence)
-- [Deferred — tracked]: Phase 10 WR-02 — panic logging at registry dispatch — deferred with rationale in 14-AUDIT.md (dev-experience nicety, not correctness)
-- [Non-blocking]: verification-debt SUMMARY metadata warnings (files not on disk) — 16-02/16-03 SUMMARYs cite a stale `internal_probe/two_process_test.go` path; tracked in /gsd-progress /gsd-audit-uat
+- [Open — tracked]: `release/update.go` joins untrusted `Asset.Name` into `os.Create` without sanitization (path traversal, defense-in-depth). Predates v1.8; recorded `open` in `milestones/v1.8-phases/16-batch-surface-multi-process-hardening/16-REVIEW-DISPOSITION.md`.
+- [Open — tracked]: Windows `-race` broadening — the race step is gated to `runner.os != 'Windows'` (no C toolchain in this repo); recorded as a follow-up in the `.github/workflows/go.yml` comment.
+- [Deferred — tracked]: Phase 10 CR-01 — D-04 errno mapping needs Windows verification; rationale in `14-AUDIT.md`.
+- [Deferred — tracked]: Phase 10 WR-02 — panic logging at registry dispatch; rationale in `14-AUDIT.md`.
+- [Non-blocking]: three `phase.complete` SUMMARY metadata warnings are scanner false positives (backticked paths in prose, not `key-files`); recorded in `.planning/v1.8-MILESTONE-AUDIT.md` under "Known false positives".
+- [Resolved at v1.8 close]: DI-15-01 concurrent first-open WAL race (Phase 16 bounded retry); the Windows CI debug session; the `sqlite-cache-provider` seed; all 14 Phase 17/17.1 review findings; six code bugs from the docs pass.
 
 ### Roadmap Evolution
 
