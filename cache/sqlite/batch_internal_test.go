@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/guionardo/go/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -335,6 +336,7 @@ func TestMSetFunc(t *testing.T) {
 
 		err := c.MSetFunc(t.Context(), map[string]string{"k": "v"})
 		require.ErrorIs(t, err, ErrClosed)
+		require.ErrorIs(t, err, cache.ErrClosed)
 		require.ErrorContains(t, err, "cache/sqlite:")
 	})
 }
@@ -476,6 +478,7 @@ func TestMDelFunc(t *testing.T) {
 
 		err := c.MDelFunc(t.Context(), "a")
 		require.ErrorIs(t, err, ErrClosed)
+		require.ErrorIs(t, err, cache.ErrClosed)
 		require.ErrorContains(t, err, "cache/sqlite:")
 	})
 }

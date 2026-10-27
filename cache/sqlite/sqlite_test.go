@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +20,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// closedMessage is the exact consumer-visible message for a closed sqlite
+// cache: one "cache/sqlite: " provider prefix followed by the cache-level
+// sentinel text. It is pinned so a future re-wrap cannot reintroduce the
+// duplicated token (W1, D-01, D-05).
+const closedMessage = "cache/sqlite: cache: cache is closed"
 
 func TestMemoryRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -554,9 +561,11 @@ func TestClosedOps(t *testing.T) {
 
 	err = c.Set(t.Context(), "k", "v")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 
 	err = c.Delete(t.Context(), "k")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 
 	require.NoError(t, c.Close()) // idempotent
 }
@@ -699,7 +708,59 @@ func TestClosedErrorPrefix(t *testing.T) {
 
 	_, err := c.Get(t.Context(), "k")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
-	require.ErrorContains(t, err, "cache/sqlite:")
+	require.ErrorIs(t, err, cache.ErrClosed)
+	require.Equal(t, closedMessage, err.Error())
+	assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+}
+
+// TestDeferredErrorPrefix pins the exactly-one-prefix contract for the two
+// kinds of deferred open error: a validation failure keeps its ErrInvalidPath
+// identity and its own single prefix, while a bare filesystem failure is
+// wrapped once and still unwraps to *fs.PathError (D-03, D-04).
+func TestDeferredErrorPrefix(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid_path_prefixed_once", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithPath("bad?path"))
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		_, err := c.Get(t.Context(), "k")
+		require.ErrorIs(t, err, sqlite.ErrInvalidPath)
+		require.Equal(t, "cache/sqlite: invalid path: path must not contain '?' or '#'", err.Error())
+		assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+	})
+
+	t.Run("bare_open_error_wrapped_once", func(t *testing.T) {
+		t.Parallel()
+
+		// A regular file where a directory is needed makes os.MkdirAll fail
+		// with ENOTDIR — a bare, unprefixed error reaching check() with no
+		// sentinel identity attached.
+		blocker := filepath.Join(t.TempDir(), "blocker")
+		require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+
+		c := sqlite.New[string, string](sqlite.WithPath(filepath.Join(blocker, "cache.db")))
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		_, err := c.Get(t.Context(), "k")
+		require.Error(t, err)
+		require.True(
+			t,
+			strings.HasPrefix(err.Error(), "cache/sqlite: "),
+			"message %q must carry the provider prefix",
+			err.Error(),
+		)
+		require.NotErrorIs(t, err, sqlite.ErrInvalidPath)
+
+		var pathErr *fs.PathError
+		require.ErrorAs(t, err, &pathErr)
+
+		assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+	})
 }
 
 func TestOptimizable(t *testing.T) {
@@ -789,10 +850,14 @@ func TestOptimizableClosed(t *testing.T) {
 
 	err := opt.Checkpoint(t.Context())
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 	require.ErrorContains(t, err, "cache/sqlite:")
+	require.Equal(t, closedMessage, err.Error())
+	assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
 
 	err = opt.Vacuum(t.Context())
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 	require.ErrorContains(t, err, "cache/sqlite:")
 }
 
