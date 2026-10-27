@@ -46,15 +46,21 @@ merger.MergeMaps(
 This bites on YAML input, where `port: 8080` decodes as `int` and `port: 9090.5` as
 `float64`.
 
-**Nested maps must be `map[string]any`.** Same-typed values of kind `Map` are recursed
-by asserting `map[string]any`; two `map[string]string` values that match in type reach
-that assertion and panic. Anything that is not `map[string]any` at every nested level
-is unsupported.
+**Only `map[string]any` is merged recursively.** A same-typed nested value that is
+not exactly `map[string]any` — `map[string]string`, for example — cannot be merged,
+so the later map's value **replaces** the earlier one as a whole. It does not panic:
 
-**Nested maps are merged in place.** The accumulator for each key is the first map's
-own nested `map[string]any`, so merging writes into it: after `MergeMaps(base, override)`
-the `base` map can be mutated. Clone the inputs if you need them afterwards.
+```go
+merger.MergeMaps(
+	map[string]any{"labels": map[string]string{"env": "dev"}},
+	map[string]any{"labels": map[string]string{"env": "prod"}},
+	// labels is now map[string]string{"env": "prod"}
+)
+```
 
-Keys absent from the accumulator are inserted as-is, so values are shared by reference
-with the input, not copied. The function never returns an error and handles a `nil`
-map in the argument list.
+**Neither input is mutated.** Nested `map[string]any` values are deep-copied into the
+accumulator, so after `MergeMaps(base, override)` both `base` and `override` are
+unchanged and can be reused. Non-map values are shared by reference (inserted as-is),
+which is safe because the merge never writes through them.
+
+The function never returns an error and handles a `nil` map in the argument list.
