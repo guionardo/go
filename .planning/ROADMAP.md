@@ -160,3 +160,13 @@ Plans:
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
 | 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | Complete    | 2026-10-26 |
 | 17. Delivery Hardening | v1.8 | 3/3 | Complete    | 2026-10-26 |
+
+### Phase 17.1: Fix error sentinel identity and MGet error propagation (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 17
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 17.1 to break down)
