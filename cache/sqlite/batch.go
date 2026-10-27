@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -71,13 +72,18 @@ func inPlaceholders(n int) string {
 // debug. A failed chunk is logged and skipped — remaining chunks still run
 // (D-03; the frozen signature has no error channel, so a canceled context
 // yields partial results by contract). A deferred open error is logged at
-// Error level and yields an empty map, again because the frozen signature has
-// no error channel to return it through (D-09).
+// Error level, while a call on a closed cache is logged at Warn — a normal
+// end-of-lifecycle state — and both yield an empty map, again because the
+// frozen signature has no error channel to return it through (D-09).
 func (c *sqliteCache[K, V]) MGetFunc(ctx context.Context, keys ...K) map[K]V {
 	result := make(map[K]V, len(keys))
 
 	if err := c.check(); err != nil {
-		logger().Error("cache/sqlite: batch get skipped", "error", err)
+		if errors.Is(err, ErrClosed) {
+			logger().Warn("cache/sqlite: batch get on closed cache", "error", err)
+		} else {
+			logger().Error("cache/sqlite: batch get skipped", "error", err)
+		}
 
 		return result
 	}

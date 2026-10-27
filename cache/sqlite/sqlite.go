@@ -59,8 +59,9 @@ var (
 //
 // New never fails: open or validation errors are recorded and deferred, and
 // the first operation that needs the database returns them.
-// MGet is the exception: it returns an empty map and logs the error at Error
-// level, because its frozen signature has no error channel. Returns a
+// MGet is the exception: it returns an empty map, logging a deferred open
+// error at Error level and a closed-cache call at Warn, because its frozen
+// signature has no error channel. Returns a
 // cache.BatchCache sharing the in-memory singleflight GetOrSet; the returned
 // value also implements Optimizable (type-assert to reach Checkpoint/Vacuum).
 func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
