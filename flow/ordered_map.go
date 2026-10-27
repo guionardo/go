@@ -67,6 +67,10 @@ func (om *OrderedMap[T, S]) Len() int {
 }
 
 func (om *OrderedMap[T, S]) validateRange(first, last int) (int, int) {
+	if len(om.keys) == 0 {
+		return 0, 0
+	}
+
 	if first < 0 {
 		first = max(0, len(om.keys)+first)
 	}

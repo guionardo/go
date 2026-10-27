@@ -80,6 +80,9 @@ func (om *OrderedMap[T, S]) Len() int
 - `first` is clamped to the last index and `last` to the length, and `last <= first`
   yields a single key.
 
+On an empty map `Keys` and `Range` are always empty, whatever indices you pass; they
+never panic.
+
 `Len()` returns the number of entries.
 
 ### Slices
