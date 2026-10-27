@@ -13,14 +13,32 @@ type (
 		logger       Logger
 		scope        string
 		defaultScope string
+		debug        bool
 	}
 )
+
+// log returns the logger injected through WithLogger, or the package default
+// — slog with module=config — when none was injected.
+func (p *provider) log() Logger {
+	if p.logger != nil {
+		return p.logger
+	}
+
+	return logger()
+}
+
+// debugLog logs at debug level only when WithDebugLogger enabled it.
+func (p *provider) debugLog(msg string, args ...any) {
+	if p.debug {
+		p.log().Debug(msg, args...)
+	}
+}
 
 func (p *provider) getProfilesPath() string {
 	if p.profilesPath == "" {
 		p.profilesPath = environment.GetEnv(EnvProfilesPath)
 		if p.profilesPath != "" {
-			slog.Warn("profiles path found in environment variables", slog.String("profilesPath", p.profilesPath))
+			p.log().Warn("profiles path found in environment variables", slog.String("profilesPath", p.profilesPath))
 		}
 	}
 

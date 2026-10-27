@@ -26,7 +26,7 @@ func (p *provider) postInit() *provider {
 		p.profilesPath = environment.GetEnv(EnvProfilesPath, DefaultConfigurationPath)
 	}
 
-	logger().Info("configuration provider initialized",
+	p.log().Info("configuration provider initialized",
 		slog.String("defaultScope", p.defaultScope),
 		slog.String("scope", p.scope),
 		slog.String("profilesPath", p.profilesPath))
@@ -81,13 +81,21 @@ func WithLogger(logger Logger) providerOption {
 
 // WithDebugLogger enables debug-level logging for configuration operations.
 // This should NOT be used in production as it may log sensitive configuration values.
+//
+// It turns on the provider's debug messages and logs them through the Logger
+// already injected by WithLogger, or through a debug-level slog logger writing
+// to stdout when no logger has been injected yet.
 func WithDebugLogger() providerOption {
 	return func(p *provider) {
-		level := slog.LevelDebug
-		logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})).
-			With("module", "configuration")
-		p.logger = logger
-		logger.Warn("DEBUG LOGGER ENABLED - THIS SHOULD NOT BE USED IN PRODUCTION")
+		p.debug = true
+
+		if p.logger == nil {
+			level := slog.LevelDebug
+			p.logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})).
+				With("module", "configuration")
+		}
+
+		p.log().Warn("DEBUG LOGGER ENABLED - THIS SHOULD NOT BE USED IN PRODUCTION")
 	}
 }
 
