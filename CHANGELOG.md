@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `SingleflightGetOrSet[K, V]` shared helper — dedups concurrent GetOrSet misses on the same key across all 5 providers
-  - `Do` (blocking) and `DoChan` (cancel-aware) entry points
-  - Setter panic recovery → `*cache.Panic` typed error
+  - `Do` (blocking) entry point — context-blind by design: the setter runs once in the leader's goroutine
+    with the leader's context, so a caller that cancels still waits for the leader (no `DoChan`, no
+    cancellation sentinel)
+  - Setter panic recovery → `*cache.PanicError` typed error
   - Double-check Get inside the group (clobber guard)
-  - `ErrCanceled` sentinel wrapping `context.Canceled`
 - Provider integration — all 5 providers delegate GetOrSet through the shared helper
   - redis/valkey preserve historical error prefixes
   - valkey initErr guard stays provider-side
