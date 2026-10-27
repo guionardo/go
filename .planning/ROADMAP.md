@@ -166,7 +166,7 @@ Plans:
 **Goal**: The cache error contract tells the truth — sqlite's closed sentinel satisfies `errors.Is` for both `sqlite.ErrClosed` and `cache.ErrClosed`, and every provider error carries the `cache/sqlite:` prefix exactly once; `MGet`'s deferred-error exception is documented in both twin doc sites and logged at `Error`; and the package's `New(WithName(...))` headline path, benchmark doc comment and shared conformance harness all carry permanent, machine-checked evidence (v1.8 audit W1–W5).
 **Requirements**: TBD (inserted gap-closure phase — no REQ-IDs; closes audit items W1–W5)
 **Depends on:** Phase 17
-**Plans:** 2/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 **Wave 1**
