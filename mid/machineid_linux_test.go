@@ -32,9 +32,8 @@ func TestOutErr(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // global state mutation: swaps collectFuncs
 func TestCollectEtcMachineId(t *testing.T) {
-	t.Parallel()
-
 	collectFuncsMu.Lock()
 	original := collectFuncs
 	collectFuncs = []func() (string, error){collectEtcMachineId}
@@ -53,9 +52,8 @@ func TestCollectEtcMachineId(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // global state mutation: swaps collectFuncs
 func TestCollectDbusMachineId(t *testing.T) {
-	t.Parallel()
-
 	collectFuncsMu.Lock()
 	original := collectFuncs
 	collectFuncs = []func() (string, error){collectDbusMachineId}
@@ -74,10 +72,9 @@ func TestCollectDbusMachineId(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // global state mutation: swaps collectFuncs
 func TestCollectHostnamectl(t *testing.T) {
-	t.Parallel()
 	t.Run("command_fails_returns_empty_in_ci", func(t *testing.T) {
-		t.Parallel()
 		collectFuncsMu.Lock()
 		original := collectFuncs
 		collectFuncs = []func() (string, error){collectHostnamectl}
@@ -165,11 +162,9 @@ func TestMachineIDFallbackOrder(t *testing.T) { //nolint: funlen
 	})
 }
 
+//nolint:paralleltest // global state read: MachineID reads collectFuncs, which sibling tests swap
 func TestMachineIDMutex(t *testing.T) {
-	t.Parallel()
 	t.Run("concurrent_access_is_safe", func(t *testing.T) {
-		t.Parallel()
-
 		done := make(chan struct{})
 
 		go func() {
