@@ -72,7 +72,11 @@ jobs:
       # test so this step cannot time out the job on unrelated failures.
       # Docker-backed provider benchmarks gate themselves inside the benchmark
       # code, so no daemon is needed here.
+      # shell: bash for the same reason as the build gate above: the default
+      # Windows shell is pwsh, where `$` is a variable sigil — `-run=^$` arrives
+      # mangled and `go test` then falls back to package "." (no Go files here).
       - name: Benchmark smoke
+        shell: bash
         run: go test -run=^$ -bench=. -benchtime=1x ./cache/...
 
       # The conformance E2E is a stock `go test` run under the e2e tag; nothing
@@ -81,6 +85,7 @@ jobs:
       # testcontainers and only skip under -short, so they would need a Docker
       # daemon that the macOS and Windows runners do not have.
       - name: Cache conformance E2E (local providers)
+        shell: bash
         run: go test -tags=e2e -run 'TestCacheE2E_(Mem|SQLite)$' ./cache/ -count=1 -timeout=120s
 
       - name: SQLite two-process E2E
