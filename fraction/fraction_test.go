@@ -142,6 +142,80 @@ func TestSubtract(t *testing.T) {
 	compare(t, f1.Subtract(f2), 487, 55)
 }
 
+// TestAddSubtractExact pins the common-denominator, unreduced results of Add and
+// Subtract so the zero-value handling cannot change them.
+func TestAddSubtractExact(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                   string
+		n1, d1, n2, d2         int64
+		sumNum, sumDen         int64
+		differenceNum, diffDen int64
+	}{
+		{
+			name: "thirds and sixths", n1: 1, d1: 3, n2: 1, d2: 6,
+			sumNum: 3, sumDen: 6, differenceNum: 1, diffDen: 6,
+		},
+		{
+			name: "unlike denominators", n1: 26, d1: 33, n2: -49, d2: 27,
+			sumNum: -305, sumDen: 297, differenceNum: 773, diffDen: 297,
+		},
+		{
+			name: "same denominator", n1: 7, d1: 9, n2: 2, d2: 9,
+			sumNum: 9, sumDen: 9, differenceNum: 5, diffDen: 9,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f1, err := fraction.New(tt.n1, tt.d1)
+			require.NoError(t, err)
+			f2, err := fraction.New(tt.n2, tt.d2)
+			require.NoError(t, err)
+
+			compare(t, f1.Add(f2), tt.sumNum, tt.sumDen)
+			compare(t, f1.Subtract(f2), tt.differenceNum, tt.diffDen)
+		})
+	}
+}
+
+func TestZeroValueAddSubtract(t *testing.T) {
+	t.Parallel()
+
+	var zero fraction.Fraction
+
+	half, err := fraction.New(1, 2)
+	require.NoError(t, err)
+	third, err := fraction.New(1, 3)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		got       fraction.Fraction
+		expectedN int64
+		expectedD int64
+	}{
+		{name: "zero + 1/2", got: zero.Add(half), expectedN: 1, expectedD: 2},
+		{name: "1/2 + zero", got: half.Add(zero), expectedN: 1, expectedD: 2},
+		{name: "zero - 1/2", got: zero.Subtract(half), expectedN: -1, expectedD: 2},
+		{name: "1/2 - zero", got: half.Subtract(zero), expectedN: 1, expectedD: 2},
+		{name: "zero + 1/3", got: zero.Add(third), expectedN: 1, expectedD: 3},
+		{name: "zero + zero", got: zero.Add(zero), expectedN: 0, expectedD: 1},
+		{name: "zero - zero", got: zero.Subtract(zero), expectedN: 0, expectedD: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			compare(t, tt.got, tt.expectedN, tt.expectedD)
+		})
+	}
+}
+
 func TestMultiply(t *testing.T) {
 	t.Parallel()
 

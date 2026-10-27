@@ -68,7 +68,9 @@ func (f Fraction) Denominator() int64
 - `Equal` compares the stored numerator and denominator, not the value, so `3/6` is not
   equal to `1/2`. Because of the previous point, compare reduced values only.
 - The zero value `Fraction{}` has a `0` denominator and reports `0/0` as its parts;
-  `Float64` on it returns `NaN`. Always construct with `New` or `FromFloat64`.
+  `Float64` on it returns `NaN`. `Add` and `Subtract` treat a zero denominator as
+  `0/1`, so the zero value behaves as zero there: adding `1/2` to `Fraction{}` yields
+  `1/2`. Prefer constructing with `New` or `FromFloat64`.
 
 ## Errors
 
