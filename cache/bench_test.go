@@ -411,7 +411,12 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 		for _, n := range batchSizes {
 			n := n
 			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
+					// Seeding is setup, not the operation: it runs with the
+					// timer stopped so ns/op covers only the batch delete.
+					b.StopTimer()
+
 					keys := make([]string, n)
 					for j := 0; j < n; j++ {
 						key := fmt.Sprintf("%s_mdel_native_%d_%d_%d", name, n, i, j)
@@ -420,13 +425,19 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 						}
 						keys[j] = key
 					}
+
+					b.StartTimer()
+
 					if err := c.MDel(b.Context(), keys...); err != nil {
 						b.Fatal(err)
 					}
 				}
 			})
 			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
+					b.StopTimer()
+
 					keys := make([]string, n)
 					for j := 0; j < n; j++ {
 						key := fmt.Sprintf("%s_mdel_pk_%d_%d_%d", name, n, i, j)
@@ -435,6 +446,9 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 						}
 						keys[j] = key
 					}
+
+					b.StartTimer()
+
 					for _, key := range keys {
 						if err := c.Delete(b.Context(), key); err != nil {
 							b.Fatal(err)
@@ -503,7 +517,12 @@ func BenchmarkBatch(b *testing.B) {
 		for _, n := range batchSizes {
 			n := n
 			b.Run(fmt.Sprintf("Size%d/native", n), func(b *testing.B) {
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
+					// Seeding is setup, not the operation: it runs with the
+					// timer stopped so ns/op covers only the batch delete.
+					b.StopTimer()
+
 					keys := make([]string, n)
 					for j := 0; j < n; j++ {
 						key := fmt.Sprintf("mdel_native_%d_%d_%d", n, i, j)
@@ -512,13 +531,19 @@ func BenchmarkBatch(b *testing.B) {
 						}
 						keys[j] = key
 					}
+
+					b.StartTimer()
+
 					if err := c.MDel(b.Context(), keys...); err != nil {
 						b.Fatal(err)
 					}
 				}
 			})
 			b.Run(fmt.Sprintf("Size%d/per-key", n), func(b *testing.B) {
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
+					b.StopTimer()
+
 					keys := make([]string, n)
 					for j := 0; j < n; j++ {
 						key := fmt.Sprintf("mdel_pk_%d_%d_%d", n, i, j)
@@ -527,6 +552,9 @@ func BenchmarkBatch(b *testing.B) {
 						}
 						keys[j] = key
 					}
+
+					b.StartTimer()
+
 					for _, key := range keys {
 						if err := c.Delete(b.Context(), key); err != nil {
 							b.Fatal(err)
