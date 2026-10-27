@@ -8,7 +8,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,6 +20,19 @@ import (
 	"github.com/guionardo/go/cache/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	// closedMessage is the exact consumer-visible message for a closed sqlite
+	// cache: one "cache/sqlite: " provider prefix followed by the cache-level
+	// sentinel text. It is pinned so a future re-wrap cannot reintroduce the
+	// duplicated token (W1, D-01, D-05).
+	closedMessage = "cache/sqlite: cache: cache is closed"
+
+	// wantDirPerm is the permission mode the provider creates cache directories
+	// with — the documented contract behind New(WithName(...)). It is asserted
+	// only on non-Windows runners, where permission bits round-trip (W5, D-11).
+	wantDirPerm os.FileMode = 0o700
 )
 
 func TestMemoryRoundTrip(t *testing.T) {
@@ -554,9 +569,11 @@ func TestClosedOps(t *testing.T) {
 
 	err = c.Set(t.Context(), "k", "v")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 
 	err = c.Delete(t.Context(), "k")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 
 	require.NoError(t, c.Close()) // idempotent
 }
@@ -699,7 +716,59 @@ func TestClosedErrorPrefix(t *testing.T) {
 
 	_, err := c.Get(t.Context(), "k")
 	require.ErrorIs(t, err, sqlite.ErrClosed)
-	require.ErrorContains(t, err, "cache/sqlite:")
+	require.ErrorIs(t, err, cache.ErrClosed)
+	require.Equal(t, closedMessage, err.Error())
+	assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+}
+
+// TestDeferredErrorPrefix pins the exactly-one-prefix contract for the two
+// kinds of deferred open error: a validation failure keeps its ErrInvalidPath
+// identity and its own single prefix, while a bare filesystem failure is
+// wrapped once and still unwraps to *fs.PathError (D-03, D-04).
+func TestDeferredErrorPrefix(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid_path_prefixed_once", func(t *testing.T) {
+		t.Parallel()
+
+		c := sqlite.New[string, string](sqlite.WithPath("bad?path"))
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		_, err := c.Get(t.Context(), "k")
+		require.ErrorIs(t, err, sqlite.ErrInvalidPath)
+		require.Equal(t, "cache/sqlite: invalid path: path must not contain '?' or '#'", err.Error())
+		assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+	})
+
+	t.Run("bare_open_error_wrapped_once", func(t *testing.T) {
+		t.Parallel()
+
+		// A regular file where a directory is needed makes os.MkdirAll fail
+		// with ENOTDIR — a bare, unprefixed error reaching check() with no
+		// sentinel identity attached.
+		blocker := filepath.Join(t.TempDir(), "blocker")
+		require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600))
+
+		c := sqlite.New[string, string](sqlite.WithPath(filepath.Join(blocker, "cache.db")))
+
+		t.Cleanup(func() { _ = c.Close() })
+
+		_, err := c.Get(t.Context(), "k")
+		require.Error(t, err)
+		require.True(
+			t,
+			strings.HasPrefix(err.Error(), "cache/sqlite: "),
+			"message %q must carry the provider prefix",
+			err.Error(),
+		)
+		require.NotErrorIs(t, err, sqlite.ErrInvalidPath)
+
+		var pathErr *fs.PathError
+		require.ErrorAs(t, err, &pathErr)
+
+		assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
+	})
 }
 
 func TestOptimizable(t *testing.T) {
@@ -789,10 +858,14 @@ func TestOptimizableClosed(t *testing.T) {
 
 	err := opt.Checkpoint(t.Context())
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 	require.ErrorContains(t, err, "cache/sqlite:")
+	require.Equal(t, closedMessage, err.Error())
+	assert.Equal(t, 1, strings.Count(err.Error(), "cache/sqlite"))
 
 	err = opt.Vacuum(t.Context())
 	require.ErrorIs(t, err, sqlite.ErrClosed)
+	require.ErrorIs(t, err, cache.ErrClosed)
 	require.ErrorContains(t, err, "cache/sqlite:")
 }
 
@@ -813,4 +886,51 @@ func TestOptimizableDeferredErr(t *testing.T) {
 	err = opt.Vacuum(t.Context())
 	require.ErrorIs(t, err, sqlite.ErrInvalidPath)
 	require.ErrorContains(t, err, "cache/sqlite:")
+}
+
+// TestNewWithNameDurability pins the headline usage advertised in doc.go: a
+// cache opened by name lands at os.UserCacheDir()/<name>/cache.db with its
+// directory created 0700, and data written before Close survives a reopen of
+// the same name. The three environment variables os.UserCacheDir consults are
+// all redirected into one temporary root (XDG on Linux, HOME on darwin,
+// LocalAppData on Windows), so no real cache directory is ever touched (D-11).
+//
+//nolint:paralleltest // global state mutation: HOME/XDG_CACHE_HOME/LocalAppData via t.Setenv
+func TestNewWithNameDurability(t *testing.T) {
+	root := t.TempDir()
+
+	t.Setenv("XDG_CACHE_HOME", root)
+	t.Setenv("HOME", root)
+	t.Setenv("LocalAppData", root)
+
+	cacheDir, err := os.UserCacheDir()
+	require.NoError(t, err)
+	require.Contains(t, cacheDir, root, "cache dir isolation did not take effect")
+
+	name := "withname-app"
+	dbPath := filepath.Join(cacheDir, name, "cache.db")
+
+	first := sqlite.New[string, string](sqlite.WithName(name))
+
+	require.NoError(t, first.Set(t.Context(), "greeting", "hello"))
+	require.NoError(t, first.Close())
+
+	require.FileExists(t, dbPath)
+
+	info, err := os.Stat(filepath.Dir(dbPath))
+	require.NoError(t, err)
+
+	// Windows does not round-trip permission bits (AGENTS.md), so the
+	// documented 0700 contract is asserted only where it is observable.
+	if runtime.GOOS != "windows" {
+		require.Equal(t, wantDirPerm, info.Mode().Perm())
+	}
+
+	second := sqlite.New[string, string](sqlite.WithName(name))
+
+	t.Cleanup(func() { _ = second.Close() })
+
+	got, err := second.Get(t.Context(), "greeting")
+	require.NoError(t, err)
+	assert.Equal(t, "hello", got)
 }

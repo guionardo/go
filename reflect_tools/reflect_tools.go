@@ -6,9 +6,10 @@ import (
 )
 
 // IsZeroValue checks if the provided value is considered a zero value.
-// It handles various types including numeric types, strings, booleans,
-// time.Time, time.Duration, slices, arrays, maps, and pointers.
-// Returns true if the value is zero, nil or empty, false otherwise.
+// It handles the exact built-in numeric types, strings, booleans, time.Time,
+// time.Duration, slices, arrays and maps, plus a nil interface.
+// Returns true if the value is zero, nil or empty, false otherwise — pointers
+// (even nil ones), other structs and named types fall through to false.
 func IsZeroValue(value any) bool { //nolint:cyclop,funlen
 	if value == nil {
 		return true

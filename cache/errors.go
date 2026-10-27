@@ -40,6 +40,8 @@ var (
 	ErrMiss = errors.New("cache: key not found")
 
 	// ErrClosed is returned when operations are attempted on a closed cache.
+	// Only cache/sqlite wraps it today, so errors.Is(err, cache.ErrClosed)
+	// holds for that provider and not yet for the others.
 	ErrClosed = errors.New("cache: cache is closed")
 )
 

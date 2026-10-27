@@ -13,7 +13,8 @@ var (
 	collectFuncs   = []func() (string, error){collectHostnamectl, collectEtcMachineId, collectDbusMachineId}
 )
 
-// MachineID in linux use hostnamectl, /var/lib/dbus/machine-id, or /etc/machine-id
+// MachineID in linux tries hostnamectl, then /etc/machine-id, then
+// /var/lib/dbus/machine-id, returning "" when none of them yields a value.
 func MachineID() string {
 	collectFuncsMu.RLock()
 

@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.8
 milestone_name: SQLite Cache Backend
-current_phase: 17
+current_phase: "17.1"
 status: completed
-stopped_at: Phase 17 complete — all phases complete
-last_updated: "2026-10-26T23:41:49.933Z"
-last_activity: 2026-10-26
-last_activity_desc: Phase 17 complete
-state_head: 963fe60ce1c3604939f5433e729b415cbd4aedad
+stopped_at: Phase 17.1 complete — all phases complete
+last_updated: "2026-10-27T09:22:57.886Z"
+last_activity: 2026-10-27
+last_activity_desc: Phase 17.1 complete
+state_head: 52a9db67486118e0f2f5cfef6d6789ca276ff1a3
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 15
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-26)
 
 **Core value:** Provide reliable, well-tested utility packages that solve common Go development problems consistently — so downstream projects don't reinvent these wheels.
-**Current focus:** Phase 17 — Delivery Hardening
+**Current focus:** Phase 17.1 — Fix error sentinel identity and MGet error propagation
 
 ## Current Position
 
-Phase: 17
+Phase: 17.1
 Plan: Not started
 Status: All phases complete
-Last activity: 2026-10-26 — Phase 17 complete
+Last activity: 2026-10-27 — Phase 17.1 complete
 
 Progress: [██████████] 100%
 
@@ -127,6 +127,10 @@ Recent decisions affecting current work:
 - [Deferred — tracked]: Phase 10 WR-02 — panic logging at registry dispatch — deferred with rationale in 14-AUDIT.md (dev-experience nicety, not correctness)
 - [Non-blocking]: verification-debt SUMMARY metadata warnings (files not on disk) — 16-02/16-03 SUMMARYs cite a stale `internal_probe/two_process_test.go` path; tracked in /gsd-progress /gsd-audit-uat
 
+### Roadmap Evolution
+
+- Phase 17.1 inserted after Phase 17: Fix error sentinel identity and MGet error propagation (URGENT)
+
 ## Deferred Items
 
 Items acknowledged and deferred at milestone close, most recent first:
@@ -137,9 +141,9 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-26T20:27:08.836Z
-Stopped at: Phase 17 complete — all phases complete
-Resume file: .planning/phases/17-delivery-hardening/17-CONTEXT.md
+Last session: 2026-10-27T00:43:12.472Z
+Stopped at: Phase 17.1 complete — all phases complete
+Resume file: .planning/phases/17.1-fix-error-sentinel-identity-and-mget-error-propagation/17.1-CONTEXT.md
 
 ## Operator Next Steps
 

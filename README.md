@@ -1,6 +1,6 @@
 # go
 
-Golang tools, examples, and packages
+Golang tools, examples, and packages.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/guionardo/go.svg)](https://pkg.go.dev/github.com/guionardo/go)
 [![Go tests and checking](https://github.com/guionardo/go/actions/workflows/go.yml/badge.svg)](https://github.com/guionardo/go/actions/workflows/go.yml)
@@ -8,491 +8,94 @@ Golang tools, examples, and packages
 [![CodeQL](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/guionardo/go/actions/workflows/github-code-scanning/codeql)
 [![Quality Report](https://img.shields.io/badge/Quality-make%20quality--report-blue)](/quality-report.md)
 
-## Package Index
-
-| Package | Import | Description |
-|---------|--------|-------------|
-| [brdocs](#package-brdocs) | `br_docs` | Brazilian document validation (CPF, CNPJ) |
-| [cache](#package-cache) | `cache` | Generic key-value cache with pluggable backends |
-| [mem](#package-cache) | `cache/mem` | In-memory cache backend |
-| [redis](#package-cache) | `cache/redis` | Redis cache backend |
-| [valkey](#package-cache) | `cache/valkey` | Valkey cache backend |
-| [memcache](#package-cache) | `cache/memcache` | Memcache cache backend |
-| [postgres](#package-cache) | `cache/postgres` | PostgreSQL cache backend |
-| [sqlite](#package-cache) | `cache/sqlite` | SQLite cache backend (embedded, survives restarts) |
-| [config](#package-config) | `config` | Typed configuration provider (YAML + env + validation) |
-| [environment](#package-config) | `config/environment` | Environment variable parsing |
-| [profile](#package-config) | `config/profile` | YAML profile loading and merging |
-| [merger](#package-config) | `config/merger` | Recursive deep-merge of maps |
-| [validation](#package-config) | `config/validation` | Struct validation |
-| [flow](#package-flow) | `flow` | Generic control flow utilities (ternary, defaults) |
-| [fraction](#package-fraction) | `fraction` | Immutable fraction arithmetic |
-| [httptestmock](#package-httptest_mock) | `httptest_mock` | HTTP mock server framework for tests |
-| [mid](#package-mid) | `mid` | Cross-platform machine ID retrieval |
-| [pathtools](#package-path_tools) | `path_tools` | File and directory path utilities |
-| [projectprobe](#package-project_probe) | `project_probe` | Best-effort project detection across 7 languages (manifest-first, stdlib-only, never fails) |
-| [reflecttools](#package-reflect_tools) | `reflect_tools` | Reflection utilities (zero-value check) |
-| [release](#package-release) | `release` | Self-update mechanism via GitHub Releases |
-| [set](#package-set) | `set` | Generic set with algebra, JSON, SQL support |
-| [shelltools](#package-shell_tools) | `shell_tools` | Shell argument parsing and env lookup |
-| [timetools](#package-time_tools) | `time_tools` | Adaptive time format parsing |
-
-## Development
-
-Don't forget to install pre-commit and setup the commit hook.
-
-## Packages
-
-### Package brdocs
-
-Import `github.com/guionardo/go/br_docs`
-
-Validation for CPF and CNPJ
-
-```go
-func IsCPF(doc string) bool
-func IsCNPJ(doc string) bool
-func RemoveNonDigitAndLetters(value *string)
-```
-
-### Package cache
-
-Import `github.com/guionardo/go/cache`
-
-Generic key-value cache abstraction with pluggable backend providers.
-
-```go
-import "github.com/guionardo/go/cache"
-```
-
-The `Cache[K, V]` interface exposes `Get`, `Set`, `Delete`, `GetOrSet`, and `Close`. `Get`, `Set`, `Delete`, and `GetOrSet` accept `context.Context`; `Close` does not.
-
-All providers share a common `cache.NewConcreteCache` adapter. `GetOrSet` is deduplicated via `SingleflightGetOrSet` (concurrent misses on the same key run the setter exactly once).
-
-All providers also implement `BatchCache[K, V]` (embedded in `Cache`), exposing `MGet`, `MSet`, and `MDel` with provider-optimal strategies: single-lock for in-memory, GetMulti for memcache, pipelines for redis/valkey, chunked IN queries + single-transaction upsert for sqlite, and SendBatch for postgres.
-
-#### Providers
-
-Each provider lives in its own sub-package and is independently importable:
-
-| Package | Backend | Driver | Connection |
-|---------|---------|--------|------------|
-| `cache/mem` | In-memory | None (stdlib) | None — zero dependency |
-| `cache/redis` | Redis | go-redis/v9 | Lazy — dials on first query |
-| `cache/valkey` | Valkey | valkey-go | Eager — dials at construction |
-| `cache/memcache` | Memcache | gomemcache | Lazy — goroutine ctx wrapper |
-| `cache/postgres` | Postgres | pgx/v5 | Eager — pgxpool at construction |
-| `cache/sqlite` | SQLite (embedded) | modernc.org/sqlite | Eager — local file, lazy errors |
-
-`cache/sqlite` is pure-Go embedded SQLite with no server to run: the zero-value
-configuration opens an in-memory cache, `WithPath`/`WithName` open a durable
-WAL-mode file that survives restarts, and the same file can be shared by
-multiple processes on one host (a 5 s busy timeout bounds write contention).
-`MGet` silently skips missing, expired, and undecodable keys, `MSet` writes the
-whole batch in one transaction under one TTL (all-or-nothing), and `MDel`
-deletes in idempotent chunks.
-
-#### Interfaces
-
-```go
-type Cache[K comparable, V any] interface {
-    Get(ctx context.Context, key K) (V, error)
-    Set(ctx context.Context, key K, value V, ttl ...time.Duration) error
-    Delete(ctx context.Context, key K) error
-    GetOrSet(ctx context.Context, key K, setter func(context.Context) (V, error), ttl ...time.Duration) (V, error)
-    Close() error
-}
-
-// BatchCache[K, V] embeds Cache[K, V] for full backward compatibility.
-type BatchCache[K comparable, V any] interface {
-    Cache[K, V] // Get, Set, Delete, GetOrSet, Close
-    MGet(ctx context.Context, keys ...K) map[K]V
-    MSet(ctx context.Context, items map[K]V, ttl ...time.Duration) error
-    MDel(ctx context.Context, keys ...K) error
-}
-```
-
-#### Basic Usage
-
-Each provider is independently importable. All return `cache.Cache[K, V]`, so the calling code never depends on the concrete provider type — swap backends by changing the constructor:
-
-```go
-import (
-    "context"
-    "github.com/guionardo/go/cache/mem"
-    // "github.com/guionardo/go/cache/redis"
-)
-
-ctx := context.Background()
-
-// In tests — zero-dependency in-memory cache
-c := mem.New[string, string](ctx)
-_ = c.Set(ctx, "mykey", "myvalue")
-
-// In production — Redis (same interface, different constructor)
-// c := redis.New[string, string](redis.WithAddr("localhost:6379"))
-
-v, err := c.Get(ctx, "mykey")
-```
-
-#### Batch Operations
-
-Use `BatchCache[K, V]` for multi-key operations. The constructor returns it — cast or assign directly:
-
-```go
-import "github.com/guionardo/go/cache/mem"
-
-bc := mem.New[string, string](ctx)
-
-// Store multiple values at once
-_ = bc.MSet(ctx, map[string]string{
-    "a": "alpha",
-    "b": "beta",
-    "c": "charlie",
-})
-
-// Fetch multiple keys — missing keys are absent from the result
-results := bc.MGet(ctx, "a", "b", "c", "missing")
-fmt.Println(results["a"]) // "alpha"
-
-// Delete multiple keys (idempotent)
-_ = bc.MDel(ctx, "a", "b")
-```
-
-Each provider uses an optimal batching strategy: single lock (in-memory), GetMulti (memcache), pipelines (redis/valkey), chunked IN queries + single-transaction upsert (sqlite), or SendBatch (postgres).
-
-#### Benchmark Results
-
-Benchmarks quantify the win from singleflight dedup and batch batching (mem provider):
-
-| Benchmark | Comparison | Result |
-|-----------|-----------|--------|
-| Thundering-herd (50 concurrent) | Naive vs singleflight | Singleflight runs setter 1× vs 50× |
-| MGet (100 keys) | Native vs per-key loop | 10-17% faster |
-| MDel (100 keys) | Native vs per-key loop | up to 49% faster |
-| MSet (100 keys) | Native vs per-key loop | ~1000 fewer allocs/op |
-
-Run `make benchmark` for the full suite or `make benchmark-quick` for fast iteration.
-
-#### Sentinel Errors
-
-```go
-var ErrMiss    = errors.New("cache: key not found")
-var ErrClosed  = errors.New("cache: cache is closed")
-var ErrCanceled = errors.New("cache: canceled") // wraps ctx.Err() for canceled waiters
-```
-
-A panicking setter yields a `*cache.Panic` (wraps the recovered value and stack trace). A canceled `DoChan` waiter receives `ErrCanceled` (wraps `context.Canceled`). Errors are wrapped with the provider prefix (`cache/redis:`, `cache/postgres:`, etc.) so callers can use `errors.Is()`.
-
-### Package config
-
-Import `github.com/guionardo/go/config`
-
-Generic typed configuration provider with YAML profile loading, environment variable overrides, and struct validation.
-
-```go
-import "github.com/guionardo/go/config"
-
-type AppConfig struct {
-	Port   int    `env:"APP_PORT" default:"8080"`
-	Host   string `env:"APP_HOST" default:"localhost"`
-	DBPath string `env:"DB_PATH"`
-}
-
-func main() {
-	provider := config.NewProvider[AppConfig]()
-	cfg, err := provider.GetConfiguration()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Listening on %s:%d\n", cfg.Host, cfg.Port)
-}
-```
-
-#### Provider
-
-`Provider[T]` loads configuration from YAML profiles (with scope-based layering) and environment variables. Supports thread-safe `GetConfiguration()` and `UpdateConfiguration()`.
-
-#### Options
-
-- `WithProfilesPath(path)` — set base directory for YAML profile files
-- `WithScope(scope)` — set active scope name (e.g. "production", "development")
-- `WithDefaultScope(scope)` — set fallback scope name
-- `WithLogger(logger)` — inject a custom Logger
-- `WithDebugLogger()` — enable debug logging (not for production)
-
-#### Sub-packages
-
-- `environment` — reads configuration from environment variables into struct fields via `env` and `default` struct tags
-- `profile` — loads and merges YAML profile files by scope (default + scope-specific)
-- `merger` — recursive deep-merge of `map[string]any` maps
-- `validation` — struct validation via `go-playground/validator` and the `Validator` interface
-
-### Package flow
-
-Import `github.com/guionardo/go/flow`
-
-Simplify logic flows with generic control flow and ordered collections.
-
-```go
-// Default returns the second argument (valueIfZero) when the value is zero
-func Default[T comparable](value T, valueIfZero T) T
-
-// If is a generic ternary operator
-func If[T any](condition bool, valueIfTrue T, valueIfFalse T) T
-
-// OrderedMap — key-value map with insertion-order iteration and range slicing
-type OrderedMap[T comparable, S any] struct{}
-func NewOrderedMap[T comparable, S any]() *OrderedMap[T, S]
-
-// Slice utilities
-func SliceFirstOrDefault[T any](s []T, defaultValue T) T
-func SliceLastOrDefault[T any](s []T, defaultValue T) T
-func RemoveItem[T any](s []T, index int) []T
-```
-
-### Package fraction
-
-Import `github.com/guionardo/go/fraction`
-
-This package is originally a work of Miguel Dorta [go-fraction](https://github.com/nethruster/go-fraction).
-
-```go
-type Fraction struct  // immutable, always simplified
-
-func New[T, K integer](numerator T, denominator K) (Fraction, error)
-func FromFloat64(f float64) (Fraction, error)
-
-func (Fraction) Add(Fraction) Fraction
-func (Fraction) Subtract(Fraction) Fraction
-func (Fraction) Multiply(Fraction) Fraction
-func (Fraction) Divide(Fraction) (Fraction, error)
-func (Fraction) Float64() float64
-func (Fraction) Equal(Fraction) bool
-func (Fraction) Numerator() int64
-func (Fraction) Denominator() int64
-```
-
-### Package httptest_mock
-
-Import `github.com/guionardo/go/httptest_mock`
-
-Full HTTP mock server framework for tests. Define mocks programmatically or via JSON/YAML files.
-
-More [documentation](httptest_mock/README.md).
-
-```go
-mock := httptestmock.NewMock("GET", "/api/resource").
-    WithResponseStatus(200).
-    WithResponseBody(`{"key": "value"}`)
-
-handler := httptestmock.MockHandler{}
-handler.AddMocks(mock)
-
-server := httptest.NewServer(&handler)
-defer server.Close()
-```
-
-### Package mid
-
-Import `github.com/guionardo/go/mid`
-
-Machine identification using OS-specific sources:
-
-- Linux: hostnamectl, /var/lib/dbus/machine-id, or /etc/machine-id
-- Windows: MachineID from registry SQMClient
-- macOS: "{model number}|{serial number}|{hardware uuid}" from system_profiler
-
-```go
-func MachineID() string
-```
-
-### Package path_tools
-
-Import `github.com/guionardo/go/path_tools`
-
-```go
-func DirExists(pathName string) bool
-func CreatePath(path string) error
-func FileExists(fileName string) bool
-func FindFileInPath(filename string) (string, error)
-func GetRootFolder(base string) (string, error)
-```
-
-### Package project_probe
-
-Import `github.com/guionardo/go/project_probe`
-
-Best-effort project detection across 7 languages (Go, Python, C#/.NET, JS/TS, Rust, Java/Kotlin, PHP). `Probe` never fails on content: unknown folders return `LanguageUnknown` with a nil error — errors are reserved for hard folder-level I/O failures. Detection runs a manifest-first cascade (go.mod → pyproject.toml → .csproj → package.json → Cargo.toml → pom.xml → composer.json) with first-match-wins ordering, stdlib-only parsing, and a never-fail read path.
-
-```go
-import "github.com/guionardo/go/project_probe"
-
-data, err := projectprobe.Probe("/path/to/project")
-if err != nil {
-    // hard folder-level I/O failure (missing, not a directory, permission)
-}
-// data.Language is LanguageUnknown when the content is unrecognized
-```
-
-### Package reflect_tools
-
-Import `github.com/guionardo/go/reflect_tools`
-
-```go
-// IsZeroValue checks if the provided value is considered a zero value.
-// Handles numeric types, strings, booleans, time.Time, time.Duration,
-// slices, arrays, maps, and pointers.
-func IsZeroValue(value any) bool
-```
-
-### Package release
-
-Import `github.com/guionardo/go/release`
-
-Complete self-update mechanism for Go CLI tools distributed via GitHub Releases. Includes version detection, update checking, SHA256-verified downloads, atomic binary replacement via an embedded swapper process, and automatic relaunch.
-
-Full documentation: [release/README.md](release/README.md)
-
-```go
-result := release.PerformSelfUpdate(context.Background())
-if result.Updated {
-    fmt.Println("Updated to", result.Release.TagName)
-    os.Exit(0)
-}
-if result.Err != nil {
-    log.Fatal(result.Err)
-}
-```
-
-Configure with functional options:
-
-```go
-release.PerformSelfUpdate(
-    context.Background(),
-    release.WithOwner("myorg"),
-    release.WithRepo("mycli"),
-    release.WithGitHubToken(os.Getenv("GITHUB_TOKEN")),
-)
-```
-
-#### Architecture
-
-1. Reads current version from `debug.ReadBuildInfo()`
-2. Checks GitHub Releases for newer version
-3. Downloads the platform-specific asset matching `runtime.GOOS`/`runtime.GOARCH`
-4. Verifies SHA256 digest (go-digest format)
-5. Extracts the embedded swapper binary
-6. Spawns swapper and exits
-7. Swapper performs atomic backup-rename-replace with checksum verification
-8. Swapper relaunches the new binary with original CLI args
-
-See [release/README.md](release/README.md) for GitHub workflow examples in Go, Python, and .NET.
-
-### Package set
-
-Import `github.com/guionardo/go/set`
-
-Generic set struct backed by a Go map.
-
-```go
-type Set[T comparable] map[T]struct{}
-
-s := set.New(1, 2, 3)
-s.Add(4)
-s.Has(2)           // true
-union := s.Union(other)
-```
-
-`Set[T]` supports JSON marshal/unmarshal and database/sql Scanner/Valuer.
-
-### Package shell_tools
-
-Import `github.com/guionardo/go/shell_tools`
-
-Utilities to parse and reconstruct simple shell-like argument lists.
-
-```go
-args := shelltools.NewQuotedShellArgs(`one "two three" 'four five'`)
-// args[0] = "one", args[1] = "two three", args[2] = "four five"
-```
-
-### Package time_tools
-
-Import `github.com/guionardo/go/time_tools`
-
-Flexible time parsing that tries multiple common layouts automatically, promoting successful templates for faster subsequent parses.
-
-```go
-t, err := timetools.Parse("2024-03-15T10:20:30Z")
-// t = 2024-03-15 10:20:30 +0000 UTC
-
-timetools.SetLayouts([]string{"2006-01-02", time.RFC3339})
-t, err = timetools.Parse("2024-12-25")
-```
-
-## 🤝 Contributing
-
-Bugs or contributions on new features can be made in the [issues page](https://github.com/guionardo/go/issues).
+A collection of reusable Go libraries — configuration, data structures, validators,
+caching, project detection, CLI self-update. Every package is independently importable
+and documented in its own README; the API reference lives on
+[pkg.go.dev](https://pkg.go.dev/github.com/guionardo/go).
 
 ## Installation
 
-The module requires **Go 1.26.4 or newer**. Add a package to your `go.mod` with `go get`:
+Requires **Go 1.26.4 or newer**. Add the module to your `go.mod`:
 
 ```bash
 go get github.com/guionardo/go
 ```
 
-All packages are independently importable from the single module, for example:
-
-```go
-import "github.com/guionardo/go/flow"
-import "github.com/guionardo/go/cache"
-import "github.com/guionardo/go/cache/mem"
-import "github.com/guionardo/go/config"
-```
-
-Because this is a library module (not a CLI), there is nothing to build or run at the top level — `go build` and `go vet` apply to the consuming project.
-
 ## Quick Start
 
-1. Add the module as a dependency:
+```go
+package main
 
-   ```bash
-   go get github.com/guionardo/go
-   ```
+import (
+	"context"
+	"fmt"
 
-2. Import and use a package from your own code:
+	"github.com/guionardo/go/cache/mem"
+	"github.com/guionardo/go/flow"
+)
 
-   ```go
-   package main
+func main() {
+	ctx := context.Background()
+	c := mem.New[string, string](ctx) // in-memory cache: default TTL, sweep, expired-entry cleanup
 
-   import (
-       "context"
-       "fmt"
+	_ = c.Set(ctx, "greeting", "hello")
 
-       "github.com/guionardo/go/cache/mem"
-       "github.com/guionardo/go/flow"
-   )
+	v, _ := c.Get(ctx, "greeting")
+	fmt.Println(flow.If(len(v) > 0, v, "default"))
+}
+```
 
-   func main() {
-       ctx := context.Background()
-       c := mem.New[string, string](ctx) // in-memory cache with default TTL, sweep + expired-entry cleanup
-       _ = c.Set(ctx, "greeting", "hello")
-       v, _ := c.Get(ctx, "greeting")
-       fmt.Println(flow.If(len(v) > 0, v, "default"))
-   }
-   ```
+## Packages
 
-3. Run it:
+| Package | What it does | Documentation |
+|---------|--------------|---------------|
+| `br_docs` | Brazilian document validation — CPF and CNPJ | [README](./br_docs/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/br_docs) |
+| `cache` | Generic key-value cache with 6 pluggable backends: mem, Redis, Valkey, Memcache, Postgres, SQLite | [README](./cache/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/cache) |
+| `config` | Typed configuration provider — YAML profiles, environment overrides, validation | [README](./config/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/config) |
+| `flow` | Control-flow helpers — ternary `If`, zero-value `Default`, insertion-ordered `OrderedMap` | [README](./flow/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/flow) |
+| `fraction` | Immutable fraction arithmetic over `int64` | [README](./fraction/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/fraction) |
+| `httptest_mock` | HTTP mock server for tests, with requests declared in code or in fixture files | [README](./httptest_mock/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/httptest_mock) |
+| `mid` | Cross-platform machine identifier (Linux, macOS, Windows) | [README](./mid/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/mid) |
+| `path_tools` | File and directory path helpers — existence, creation, Go-root detection | [README](./path_tools/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/path_tools) |
+| `project_probe` | Never-fail project detection across Go, Python, JavaScript, Rust, Java, PHP and C#/.NET | [README](./project_probe/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/project_probe) |
+| `reflect_tools` | Zero-value checking through reflection | [README](./reflect_tools/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/reflect_tools) |
+| `release` | Self-update through GitHub Releases — version check, digest verification, atomic swap, relaunch | [README](./release/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/release) |
+| `set` | Generic set with algebra (union, intersect, diff), JSON, and SQL scan/valuer support | [README](./set/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/set) |
+| `shell_tools` | Quoted shell-argument parsing and environment lookup | [README](./shell_tools/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/shell_tools) |
+| `time_tools` | Time parsing that tries a prioritized list of layouts | [README](./time_tools/README.md) · [API](https://pkg.go.dev/github.com/guionardo/go/time_tools) |
 
-   ```bash
-   go run .
-   ```
+## Development
 
-Each package is designed to be used independently — see the [Package Index](#package-index) for the
-full inventory and the per-package sections below for usage examples.
+Install the tooling and the commit hook once:
+
+```bash
+make deps
+pre-commit install
+```
+
+| Target | Purpose |
+|--------|---------|
+| `make test` | Run the full test suite |
+| `make coverage-quick` | Unit-only coverage gate — packages ≥80%, files ≥70%, total ≥75% |
+| `make coverage` | Unit + Docker E2E coverage, merged and gated |
+| `make lint` / `make lint-fix` | `golangci-lint` |
+| `make benchmark` / `make benchmark-quick` | Benchmark suite (mem always; Docker-backed providers when available) |
+| `make quality-report` | Regenerate `quality-report.md` (lint, vulns, coverage, metrics) |
+| `make swapper` | Regenerate the self-update binaries embedded by `release/` |
+
+**Clean checkout:** `release/embed_swapper.go` embeds the generated
+`release/swapper/swapper_*` binaries, so run `make swapper` before `go build ./...`
+or `go test ./...` on a fresh clone.
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/); every
+package documents itself through `doc.go`, a runnable `example_test.go`, and its own
+`README.md` — see [AGENTS.md](./AGENTS.md#documentation) for the rules.
+
+## Contributing
+
+Bugs and feature requests belong in the [issue tracker](https://github.com/guionardo/go/issues).
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the workflow.
 
 ## License
 
-Released under the [MIT License](LICENSE). Copyright (c) 2025 Guionardo Furlan.
+Released under the [MIT License](./LICENSE). Copyright (c) 2025 Guionardo Furlan.

@@ -18,6 +18,7 @@ import (
 	"github.com/guionardo/go/cache/memcache"
 	"github.com/guionardo/go/cache/postgres"
 	"github.com/guionardo/go/cache/redis"
+	"github.com/guionardo/go/cache/sqlite"
 	"github.com/guionardo/go/cache/valkey"
 )
 
@@ -235,6 +236,17 @@ func TestCacheE2E_Mem(t *testing.T) {
 			name: "in_memory",
 			fn: func(t *testing.T) cache.BatchCache[string, string] {
 				return mem.New[string, string](t.Context())
+			},
+		},
+	})
+}
+
+func TestCacheE2E_SQLite(t *testing.T) {
+	runCacheE2E(t, []providerCase{
+		{
+			name: "sqlite_memory",
+			fn: func(t *testing.T) cache.BatchCache[string, string] {
+				return sqlite.New[string, string](sqlite.WithMemory())
 			},
 		},
 	})

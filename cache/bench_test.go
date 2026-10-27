@@ -448,7 +448,9 @@ func runBatchBenchmarks(b *testing.B, c cache.BatchCache[string, string], name s
 
 // BenchmarkBatch quantifies the performance win of native batch operations
 // (MGet/MSet/MDel) against per-key sequential fallback across multiple batch
-// sizes. Uses the mem provider (zero-dependency).
+// sizes. Runs the mem provider (zero-dependency) plus the always-run sqlite
+// Memory and File families; the remaining provider families sit behind the
+// skipIfNoDocker Docker gate.
 func BenchmarkBatch(b *testing.B) {
 	c := mem.New[string, string](b.Context())
 	defer c.Close()

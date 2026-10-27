@@ -160,3 +160,19 @@ Plans:
 | 15. Provider Foundation + Core Semantics | v1.8 | 3/3 | Complete    | 2026-10-08 |
 | 16. Batch + Multi-Process Hardening | v1.8 | 5/5 | Complete    | 2026-10-26 |
 | 17. Delivery Hardening | v1.8 | 3/3 | Complete    | 2026-10-26 |
+
+### Phase 17.1: Fix error sentinel identity and MGet error propagation (INSERTED)
+
+**Goal**: The cache error contract tells the truth — sqlite's closed sentinel satisfies `errors.Is` for both `sqlite.ErrClosed` and `cache.ErrClosed`, and every provider error carries the `cache/sqlite:` prefix exactly once; `MGet`'s deferred-error exception is documented in both twin doc sites and logged at `Error`; and the package's `New(WithName(...))` headline path, benchmark doc comment and shared conformance harness all carry permanent, machine-checked evidence (v1.8 audit W1–W5).
+**Requirements**: TBD (inserted gap-closure phase — no REQ-IDs; closes audit items W1–W5)
+**Depends on:** Phase 17
+**Plans:** 2/2 plans complete
+
+Plans:
+**Wave 1**
+
+- [x] 17.1-01-PLAN.md — W1 sentinel identity + single prefix (tracer-led), W2 MGet doc/log level, cache-level sentinel docs (D-02/D-06)
+
+**Wave 2** *(blocked on Wave 1 — shares `cache/sqlite/sqlite_test.go`)*
+
+- [x] 17.1-02-PLAN.md — W3 sqlite conformance E2E row, W4 benchmark doc comment, W5 `New(WithName(...))` durability test

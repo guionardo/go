@@ -5,8 +5,10 @@ import (
 )
 
 // QuotedShellArgs splits a string into arguments, respecting quoted substrings.
-// Supports single and double quotes and backslash escaping (outside or inside double quotes).
-// Quotes are removed from returned arguments. All unicode whitespace is treated as separator.
+// Single and double quotes are honoured and removed from the returned arguments.
+// The only backslash sequence interpreted is "\ " (an escaped space), so a quote
+// cannot be escaped: `"hello\"world"` yields two arguments. All unicode
+// whitespace is treated as separator.
 type QuotedShellArgs []string
 
 func NewQuotedShellArgs(s string) QuotedShellArgs {

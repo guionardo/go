@@ -11,7 +11,7 @@
 //	import "github.com/guionardo/go/cache"
 //
 //	var c cache.Cache[string, string]
-//	c = mem.New[string, string]()
+//	c = mem.New[string, string](ctx) // ctx drives the background TTL sweeper
 //	c.Set(ctx, "key", "value")
 //	v, err := c.Get(ctx, "key")
 //
@@ -37,9 +37,10 @@
 //	MSet(ctx, items map[K]V, ttl ...time.Duration) — store multiple values with optional single TTL
 //	MDel(ctx, keys ...K)                 — delete multiple keys (idempotent)
 //
-// Each provider uses an optimal strategy: mem uses a single lock acquisition,
-// redis/valkey use pipelines, memcache uses GetMulti, postgres uses SendBatch,
-// sqlite uses chunked IN queries and a single-transaction prepared upsert.
+// Each provider uses its client library's single-round-trip primitive: mem takes
+// one lock acquisition, redis uses a go-redis Pipeline, valkey uses valkey-go
+// DoMulti, memcache uses GetMulti, postgres uses pgx SendBatch, and sqlite uses
+// chunked IN queries plus a single-transaction prepared upsert.
 // BatchCache[K,V] embeds Cache[K,V] for full backward compatibility.
 //
 // Configuration via functional options:
@@ -49,11 +50,16 @@
 //	    redis.WithDefaultTTL(5*time.Minute),
 //	)
 //
-// Sentinel errors (wrapped with provider prefix):
+// Sentinel errors:
 //
-//	var ErrMiss    = errors.New("cache: key not found")
-//	var ErrClosed  = errors.New("cache: cache is closed")
-//	var ErrCanceled = errors.New("cache: canceled") // wraps the waiter's ctx.Err()
+//	var ErrMiss   = errors.New("cache: key not found")
+//	var ErrClosed = errors.New("cache: cache is closed")
+//
+// cache.ErrMiss is honoured by every provider: the in-memory provider returns
+// it bare, while redis, valkey, memcache, postgres and sqlite wrap it with
+// their own prefix. cache.ErrClosed is the one with per-provider adoption —
+// cache/sqlite is currently the only provider that returns it; the others do
+// not signal close. Consumers branch with errors.Is, never with ==.
 //
 // SingleflightGetOrSet[K, V] is an exported helper that dedups concurrent
 // GetOrSet misses on the same key. Providers embed it to share one

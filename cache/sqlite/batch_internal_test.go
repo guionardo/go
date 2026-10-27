@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/guionardo/go/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -335,6 +337,7 @@ func TestMSetFunc(t *testing.T) {
 
 		err := c.MSetFunc(t.Context(), map[string]string{"k": "v"})
 		require.ErrorIs(t, err, ErrClosed)
+		require.ErrorIs(t, err, cache.ErrClosed)
 		require.ErrorContains(t, err, "cache/sqlite:")
 	})
 }
@@ -476,6 +479,45 @@ func TestMDelFunc(t *testing.T) {
 
 		err := c.MDelFunc(t.Context(), "a")
 		require.ErrorIs(t, err, ErrClosed)
+		require.ErrorIs(t, err, cache.ErrClosed)
 		require.ErrorContains(t, err, "cache/sqlite:")
 	})
+}
+
+// TestMGetClosedBranchLogsBelowError pins the WR-03 severity split at the
+// source level: check() returns both deferred open/validation errors and
+// ErrClosed, and only the former may log at Error. A log-capture test is not
+// viable here because logger() is a sync.OnceValue writing to the process-wide
+// default handler, so the branch shape itself is the property under test.
+func TestMGetClosedBranchLogsBelowError(t *testing.T) {
+	t.Parallel()
+
+	src, err := os.ReadFile("batch.go")
+	require.NoError(t, err)
+
+	body := string(src)
+
+	start := strings.Index(body, "func (c *sqliteCache[K, V]) MGetFunc")
+	require.NotEqual(t, -1, start, "MGetFunc must stay in batch.go")
+
+	end := strings.Index(body[start:], "// mgetChunk")
+	require.NotEqual(t, -1, end, "mgetChunk must follow MGetFunc")
+
+	fn := body[start : start+end]
+
+	closed := strings.Index(fn, "errors.Is(err, ErrClosed)")
+	require.NotEqual(t, -1, closed, "the closed case must be split from deferred errors")
+
+	elseAt := strings.Index(fn[closed:], "} else {")
+	require.NotEqual(t, -1, elseAt, "the closed branch must precede the deferred branch")
+
+	closedBranch := fn[closed : closed+elseAt]
+	require.Contains(t, closedBranch, `logger().Warn("cache/sqlite: batch get on closed cache"`,
+		"a closed cache is a lifecycle state, not a failure")
+	require.NotContains(t, closedBranch, "logger().Error",
+		"the ErrClosed branch must not log at Error")
+
+	deferred := fn[closed+elseAt:]
+	require.Contains(t, deferred, `logger().Error("cache/sqlite: batch get skipped"`,
+		"a deferred open/validation failure must still log at Error")
 }

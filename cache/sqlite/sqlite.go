@@ -42,8 +42,10 @@ type sqliteCache[K comparable, V any] struct {
 const cacheDirPerm = 0o700
 
 var (
-	// ErrClosed is returned by operations attempted on a closed cache.
-	ErrClosed = errors.New("cache/sqlite: cache is closed")
+	// ErrClosed is returned by operations attempted on a closed cache. It
+	// wraps cache.ErrClosed, so errors.Is matches both sentinels; consumers
+	// must compare with errors.Is, never with ==.
+	ErrClosed = fmt.Errorf("cache/sqlite: %w", cache.ErrClosed)
 
 	// ErrInvalidPath is returned when a path or cache name fails validation.
 	ErrInvalidPath = errors.New("cache/sqlite: invalid path")
@@ -56,7 +58,10 @@ var (
 // New creates a new SQLite cache provider with optional functional options.
 //
 // New never fails: open or validation errors are recorded and deferred, and
-// the first operation that needs the database returns them wrapped. Returns a
+// the first operation that needs the database returns them.
+// MGet is the exception: it returns an empty map, logging a deferred open
+// error at Error level and a closed-cache call at Warn, because its frozen
+// signature has no error channel. Returns a
 // cache.BatchCache sharing the in-memory singleflight GetOrSet; the returned
 // value also implements Optimizable (type-assert to reach Checkpoint/Vacuum).
 func New[K comparable, V any](opts ...Option) cache.BatchCache[K, V] {
@@ -174,13 +179,23 @@ func (c *sqliteCache[K, V]) bootstrap(ctx context.Context) error {
 
 // check returns the deferred open/validation error, or ErrClosed once the
 // cache has been closed. It is the first statement of every operation.
+//
+// Every error leaves this function carrying exactly one "cache/sqlite: "
+// prefix: ErrClosed is prefixed in its own definition and ErrInvalidPath
+// errors are prefixed in resolveLocation, so both are returned as-is; only a
+// bare error is wrapped here. Error identity — not message text — decides
+// whether a value is already prefixed (D-04).
 func (c *sqliteCache[K, V]) check() error {
 	if c.initErr != nil {
+		if errors.Is(c.initErr, ErrInvalidPath) {
+			return c.initErr
+		}
+
 		return fmt.Errorf("cache/sqlite: %w", c.initErr)
 	}
 
 	if c.closed.Load() {
-		return fmt.Errorf("cache/sqlite: %w", ErrClosed)
+		return ErrClosed
 	}
 
 	return nil
