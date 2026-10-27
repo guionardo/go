@@ -49,11 +49,14 @@
 //	    redis.WithDefaultTTL(5*time.Minute),
 //	)
 //
-// Sentinel errors (wrapped with provider prefix):
+// Sentinel errors:
 //
-//	var ErrMiss    = errors.New("cache: key not found")
-//	var ErrClosed  = errors.New("cache: cache is closed")
-//	var ErrCanceled = errors.New("cache: canceled") // wraps the waiter's ctx.Err()
+//	var ErrMiss   = errors.New("cache: key not found")
+//	var ErrClosed = errors.New("cache: cache is closed")
+//
+// Sentinel support is currently per-provider: cache/sqlite wraps
+// cache.ErrMiss and cache.ErrClosed, while the other providers return their
+// own errors. Consumers branch with errors.Is, never with ==.
 //
 // SingleflightGetOrSet[K, V] is an exported helper that dedups concurrent
 // GetOrSet misses on the same key. Providers embed it to share one
