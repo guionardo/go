@@ -196,13 +196,26 @@ queries and the prewarm alike.
 ## Benchmarks
 
 `cache/bench_test.go` compares, on the `mem` provider, a naive thundering herd against
-`GetOrSet`'s singleflight dedup (10/50/100/500 concurrent callers) and each batch method
-against a per-key loop (1/10/100/1000 keys); Docker-backed providers are benchmarked
-when Docker is available. The dedup difference is structural — one setter call instead
-of one per caller — while batch timings are machine-dependent and not consistently
-favourable at small batch sizes. Rerun before quoting figures:
+`GetOrSet`'s singleflight dedup (10/50/100/500 concurrent callers); it also runs batch
+methods against a per-key loop (1/10/100/1000 keys) and the single-key primitives across
+`mem` and both sqlite modes. Docker-backed providers are benchmarked when Docker is
+available. The dedup difference is structural — one setter call instead of one per
+caller — while batch timings are machine-dependent and not consistently favourable at
+small batch sizes. Rerun before quoting figures:
 
 ```bash
 make benchmark        # full suite, Docker-backed providers when available
 make benchmark-quick  # fast iteration
 ```
+
+The suite is explicit about what each arm times, so the numbers stay comparable:
+
+- **Key space is bounded.** Batch and primitive arms draw keys from a 1024-key ring,
+  so a file-backed run measures the operation rather than a database growing with
+  `b.N`.
+- **`MDel` arms time only the delete.** The `Set` calls that make the keys exist run
+  with the timer stopped; the reported ns/op is the batch (or per-key) delete alone.
+- **`GetOrSet` measures the miss path.** The key is deleted before every call
+  (untimed), so the setter runs each iteration and the figure is not a warm hit.
+- **`Delete` measures a `Set`+`Delete` cycle.** Removing an existing key requires
+  creating it first, and both halves are timed.
