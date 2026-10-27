@@ -55,6 +55,35 @@ The CI runs tests on Linux, macOS, and Windows. Known platform differences:
 - Follow Conventional Commits format
 - Minimal external dependencies — prefer stdlib solutions
 
+## Documentation
+
+Every package documents itself in three places, each with a distinct job and no
+duplication between them:
+
+| Surface | File | Contains |
+|---------|------|----------|
+| Package doc | `doc.go` | `// Package <name> provides …` — the contract: what it does, its semantics, its gotchas. No tutorials. |
+| Runnable usage | `example_test.go` | At least one `Example…` with an `// Output:` block, so `go test` proves the example still works. |
+| Narrative detail | `README.md` in the package directory | The full story: usage, options, comparisons, limitations. |
+
+The root `README.md` is an **index only**: badges, pitch, installation, quick start,
+development, and one row per package (short description + relative link to that
+package's `README.md`). Package detail never lives in the root README.
+
+Rules:
+
+- Behaviour changes update `doc.go`, the package `README.md`, and its example **in the
+  same commit**. Documentation drift is a defect, not a chore.
+- Every exported symbol has a doc comment (`godoclint` enforces the package prefix).
+- Examples must compile and assert through `// Output:` — an example without an
+  output block proves nothing.
+- `main` packages are exempt from `doc.go`, and from `example_test.go` when they
+  cannot run under `go test` (`cmd/example-updater`, `release/swapper`).
+- `cache` keeps **one** `README.md` for the shared architecture plus the backend
+  matrix; each backend's specifics live in its own `doc.go` and `example_test.go`.
+  A backend earns its own README only when its story outgrows a table row.
+- `CONTRIBUTING.md` and `LICENSE` own their content; the root README only links to them.
+
 ## Packages
 
 | Package | Description |

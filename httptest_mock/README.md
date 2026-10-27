@@ -1,44 +1,24 @@
-# httptestmock
+# httptest_mock
 
-A Go library for creating HTTP mock servers in tests using declarative JSON/YAML mock definitions.
+HTTP mock server framework for tests: declare request/response mocks in YAML, JSON, or Go code, serve them from an `httptest.Server`, and match requests by method, path, query parameters, path parameters, headers, and body.
 
-## Overview
+Part of [`github.com/guionardo/go`](../README.md) · API reference: [pkg.go.dev](https://pkg.go.dev/github.com/guionardo/go/httptest_mock)
 
-`httptestmock` simplifies HTTP integration testing by allowing you to define request/response mocks in external files. Instead of writing verbose mock handlers in Go code, you declare your expected requests and responses in human-readable YAML or JSON files.
-
-## Features
-
-- **Declarative mocks**: Define mocks in YAML or JSON files
-- **Automatic cleanup**: Server closes automatically when the test ends
-- **Request matching**: Match requests by method, path (including path parameters with `{param}` syntax), query parameters, headers, and body
-- **Validation**: Built-in validation for mock definitions using struct tags
-- **Flexible responses**: Support for JSON, string, and byte body responses with custom headers and status codes
-- **Automatic JSON headers**: When `response.body` is an object/map, the library JSON-encodes it and sets `Content-Type: application/json` automatically (unless you override it)
-- **Response delays**: Simulate network latency or processing time with configurable delays
-- **Partial matching**: Accept requests even when not all parameters match (useful for flexible testing)
-- **Request assertions**: Verify that mocks were called the expected number of times
-- **Post-request hooks**: Modify responses or perform actions before sending responses
-- **Debugging support**: Add the matched mock name to response headers for easier debugging
-- **Dynamic mock management**: Add new mocks to running servers at runtime
-- **Structured logging**: Optional slog.Logger integration for structured logging
-- **Helper utilities**: Load mocks from files, retrieve handlers from servers, and more
-- **Builder API**: Fluent helpers to build mocks in code (`NewMock`, `FastServe`) and create custom handlers
-- **Captured request values**: Access matched `{path}` params, query params, and headers from inside custom handlers
-- **Cross-platform header matching**: Header keys are normalized for comparison (lowercase, underscores→hyphens), so `API_KEY` matches `api-key` on all platforms
-
-## Installation
+## Install
 
 ```bash
-go get github.com/guionardo/go/httptest_mock@latest
+go get github.com/guionardo/go/httptest_mock
 ```
 
-## Quick Start
+## Usage
 
-### 1. Create a mock file
+Mocks can come from files or from code. Both end up in the same `MockHandler` and follow the same matching rules.
 
-Create a directory for your mocks (e.g., `mocks/`) and add a YAML or JSON file:
+### Mocks from files
 
-#### **mocks/get_user.yaml**
+`WithRequestsFrom` loads every `.json`, `.yaml`, and `.yml` file in a directory (top level only, subdirectories are skipped) or explicit file paths.
+
+`mocks/get_user.yaml`:
 
 ```yaml
 name: get_user
@@ -55,7 +35,7 @@ response:
     Content-Type: "application/json"
 ```
 
-### 2. Use in your test
+Then, in your test:
 
 ```go
 package mypackage_test
@@ -87,6 +67,42 @@ func TestGetUser(t *testing.T) {
     require.JSONEq(t, `{"id":123,"name":"John Doe","email":"john@example.com"}`, string(body))
 }
 ```
+
+### Mocks from code
+
+`NewMock` builds the same structure with a fluent API; `FastServe` registers it on a server of its own, `WithRequests` registers it alongside other mocks.
+
+```go
+mock := httptestmock.NewMock(http.MethodGet, "/api/resource").
+    WithQueryParam("page", "1").
+    WithResponseStatus(http.StatusOK).
+    WithResponseBody(map[string]string{"key": "value"})
+
+server, assertFunc := mock.FastServe(t) // or SetupServer(t, httptestmock.WithRequests(mock))
+defer assertFunc(t)
+```
+
+Use `WithCustomHandler` when the response has to be computed from the request: the handler reads matched values with `m.GetPathValue`, `m.GetQueryValue`, and `m.GetHeaderValue`.
+
+## Features
+
+- **Declarative mocks**: Define mocks in YAML or JSON files
+- **Automatic cleanup**: Server closes automatically when the test ends
+- **Request matching**: Match requests by method, path (including path parameters with `{param}` syntax), query parameters, headers, and body
+- **Validation**: Built-in validation for mock definitions using struct tags
+- **Flexible responses**: Support for JSON, string, and byte body responses with custom headers and status codes
+- **Automatic JSON headers**: When `response.body` is an object/map, the library JSON-encodes it and sets `Content-Type: application/json` automatically (unless you override it)
+- **Response delays**: Simulate network latency or processing time with configurable delays
+- **Partial matching**: Accept requests even when not all parameters match (useful for flexible testing)
+- **Request assertions**: Verify that mocks were called the expected number of times
+- **Post-request hooks**: Modify responses or perform actions before sending responses
+- **Debugging support**: Add the matched mock name to response headers for easier debugging
+- **Dynamic mock management**: Add new mocks to running servers at runtime
+- **Structured logging**: Optional slog.Logger integration for structured logging
+- **Helper utilities**: Load mocks from files, retrieve handlers from servers, and more
+- **Builder API**: Fluent helpers to build mocks in code (`NewMock`, `FastServe`) and create custom handlers
+- **Captured request values**: Access matched `{path}` params, query params, and headers from inside custom handlers
+- **Cross-platform header matching**: Header keys are normalized for comparison (lowercase, underscores→hyphens), so `API_KEY` matches `api-key` on all platforms
 
 ## Mock File Structure
 
@@ -230,9 +246,7 @@ httptestmock.WithExtraLogger(logger)
 
 #### WithAcceptingPartialMatch
 
-Enables partial matching for requests. When partial matching is enabled, requests that matches at least `method` and `path` will be considered a match. Otherwise, it must fully match all criteria to be considered a match.
-
-This is useful when you want strict matching behavior and don't want to see candidate mocks in logs or responses.
+Enables handler-wide partial matching. With it, a request that matches `method` and `path` but misses another criterion becomes a partial match; a mock only accepts that partial match when it also sets `partial_match: true`, otherwise it is logged as a candidate. Disabled by default, so anything short of a full match is a non-match.
 
 ```go
 httptestmock.WithAcceptingPartialMatch()
@@ -294,7 +308,7 @@ if err != nil {
 
 ## Request Matching
 
-Requests are matched in the order they are defined. The first matching mock wins.
+Mocks are grouped by `method + path`; within a group they are tried in registration order and the first full match wins.
 
 ### Full Match
 
@@ -304,16 +318,16 @@ A request is considered a **full match** when:
 2. **Path** matches exactly or all path parameters match
 3. **Query parameters** (if specified in mock) all match
 4. **Path parameters** (if specified in mock) all match
-5. **Headers**: header names are matched case-insensitively (per HTTP spec), but header values are matched case-sensitively
+5. **Headers**: header names are normalized (lowercase, `_` → `-`) and compared case-insensitively; header values are compared case-sensitively
 6. **Body** (if specified in mock) matches
 
 ### Partial Match
 
-When a request matches method and path but not all other criteria, it's a **partial match**. If `partial_match: true` is set in the mock, the mock will accept the request despite missing parameters. This is useful for flexible testing scenarios.
+When a request matches method and path but not all other criteria, it's a **partial match**. Two switches must both be on for the mock to answer it: the handler-wide `WithAcceptingPartialMatch()` option and `partial_match: true` on the individual mock. This is useful for flexible testing scenarios.
 
-If no full match is found and partial matches exist without `partial_match: true`, the server returns `404 Not Found` with details about candidate mocks.
+If no full match is found, the server returns `404 Not Found`; candidate mocks and the criteria that failed are written to the test log.
 
-**Note**: You must enable partial matching entirely using the `WithAcceptingPartialMatch()` option. When disabled, partial matches are treated as no match and return `404 Not Found`.
+**Note**: partial matching is off by default. With `WithAcceptingPartialMatch()` not enabled, a partial match is treated as no match and returns `404 Not Found`.
 
 ### Path Parameters
 
@@ -330,11 +344,7 @@ This will match `/api/v1/users/123` and extract `id=123` for validation against 
 
 ### No Match Behavior
 
-When a request doesn't match any mock:
-
-- **No match at all**: Returns `404 Not Found`
-- **Partial match exists** (but `partial_match` not enabled): Returns `400 Bad Request` with logging of candidate mocks for debugging
-- **Partial matching disabled** (using `WithAcceptingPartialMatch()`): All non-full matches return `404 Not Found`
+When a request doesn't match any mock, the server always returns `404 Not Found`. What varies is the logging: a partial match is logged with the criteria that failed and listed as a candidate, while a request that matches no method+path group is logged as unmatched.
 
 ## Response Body Types
 
@@ -591,31 +601,24 @@ func TestDynamicMockManagement(t *testing.T) {
 }
 ```
 
-### Strict Matching (Disable Partial Match)
+### Partial vs Strict Matching
 
-Strict matching requests is enabled by default.
+Strict matching is the default: a mock answers only when every criterion in its `request` block matches.
 
-You must individually allow the mocks to accept partial matching setting the `partial_match` key of the `request` object in the mock file, or setting the return of the `AcceptsPartialMatch()` method from custom handlers.
+Lenient matching takes both switches — `WithAcceptingPartialMatch()` on the server and `partial_match: true` on the individual mock. Only then does a request that matches method and path but misses a query param, header, or body still receive the mock's response.
 
 ```go
-func TestStrictMatching(t *testing.T) {
-    // Setup server with strict matching enabled
+func TestPartialMatch(t *testing.T) {
     server, assertFunc := httptestmock.SetupServer(t,
         httptestmock.WithRequestsFrom("mocks"),
         httptestmock.WithAcceptingPartialMatch())
     defer assertFunc(t)
 
-    // This request will only match if ALL criteria match
-    // Partial matches will return 404 instead of 400
+    // /api/v1/users/123 matches method+path. A missing header makes it a
+    // partial match, accepted only by mocks that set partial_match: true.
     resp, err := http.Get(server.URL + "/api/v1/users/123")
     require.NoError(t, err)
-    defer resp.Body.Close()
-
-    // If the mock doesn't fully match (e.g., missing headers),
-    // it returns 404 instead of showing candidate mocks
-    if resp.StatusCode == http.StatusNotFound {
-        t.Log("No full match found - strict matching enforced")
-    }
+    defer func() { _ = resp.Body.Close() }()
 }
 ```
 
